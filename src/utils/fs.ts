@@ -1,0 +1,143 @@
+import { readdir, readFile } from "fs/promises";
+import path from "path";
+
+const IGNORE_DIRS = new Set([
+  "node_modules",
+  "vendor",
+  ".git",
+  "dist",
+  "build",
+  "target",
+  "__pycache__",
+  ".tox",
+  ".venv",
+  "venv",
+  ".mypy_cache",
+  ".gradle",
+  "bin",
+  "obj",
+  ".dart_tool",
+  ".pub-cache",
+  "Pods",
+  ".next",
+  ".nuxt",
+  ".output",
+  "coverage",
+  ".turbo",
+  "deps",
+]);
+
+/** Dot-prefixed directories that should be included when scanning repo structure. */
+const INCLUDE_DOT_DIRS = new Set([
+  ".github",
+  ".circleci",
+  ".husky",
+  ".changeset",
+  ".buildkite",
+  ".vscode",
+  ".azure",
+]);
+
+export interface WalkOptions {
+  /** File extensions to include (e.g. new Set([".ts", ".py"])). All files if undefined. */
+  extensions?: ReadonlySet<string>;
+  /** Include specific dot-prefixed directories (.github, .circleci, etc.) */
+  includeDotDirs?: boolean;
+}
+
+/**
+ * Recursively walk a directory, yielding file paths.
+ * Skips common non-source directories for performance.
+ */
+export async function* walkFiles(
+  rootPath: string,
+  options?: WalkOptions,
+): AsyncGenerator<string> {
+  const entries = await readdir(rootPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (IGNORE_DIRS.has(entry.name)) continue;
+      if (entry.name.startsWith(".")) {
+        if (!options?.includeDotDirs || !INCLUDE_DOT_DIRS.has(entry.name)) {
+          continue;
+        }
+      }
+      yield* walkFiles(path.join(rootPath, entry.name), options);
+    } else if (entry.isFile()) {
+      if (options?.extensions) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (!options.extensions.has(ext)) continue;
+      }
+      yield path.join(rootPath, entry.name);
+    }
+  }
+}
+
+/**
+ * Find files matching specific filename patterns.
+ */
+export async function findFiles(
+  rootPath: string,
+  fileNames: readonly string[],
+  options?: { includeDotDirs?: boolean },
+): Promise<string[]> {
+  const results: string[] = [];
+  const extensionSet = new Set(
+    fileNames.filter((f) => f.startsWith("*.")).map((f) => f.slice(1)),
+  );
+  const exactNameSet = new Set(fileNames.filter((f) => !f.startsWith("*")));
+
+  for await (const filePath of walkFiles(rootPath, {
+    includeDotDirs: options?.includeDotDirs,
+  })) {
+    const baseName = path.basename(filePath);
+    if (exactNameSet.has(baseName)) {
+      results.push(filePath);
+      continue;
+    }
+    const ext = path.extname(baseName);
+    if (extensionSet.has(ext)) {
+      results.push(filePath);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Read a file as UTF-8 text, returning undefined on any error.
+ */
+export const readText = async (
+  filePath: string,
+): Promise<string | undefined> => {
+  try {
+    return await readFile(filePath, "utf-8");
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Strip trailing commas from JSON-like content (JSONC support).
+ */
+const stripTrailingCommas = (text: string): string =>
+  text.replace(/,(\s*[}\]])/g, "$1");
+
+/**
+ * Read and parse a JSON file, returning undefined on any error.
+ * Supports JSONC (trailing commas).
+ */
+export const readJson = async <T>(filePath: string): Promise<T | undefined> => {
+  try {
+    const content = await readFile(filePath, "utf-8");
+    return JSON.parse(content) as T;
+  } catch {
+    try {
+      const content = await readFile(filePath, "utf-8");
+      return JSON.parse(stripTrailingCommas(content)) as T;
+    } catch {
+      return undefined;
+    }
+  }
+};

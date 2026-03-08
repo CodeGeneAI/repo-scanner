@@ -1,0 +1,26 @@
+{
+  "name": "@codegeneai/repo-scanner",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Universal repository structure scanner for any codebase",
+  "bin": {
+    "repo-scanner": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun src/bin.ts",
+    "typecheck": "bun --bun tsc --noEmit",
+    "test:unit": "files=$(find . -type f \\( -name '*.unit.spec.ts' -o -name '*.unit.spec.tsx' -o -name '*.unit.test.ts' -o -name '*.unit.test.tsx' \\)); if [ -n \"$files\" ]; then bun test $files; else echo 'No unit tests found'; fi",
+    "lint": "biome check --write --diagnostic-level=error",
+    "clean": "rm -rf dist .turbo coverage .vitest build lib out tmp temp .cache node_modules tsconfig.tsbuildinfo"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@codegeneai/typescript-config": "workspace:*",
+    "@types/bun": "catalog:tooling",
+    "typescript": "catalog:tooling",
+    "vitest": "catalog:testing"
+  }
+}

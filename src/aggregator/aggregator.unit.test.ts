@@ -1,0 +1,226 @@
+import { describe, expect, it } from "vitest";
+import type { DetectorResult } from "../detectors/types";
+import { aggregate } from "./aggregator";
+
+describe("aggregate", () => {
+  const scanPath = "/tmp/test-repo";
+  const durationMs = 42;
+
+  it("merges findings from multiple detectors into correct categories", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [
+          { value: "TypeScript", confidence: 1.0, evidence: ["10 files"] },
+          { value: "Python", confidence: 0.8, evidence: ["3 files"] },
+        ],
+      },
+      {
+        detectorId: "framework",
+        findings: [
+          { value: "React", confidence: 1.0, evidence: ["react dep"] },
+        ],
+      },
+      {
+        detectorId: "ci",
+        findings: [
+          {
+            value: "GitHub Actions",
+            confidence: 1.0,
+            evidence: [".github/workflows"],
+          },
+        ],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.inventory.languages).toContain("TypeScript");
+    expect(result.inventory.languages).toContain("Python");
+    expect(result.inventory.frameworks).toContain("React");
+    expect(result.buildAndTest.ciSystems).toContain("GitHub Actions");
+  });
+
+  it("deduplicates values within a category", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [
+          { value: "TypeScript", confidence: 1.0, evidence: ["ext"] },
+          { value: "TypeScript", confidence: 0.8, evidence: ["manifest"] },
+        ],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    // Set-based dedup means TypeScript appears once
+    expect(
+      result.inventory.languages.filter((l) => l === "TypeScript"),
+    ).toHaveLength(1);
+  });
+
+  it("sets signals correctly from detector signals", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "ci",
+        findings: [
+          {
+            value: "GitHub Actions",
+            confidence: 1.0,
+            evidence: ["workflows"],
+          },
+        ],
+        signals: { hasCi: true },
+      },
+      {
+        detectorId: "repo-tools",
+        findings: [],
+        signals: { hasReadme: true },
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.signals.hasCi).toBe(true);
+    expect(result.signals.hasReadme).toBe(true);
+    expect(result.signals.hasContainerization).toBe(false);
+    expect(result.signals.hasIaC).toBe(false);
+  });
+
+  it("derives hasCi from ci detector findings", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "ci",
+        findings: [
+          { value: "GitLab CI", confidence: 1.0, evidence: ["found"] },
+        ],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+    expect(result.signals.hasCi).toBe(true);
+  });
+
+  it("derives hasContainerization from containerization signals", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "containerization",
+        findings: [
+          { value: "Docker", confidence: 1.0, evidence: ["Dockerfile"] },
+        ],
+        signals: { hasContainerization: true },
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+    expect(result.signals.hasContainerization).toBe(true);
+  });
+
+  it("merges commands from multiple detectors", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "build",
+        findings: [],
+        commands: {
+          build: ["npm run build"],
+          test: ["npm test"],
+        },
+      },
+      {
+        detectorId: "testing",
+        findings: [],
+        commands: {
+          test: ["vitest run"],
+        },
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.buildAndTest.buildCommands).toContain("npm run build");
+    expect(result.buildAndTest.testCommands).toContain("npm test");
+    expect(result.buildAndTest.testCommands).toContain("vitest run");
+  });
+
+  it("sets monorepo flag from monorepo detector findings", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1.0, evidence: ["turbo.json"] },
+          { value: "monorepo", confidence: 1.0, evidence: ["detected"] },
+        ],
+        componentHints: [
+          { path: "packages/foo", name: "foo" },
+          { path: "packages/bar", name: "bar" },
+        ],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.architecture.monorepo).toBe(true);
+    expect(result.architecture.components).toHaveLength(2);
+    const names = result.architecture.components.map((c) => c.name);
+    expect(names).toContain("foo");
+    expect(names).toContain("bar");
+  });
+
+  it("sets monorepo false when no monorepo findings", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "monorepo",
+        findings: [],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+    expect(result.architecture.monorepo).toBe(false);
+  });
+
+  it("includes scanPath and durationMs in result", () => {
+    const result = aggregate(scanPath, durationMs, []);
+
+    expect(result.scanPath).toBe(scanPath);
+    expect(result.durationMs).toBe(durationMs);
+    expect(result.timestamp).toBeDefined();
+  });
+
+  it("returns sorted arrays", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [
+          { value: "Python", confidence: 0.8, evidence: [] },
+          { value: "Go", confidence: 0.8, evidence: [] },
+          { value: "TypeScript", confidence: 1.0, evidence: [] },
+        ],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.inventory.languages).toEqual(["Go", "Python", "TypeScript"]);
+  });
+
+  it("uses OR semantics for signals across detectors", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [],
+        signals: { hasTests: false },
+      },
+      {
+        detectorId: "testing",
+        findings: [
+          { value: "Vitest", confidence: 1.0, evidence: ["vitest.config"] },
+        ],
+        signals: { hasTests: true },
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+    expect(result.signals.hasTests).toBe(true);
+  });
+});
