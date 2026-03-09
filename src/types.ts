@@ -34,6 +34,8 @@ export interface RepoScanResult {
     readonly dependencyManagers: readonly string[];
     readonly repoTools: readonly string[];
     readonly envVars: readonly EnvVarInfo[];
+    readonly runtimes: readonly RuntimeInfo[];
+    readonly apiSurface?: ApiSurface;
     readonly namingConventions?: readonly {
       readonly category: string;
       readonly dominantStyle: string;
@@ -91,6 +93,27 @@ export interface EnvVarInfo {
   readonly required: boolean;
   readonly definedInConfig: boolean;
   readonly frameworkPrefix?: string;
+}
+
+export interface RuntimeInfo {
+  readonly language: string;
+  readonly version: string;
+  readonly source: string;
+  readonly file: string;
+}
+
+export interface ApiEndpoint {
+  readonly method: string;
+  readonly path: string;
+  readonly file: string;
+  readonly line: number;
+  readonly framework: string;
+}
+
+export interface ApiSurface {
+  readonly endpoints: readonly ApiEndpoint[];
+  readonly protocols: readonly string[];
+  readonly frameworksUsed: readonly string[];
 }
 
 export interface CliOptions {

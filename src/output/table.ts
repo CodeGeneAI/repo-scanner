@@ -12,6 +12,22 @@ const section = (title: string) => `\n${BOLD}${CYAN}${title}${RESET}\n`;
 const list = (items: readonly string[]) =>
   items.length > 0 ? items.join(", ") : `${DIM}(none)${RESET}`;
 
+/** Derive protocol from method. */
+const deriveProtocol = (method: string): string => {
+  switch (method) {
+    case "QUERY":
+    case "MUTATION":
+    case "SUBSCRIPTION":
+      return "GraphQL";
+    case "RPC":
+      return "gRPC";
+    case "WS":
+      return "WebSocket";
+    default:
+      return "REST";
+  }
+};
+
 export const renderTable = (
   result: RepoScanResult,
   stream: NodeJS.WritableStream,
@@ -98,6 +114,55 @@ export const renderTable = (
       w(
         `  ${YELLOW}${cat}${RESET} ${style} ${pct}  ${DIM}(${nc.sampleSize} samples)${RESET}\n`,
       );
+    }
+  }
+
+  // Runtimes
+  if (result.inventory.runtimes.length > 0) {
+    w(section("Runtimes"));
+    for (const r of result.inventory.runtimes) {
+      const lang = r.language.padEnd(12);
+      const ver = r.version.padEnd(16);
+      w(
+        `  ${YELLOW}${lang}${RESET} ${ver} ${DIM}(${r.source} — ${r.file})${RESET}\n`,
+      );
+    }
+  }
+
+  // API Surface
+  if (
+    result.inventory.apiSurface &&
+    result.inventory.apiSurface.endpoints.length > 0
+  ) {
+    const api = result.inventory.apiSurface;
+    w(section("API Surface"));
+    w(`  Protocols:  ${api.protocols.join(", ")}\n`);
+    w(`  Frameworks: ${api.frameworksUsed.join(", ")}\n`);
+    w(`  Endpoints:  ${api.endpoints.length}\n`);
+
+    // Group by protocol
+    const byProtocol = new Map<string, (typeof api.endpoints)[number][]>();
+    for (const ep of api.endpoints) {
+      const proto = deriveProtocol(ep.method);
+      const group = byProtocol.get(proto);
+      if (group) group.push(ep);
+      else byProtocol.set(proto, [ep]);
+    }
+
+    const MAX_SHOWN = 10;
+    for (const [proto, endpoints] of byProtocol) {
+      w(`\n  ${BOLD}${proto}${RESET} (${endpoints.length}):\n`);
+      const shown = endpoints.slice(0, MAX_SHOWN);
+      for (const ep of shown) {
+        const method = ep.method.padEnd(8);
+        const path = ep.path.padEnd(30);
+        w(
+          `    ${YELLOW}${method}${RESET} ${path} ${DIM}(${ep.framework} — ${ep.file}:${ep.line})${RESET}\n`,
+        );
+      }
+      if (endpoints.length > MAX_SHOWN) {
+        w(`    ${DIM}... +${endpoints.length - MAX_SHOWN} more${RESET}\n`);
+      }
     }
   }
 

@@ -16,7 +16,7 @@ src/
   types.ts            # Output schema (RepoScanResult, Component, etc.)
   index.ts            # Public API exports
 
-  detectors/          # 12 independent detectors (one per concern area)
+  detectors/          # 16 independent detectors (one per concern area)
     types.ts          # Detector/Finding/DetectorResult interfaces
     registry.ts       # registerDetector / getDetectors
     init.ts           # Imports all detectors to register them
@@ -32,6 +32,10 @@ src/
     linting.ts        # Linter/formatter config detection
     build.ts          # Build system + command extraction
     repo-tools.ts     # Git hooks, changesets, AI config, etc.
+    env/              # Environment variable detection (14 language extractors)
+    naming-convention.ts  # Code naming convention analysis
+    runtime.ts        # Runtime version detection (.nvmrc, go.mod, etc.)
+    api/              # API surface detection (REST, GraphQL, gRPC, WebSocket)
 
   aggregator/
     aggregator.ts         # Merges DetectorResult[] → RepoScanResult

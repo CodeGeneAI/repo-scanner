@@ -1,9 +1,11 @@
 import type { DetectorResult } from "../detectors/types";
 import type {
+  ApiSurface,
   Component,
   EnvVarInfo,
   LanguageStats,
   RepoScanResult,
+  RuntimeInfo,
 } from "../types";
 import { classifyComponent } from "./component-classifier";
 
@@ -38,6 +40,8 @@ export const aggregate = (
   let totalLinesOfCode = 0;
   let isMonorepo = false;
   let envVars: readonly EnvVarInfo[] = [];
+  let runtimes: readonly RuntimeInfo[] = [];
+  let apiSurface: ApiSurface | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -152,6 +156,19 @@ export const aggregate = (
       }));
     }
 
+    // Extract runtime details
+    if (
+      result.detectorId === "runtime" &&
+      Array.isArray(result.metadata?.runtimeDetails)
+    ) {
+      runtimes = result.metadata.runtimeDetails as RuntimeInfo[];
+    }
+
+    // Extract API surface
+    if (result.detectorId === "api-surface" && result.metadata?.apiSurface) {
+      apiSurface = result.metadata.apiSurface as ApiSurface;
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -176,6 +193,8 @@ export const aggregate = (
       dependencyManagers: sorted(dependencyManagers),
       repoTools: sorted(repoTools),
       envVars,
+      runtimes,
+      apiSurface,
       namingConventions,
     },
     architecture: { monorepo: isMonorepo, components },
