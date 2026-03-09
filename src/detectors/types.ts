@@ -22,6 +22,8 @@ export interface DetectorResult {
     readonly name?: string;
     readonly description?: string;
   }[];
+  /** Optional structured metadata for the aggregator. */
+  readonly metadata?: Record<string, unknown>;
   /** Optional signal overrides. */
   readonly signals?: Partial<{
     readonly hasReadme: boolean;

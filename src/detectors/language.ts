@@ -1,6 +1,26 @@
-import type { FileIndex } from "../utils/file-index";
+import { readFile } from "fs/promises";
+import type { LanguageStats } from "../types";
+import { mapWithConcurrency } from "../utils/concurrency";
+import type { FileIndex, IndexedFile } from "../utils/file-index";
 import { registerDetector } from "./registry";
 import type { DetectorResult, Finding } from "./types";
+
+/** Count newlines in a file. Returns 0 on read errors. */
+const countLines = async (filePath: string): Promise<number> => {
+  try {
+    const content = await readFile(filePath, "utf-8");
+    if (content.length === 0) return 0;
+    let count = 0;
+    for (let i = 0; i < content.length; i++) {
+      if (content.charCodeAt(i) === 10) count++;
+    }
+    // A non-empty file with no trailing newline still has at least 1 line
+    if (content.charCodeAt(content.length - 1) !== 10) count++;
+    return count;
+  } catch {
+    return 0;
+  }
+};
 
 /** Extension → language name mapping. */
 const EXT_TO_LANGUAGE: ReadonlyMap<string, string> = new Map([
@@ -77,15 +97,22 @@ const EXT_MANIFEST_CONFIRMS: ReadonlyMap<string, string> = new Map([
   [".fsproj", "F#"],
 ]);
 
+/** Max concurrent file reads for LoC counting. */
+const LOC_CONCURRENCY = 64;
+
 registerDetector({
   id: "language",
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
     const counts = new Map<string, number>();
+    const filesByLang = new Map<string, IndexedFile[]>();
 
     for (const file of index.all()) {
       const lang = EXT_TO_LANGUAGE.get(file.ext);
       if (lang) {
         counts.set(lang, (counts.get(lang) ?? 0) + 1);
+        const list = filesByLang.get(lang);
+        if (list) list.push(file);
+        else filesByLang.set(lang, [file]);
       }
     }
 
@@ -141,9 +168,42 @@ registerDetector({
       }
     }
 
+    // Count lines of code per language concurrently
+    const allLangFiles = [...filesByLang.entries()].flatMap(([lang, files]) =>
+      files.map((f) => ({ lang, path: f.path })),
+    );
+    const lineCounts = await mapWithConcurrency(
+      allLangFiles,
+      LOC_CONCURRENCY,
+      async (item) => ({ lang: item.lang, lines: await countLines(item.path) }),
+    );
+    const locByLang = new Map<string, number>();
+    for (const { lang, lines } of lineCounts) {
+      locByLang.set(lang, (locByLang.get(lang) ?? 0) + lines);
+    }
+
+    // Compute language stats (file counts + percentages + LoC)
+    const totalFiles = [...counts.values()].reduce((sum, n) => sum + n, 0);
+    const totalLinesOfCode = [...locByLang.values()].reduce(
+      (sum, n) => sum + n,
+      0,
+    );
+    const languageStats: LanguageStats[] =
+      totalFiles > 0
+        ? [...counts.entries()]
+            .map(([name, fileCount]) => ({
+              name,
+              fileCount,
+              linesOfCode: locByLang.get(name) ?? 0,
+              percentage: Math.round((fileCount / totalFiles) * 1000) / 10,
+            }))
+            .sort((a, b) => b.percentage - a.percentage)
+        : [];
+
     return {
       detectorId: "language",
       findings: findings.sort((a, b) => b.confidence - a.confidence),
+      metadata: { languageStats, totalFiles, totalLinesOfCode },
     };
   },
 });

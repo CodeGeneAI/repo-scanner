@@ -204,6 +204,56 @@ describe("aggregate", () => {
     expect(result.inventory.languages).toEqual(["Go", "Python", "TypeScript"]);
   });
 
+  it("forwards languageStats and totals from language detector metadata", () => {
+    const stats = [
+      { name: "TypeScript", fileCount: 10, linesOfCode: 500, percentage: 71.4 },
+      { name: "Python", fileCount: 4, linesOfCode: 200, percentage: 28.6 },
+    ];
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [
+          { value: "TypeScript", confidence: 1.0, evidence: [] },
+          { value: "Python", confidence: 0.8, evidence: [] },
+        ],
+        metadata: {
+          languageStats: stats,
+          totalFiles: 14,
+          totalLinesOfCode: 700,
+        },
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.inventory.languageStats).toEqual(stats);
+    expect(result.inventory.totalFiles).toBe(14);
+    expect(result.inventory.totalLinesOfCode).toBe(700);
+  });
+
+  it("returns empty languageStats and zero totals when metadata is absent", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [{ value: "TypeScript", confidence: 1.0, evidence: [] }],
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+
+    expect(result.inventory.languageStats).toEqual([]);
+    expect(result.inventory.totalFiles).toBe(0);
+    expect(result.inventory.totalLinesOfCode).toBe(0);
+  });
+
+  it("returns zero totals when no language detector present", () => {
+    const result = aggregate(scanPath, durationMs, []);
+
+    expect(result.inventory.languageStats).toEqual([]);
+    expect(result.inventory.totalFiles).toBe(0);
+    expect(result.inventory.totalLinesOfCode).toBe(0);
+  });
+
   it("uses OR semantics for signals across detectors", () => {
     const results: DetectorResult[] = [
       {

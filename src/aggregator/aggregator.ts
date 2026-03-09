@@ -1,5 +1,10 @@
 import type { DetectorResult } from "../detectors/types";
-import type { Component, RepoScanResult } from "../types";
+import type {
+  Component,
+  EnvVarInfo,
+  LanguageStats,
+  RepoScanResult,
+} from "../types";
 import { classifyComponent } from "./component-classifier";
 
 /** Merge all detector results into a single RepoScanResult. */
@@ -28,7 +33,19 @@ export const aggregate = (
   };
 
   const componentMap = new Map<string, Component>();
+  let languageStats: readonly LanguageStats[] = [];
+  let totalFiles = 0;
+  let totalLinesOfCode = 0;
   let isMonorepo = false;
+  let envVars: readonly EnvVarInfo[] = [];
+  let namingConventions:
+    | readonly {
+        category: string;
+        dominantStyle: string;
+        percentage: number;
+        sampleSize: number;
+      }[]
+    | undefined;
 
   const categoryMap: Record<string, Set<string>> = {
     language: languages,
@@ -94,6 +111,47 @@ export const aggregate = (
       }
     }
 
+    // Extract language stats from language detector metadata
+    if (result.detectorId === "language" && result.metadata) {
+      if (Array.isArray(result.metadata.languageStats)) {
+        languageStats = result.metadata.languageStats as LanguageStats[];
+      }
+      if (typeof result.metadata.totalFiles === "number") {
+        totalFiles = result.metadata.totalFiles;
+      }
+      if (typeof result.metadata.totalLinesOfCode === "number") {
+        totalLinesOfCode = result.metadata.totalLinesOfCode;
+      }
+    }
+
+    // Extract env var details from env detector metadata
+    if (
+      result.detectorId === "env" &&
+      Array.isArray(result.metadata?.envVarDetails)
+    ) {
+      envVars = result.metadata.envVarDetails as EnvVarInfo[];
+    }
+
+    // Extract naming convention patterns
+    if (
+      result.detectorId === "naming-convention" &&
+      Array.isArray(result.metadata?.namingPatterns)
+    ) {
+      namingConventions = (
+        result.metadata.namingPatterns as {
+          category: string;
+          dominantStyle: string;
+          percentage: number;
+          sampleSize: number;
+        }[]
+      ).map((p) => ({
+        category: p.category,
+        dominantStyle: p.dominantStyle,
+        percentage: p.percentage,
+        sampleSize: p.sampleSize,
+      }));
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -110,10 +168,15 @@ export const aggregate = (
   return {
     inventory: {
       languages: sorted(languages),
+      languageStats,
+      totalFiles,
+      totalLinesOfCode,
       frameworks: sorted(frameworks),
       datastores: sorted(datastores),
       dependencyManagers: sorted(dependencyManagers),
       repoTools: sorted(repoTools),
+      envVars,
+      namingConventions,
     },
     architecture: { monorepo: isMonorepo, components },
     buildAndTest: {

@@ -16,13 +16,30 @@ export interface Component {
   readonly evidence: readonly string[];
 }
 
+export interface LanguageStats {
+  readonly name: string;
+  readonly fileCount: number;
+  readonly linesOfCode: number;
+  readonly percentage: number; // 0–100, rounded to 1 decimal
+}
+
 export interface RepoScanResult {
   readonly inventory: {
     readonly languages: readonly string[];
+    readonly languageStats: readonly LanguageStats[];
+    readonly totalFiles: number;
+    readonly totalLinesOfCode: number;
     readonly frameworks: readonly string[];
     readonly datastores: readonly string[];
     readonly dependencyManagers: readonly string[];
     readonly repoTools: readonly string[];
+    readonly envVars: readonly EnvVarInfo[];
+    readonly namingConventions?: readonly {
+      readonly category: string;
+      readonly dominantStyle: string;
+      readonly percentage: number;
+      readonly sampleSize: number;
+    }[];
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -45,6 +62,35 @@ export interface RepoScanResult {
   readonly scanPath: string;
   readonly timestamp: string;
   readonly durationMs: number;
+}
+
+/** A single usage of an environment variable in source code or config. */
+export interface EnvVarUsage {
+  readonly file: string;
+  readonly line: number;
+  readonly pattern: string;
+  readonly accessType: "read" | "write" | "definition";
+}
+
+/** Inferred value type for an environment variable. */
+export type EnvValueType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "url"
+  | "path"
+  | "json"
+  | "unknown";
+
+/** A deduplicated environment variable with all metadata. */
+export interface EnvVarInfo {
+  readonly name: string;
+  readonly usages: readonly EnvVarUsage[];
+  readonly inferredType: EnvValueType;
+  readonly defaultValue?: string;
+  readonly required: boolean;
+  readonly definedInConfig: boolean;
+  readonly frameworkPrefix?: string;
 }
 
 export interface CliOptions {

@@ -37,11 +37,69 @@ export const renderTable = (
   }
 
   w(section("Inventory"));
-  w(`  Languages:    ${list(result.inventory.languages)}\n`);
+  if (result.inventory.languageStats.length > 0) {
+    w(
+      `  Languages: ${DIM}${result.inventory.totalFiles.toLocaleString()} files, ${result.inventory.totalLinesOfCode.toLocaleString()} lines${RESET}\n`,
+    );
+    for (const lang of result.inventory.languageStats) {
+      const pct =
+        lang.fileCount > 0 && lang.percentage < 0.1
+          ? "< 0.1"
+          : lang.percentage.toFixed(1).padStart(5);
+      const files = `${lang.fileCount}`.padStart(4);
+      const loc = lang.linesOfCode.toLocaleString().padStart(8);
+      w(
+        `    ${YELLOW}${lang.name.padEnd(14)}${RESET} ${pct}%  ${DIM}(${files} files, ${loc} lines)${RESET}\n`,
+      );
+    }
+  } else {
+    w(`  Languages:    ${list(result.inventory.languages)}\n`);
+  }
   w(`  Frameworks:   ${list(result.inventory.frameworks)}\n`);
   w(`  Datastores:   ${list(result.inventory.datastores)}\n`);
   w(`  Dep Managers: ${list(result.inventory.dependencyManagers)}\n`);
   w(`  Repo Tools:   ${list(result.inventory.repoTools)}\n`);
+
+  if (result.inventory.envVars.length > 0) {
+    w(section("Environment Variables"));
+    w(`  Found: ${result.inventory.envVars.length} unique variables\n`);
+    for (const v of result.inventory.envVars) {
+      const type =
+        v.inferredType !== "unknown"
+          ? ` ${DIM}(${v.inferredType})${RESET}`
+          : "";
+      const req = v.required
+        ? `${YELLOW}required${RESET}`
+        : `${DIM}optional${RESET}`;
+      const def = v.defaultValue
+        ? ` ${DIM}default: ${v.defaultValue}${RESET}`
+        : "";
+      const prefix = v.frameworkPrefix
+        ? ` ${CYAN}[${v.frameworkPrefix}]${RESET}`
+        : "";
+      w(`    ${v.name}${type}  ${req}${def}${prefix}\n`);
+      for (const u of v.usages.slice(0, 3)) {
+        w(`      ${DIM}${u.file}:${u.line}${RESET}\n`);
+      }
+      if (v.usages.length > 3)
+        w(`      ${DIM}... +${v.usages.length - 3} more${RESET}\n`);
+    }
+  }
+
+  if (
+    result.inventory.namingConventions &&
+    result.inventory.namingConventions.length > 0
+  ) {
+    w(section("Naming Conventions"));
+    for (const nc of result.inventory.namingConventions) {
+      const cat = nc.category.padEnd(12);
+      const style = nc.dominantStyle.padEnd(22);
+      const pct = `${nc.percentage.toFixed(0)}%`.padStart(4);
+      w(
+        `  ${YELLOW}${cat}${RESET} ${style} ${pct}  ${DIM}(${nc.sampleSize} samples)${RESET}\n`,
+      );
+    }
+  }
 
   w(section("Build & Test"));
   w(`  CI Systems:   ${list(result.buildAndTest.ciSystems)}\n`);
