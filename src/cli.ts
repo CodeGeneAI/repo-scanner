@@ -1,20 +1,164 @@
+import os from "os";
+import type {
+  DependencyComponentGroupingMode,
+  Ecosystem,
+  OutdatedThreshold,
+  VulnerabilitySeverity,
+} from "./dependency/types";
 import type { CliOptions } from "./types";
+
+export class CliParseError extends Error {
+  readonly exitCode: number;
+
+  constructor(message: string, exitCode = 1) {
+    super(message);
+    this.name = "CliParseError";
+    this.exitCode = exitCode;
+  }
+}
+
+const VALID_ECOSYSTEMS = new Set<Ecosystem>([
+  "npm",
+  "pypi",
+  "go",
+  "cargo",
+  "rubygems",
+  "maven",
+  "nuget",
+  "packagist",
+  "cocoapods",
+  "pub",
+  "conan",
+]);
+
+const VALID_SEVERITIES = new Set<VulnerabilitySeverity>([
+  "UNKNOWN",
+  "LOW",
+  "MODERATE",
+  "HIGH",
+  "CRITICAL",
+]);
+
+const VALID_OUTDATED_THRESHOLDS = new Set<OutdatedThreshold>([
+  "patch",
+  "minor",
+  "major",
+]);
+
+const VALID_COMPONENT_GROUPING_MODES = new Set<DependencyComponentGroupingMode>(
+  ["default", "apps-only", "services-only", "workspace-package"],
+);
 
 const HELP_TEXT = `repo-scanner - Universal repository structure scanner
 
 Usage: repo-scanner [options]
 
 Options:
-  --path <dir>     Directory to scan (default: cwd)
-  --format <fmt>   Output format: table | json (default: table)
-  --help, -h       Show this help text
+  --path <dir>                Directory to scan (default: cwd)
+  --format <fmt>              Output format: table | json (default: table)
+  --deps                      Enable deep dependency analysis
+  --deps-debug                Emit dependency debug diagnostics to stderr
+  --ecosystems <list>         Comma-separated ecosystems to scan (default: all)
+                              Valid: npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan
+  --no-usage                  Skip dependency usage scanning
+  --no-security               Skip vulnerability checks
+  --concurrency <n>           Max dependency scan parallel operations (default: CPU count)
+  --component-grouping <m>    Component grouping for dependency summaries
+                              Valid: default,apps-only,services-only,workspace-package (default: default)
+  --fail-on-vulns             Exit with code 1 when vulnerabilities match threshold
+  --fail-on-vulns-count <n>   Exit with code 1 when vulnerability matches >= n
+  --severity-threshold <lvl>  Vulnerability threshold for --fail-on-vulns
+                              Valid: unknown,low,moderate,high,critical (default: low)
+  --fail-on-outdated          Exit with code 1 when updates match outdated threshold
+  --fail-on-outdated-count <n> Exit with code 1 when outdated matches >= n
+  --outdated-threshold <lvl>  Update threshold for --fail-on-outdated
+                              Valid: patch,minor,major (default: patch)
+  --help, -h                  Show this help text
 `;
+
+const parseSeverity = (raw: string): VulnerabilitySeverity | undefined => {
+  const normalized = raw.trim().toUpperCase();
+  if (!VALID_SEVERITIES.has(normalized as VulnerabilitySeverity)) {
+    return undefined;
+  }
+  return normalized as VulnerabilitySeverity;
+};
+
+const parseOutdatedThreshold = (raw: string): OutdatedThreshold | undefined => {
+  const normalized = raw.trim().toLowerCase();
+  if (!VALID_OUTDATED_THRESHOLDS.has(normalized as OutdatedThreshold)) {
+    return undefined;
+  }
+  return normalized as OutdatedThreshold;
+};
+
+const parseComponentGroupingMode = (
+  raw: string,
+): DependencyComponentGroupingMode | undefined => {
+  const normalized = raw.trim().toLowerCase();
+  if (
+    !VALID_COMPONENT_GROUPING_MODES.has(
+      normalized as DependencyComponentGroupingMode,
+    )
+  ) {
+    return undefined;
+  }
+  return normalized as DependencyComponentGroupingMode;
+};
+
+const parsePositiveInteger = (raw: string): number | undefined => {
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return undefined;
+  }
+  return parsed;
+};
+
+const isFlagToken = (raw: string | undefined): boolean =>
+  raw?.startsWith("--") ?? false;
+
+const failCliParse = (message: string): never => {
+  throw new CliParseError(message);
+};
+
+const parseRequiredPositiveIntegerOption = (
+  raw: string | undefined,
+  optionName: string,
+): number => {
+  const value =
+    raw ??
+    failCliParse(`Error: ${optionName} requires a positive integer value.`);
+
+  if (isFlagToken(value)) {
+    failCliParse(`Error: ${optionName} requires a positive integer value.`);
+  }
+
+  return (
+    parsePositiveInteger(value) ??
+    failCliParse(
+      `Error: invalid ${optionName.replace(/^--/, "")} "${value}". Value must be a positive integer.`,
+    )
+  );
+};
 
 export const parseArgs = (argv: string[]): CliOptions => {
   const args = argv.slice(2);
   let pathArg = process.cwd();
   let format: "table" | "json" = "table";
   let showHelp = false;
+  let deps = false;
+  let depsDebug = false;
+  let ecosystems: Ecosystem[] | undefined;
+  let skipUsage = false;
+  let skipSecurity = false;
+  let concurrency = os.cpus().length;
+  let componentGrouping: DependencyComponentGroupingMode = "default";
+  let failOnVulns = false;
+  let failOnVulnsCount: number | undefined;
+  let severityThreshold: VulnerabilitySeverity = "LOW";
+  let failOnOutdated = false;
+  let failOnOutdatedCount: number | undefined;
+  let outdatedThreshold: OutdatedThreshold = "patch";
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -28,20 +172,135 @@ export const parseArgs = (argv: string[]): CliOptions => {
         pathArg = args[++i] ?? pathArg;
         break;
       case "--format": {
-        const fmt: string = args[++i] ?? format;
+        const fmtArg = args[++i];
+        const fmt = fmtArg ?? "table";
         if (fmt !== "table" && fmt !== "json") {
-          console.error(
+          failCliParse(
             `Error: invalid format "${fmt}". Must be "table" or "json".`,
           );
-          process.exit(1);
         }
-        format = fmt;
+        format = fmt as "table" | "json";
+        break;
+      }
+      case "--deps":
+        deps = true;
+        break;
+      case "--deps-debug":
+        depsDebug = true;
+        break;
+      case "--ecosystems": {
+        const raw = args[++i];
+        if (!raw || isFlagToken(raw)) {
+          failCliParse("Error: --ecosystems requires a comma-separated value.");
+        }
+
+        const tokens = raw
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0);
+
+        if (tokens.length === 0) {
+          failCliParse(
+            "Error: --ecosystems must include at least one ecosystem.",
+          );
+        }
+
+        const invalid = tokens.filter(
+          (value) => !VALID_ECOSYSTEMS.has(value as Ecosystem),
+        );
+
+        if (invalid.length > 0) {
+          failCliParse(
+            `Error: invalid ecosystems "${invalid.join(",")}". Use one of npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan.`,
+          );
+        }
+
+        ecosystems = [...new Set(tokens)] as Ecosystem[];
+        break;
+      }
+      case "--no-usage":
+        skipUsage = true;
+        break;
+      case "--no-security":
+        skipSecurity = true;
+        break;
+      case "--concurrency":
+        concurrency = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--concurrency",
+        );
+        break;
+      case "--component-grouping": {
+        const raw = args[++i] ?? "";
+        const parsed =
+          parseComponentGroupingMode(raw) ??
+          failCliParse(
+            `Error: invalid component grouping mode "${raw}". Use one of default,apps-only,services-only,workspace-package.`,
+          );
+        componentGrouping = parsed;
+        break;
+      }
+      case "--fail-on-vulns":
+        failOnVulns = true;
+        break;
+      case "--fail-on-vulns-count": {
+        failOnVulnsCount = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--fail-on-vulns-count",
+        );
+        break;
+      }
+      case "--severity-threshold": {
+        const raw = args[++i] ?? "";
+        const parsed =
+          parseSeverity(raw) ??
+          failCliParse(
+            `Error: invalid severity threshold "${raw}". Use one of unknown,low,moderate,high,critical.`,
+          );
+        severityThreshold = parsed;
+        break;
+      }
+      case "--fail-on-outdated":
+        failOnOutdated = true;
+        break;
+      case "--fail-on-outdated-count": {
+        failOnOutdatedCount = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--fail-on-outdated-count",
+        );
+        break;
+      }
+      case "--outdated-threshold": {
+        const raw = args[++i] ?? "";
+        const parsed =
+          parseOutdatedThreshold(raw) ??
+          failCliParse(
+            `Error: invalid outdated threshold "${raw}". Use one of patch,minor,major.`,
+          );
+        outdatedThreshold = parsed;
         break;
       }
     }
   }
 
-  return { path: pathArg, format, showHelp };
+  return {
+    path: pathArg,
+    format,
+    showHelp,
+    deps,
+    depsDebug,
+    ecosystems,
+    skipUsage,
+    skipSecurity,
+    concurrency,
+    componentGrouping,
+    failOnVulns,
+    failOnVulnsCount,
+    severityThreshold,
+    failOnOutdated,
+    failOnOutdatedCount,
+    outdatedThreshold,
+  };
 };
 
 export const getHelpText = () => HELP_TEXT;

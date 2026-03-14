@@ -166,6 +166,52 @@ export const renderTable = (
     }
   }
 
+  if (result.dependencies) {
+    w(section("Dependencies"));
+
+    w(`  Ecosystems:       ${list(result.dependencies.summary.ecosystems)}\n`);
+    w(`  Dependencies:     ${result.dependencies.totalDependencies}\n`);
+    w(
+      `  Outdated:         ${result.dependencies.summary.outdatedDependencies}\n`,
+    );
+    w(`  Vulnerabilities:  ${result.dependencies.totalVulnerabilities}\n`);
+
+    if (result.dependencies.summary.topOutdated.length > 0) {
+      w("  Top outdated:\n");
+      for (const item of result.dependencies.summary.topOutdated) {
+        w(
+          `    ${YELLOW}${item.name}${RESET} ${DIM}(${item.ecosystem}, ${item.updateType})${RESET}\n`,
+        );
+      }
+    }
+
+    if (result.dependencies.summary.topVulnerable.length > 0) {
+      w("  Top vulnerable:\n");
+      for (const item of result.dependencies.summary.topVulnerable) {
+        w(
+          `    ${YELLOW}${item.name}${RESET} ${DIM}(${item.ecosystem}, ${item.vulnerabilityCount} vuln, highest ${item.highestSeverity})${RESET}\n`,
+        );
+      }
+    }
+
+    if (result.dependencies.summary.byComponent.length > 0) {
+      w("  By component:\n");
+      for (const component of result.dependencies.summary.byComponent.slice(
+        0,
+        10,
+      )) {
+        w(
+          `    ${YELLOW}${component.component}${RESET} ${DIM}deps:${component.totalDependencies} outdated:${component.outdatedDependencies} vulns:${component.vulnerabilityCount}${RESET}\n`,
+        );
+      }
+      if (result.dependencies.summary.byComponent.length > 10) {
+        w(
+          `    ${DIM}... +${result.dependencies.summary.byComponent.length - 10} more${RESET}\n`,
+        );
+      }
+    }
+  }
+
   w(section("Build & Test"));
   w(`  CI Systems:   ${list(result.buildAndTest.ciSystems)}\n`);
   w(`  Build:        ${list(result.buildAndTest.buildCommands)}\n`);

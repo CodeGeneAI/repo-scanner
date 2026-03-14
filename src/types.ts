@@ -1,3 +1,11 @@
+import type {
+  DependencyComponentGroupingMode,
+  DepScannerResult,
+  Ecosystem,
+  OutdatedThreshold,
+  VulnerabilitySeverity,
+} from "./dependency/types";
+
 export type ComponentKind =
   | "app"
   | "service"
@@ -24,6 +32,7 @@ export interface LanguageStats {
 }
 
 export interface RepoScanResult {
+  readonly dependencies?: DepScannerResult;
   readonly inventory: {
     readonly languages: readonly string[];
     readonly languageStats: readonly LanguageStats[];
@@ -120,4 +129,30 @@ export interface CliOptions {
   readonly path: string;
   readonly format: "table" | "json";
   readonly showHelp: boolean;
+  readonly deps: boolean;
+  readonly depsDebug: boolean;
+  readonly ecosystems?: readonly Ecosystem[];
+  readonly skipUsage: boolean;
+  readonly skipSecurity: boolean;
+  readonly concurrency: number;
+  readonly componentGrouping: DependencyComponentGroupingMode;
+  readonly failOnVulns: boolean;
+  readonly failOnVulnsCount?: number;
+  readonly severityThreshold: VulnerabilitySeverity;
+  readonly failOnOutdated: boolean;
+  readonly failOnOutdatedCount?: number;
+  readonly outdatedThreshold: OutdatedThreshold;
+}
+export interface DependencyScanConfig {
+  readonly enabled: boolean;
+  readonly ecosystems?: readonly Ecosystem[];
+  readonly skipUsage?: boolean;
+  readonly skipSecurity?: boolean;
+  readonly concurrency?: number;
+  readonly componentGrouping?: DependencyComponentGroupingMode;
+  readonly debugVulnerabilityKeys?: boolean;
+}
+
+export interface ScanRepoOptions {
+  readonly dependencies?: DependencyScanConfig;
 }
