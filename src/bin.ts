@@ -34,6 +34,7 @@ const main = async () => {
       ecosystems: options.ecosystems,
       skipUsage: options.skipUsage,
       skipSecurity: options.skipSecurity,
+      skipVersionLookup: options.skipVersionLookup,
       concurrency: options.concurrency,
       componentGrouping: options.componentGrouping,
       debugVulnerabilityKeys: options.depsDebug,

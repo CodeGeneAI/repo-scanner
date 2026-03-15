@@ -53,6 +53,7 @@ describe("repo-scanner bin", () => {
         "--deps",
         "--no-security",
         "--no-usage",
+        "--no-version-lookup",
         "--format",
         "json",
       ]);
@@ -84,6 +85,7 @@ describe("repo-scanner bin", () => {
         "--deps",
         "--no-security",
         "--no-usage",
+        "--no-version-lookup",
         "--fail-on-vulns",
         "--severity-threshold",
         "high",
@@ -105,6 +107,7 @@ describe("repo-scanner bin", () => {
         "--deps",
         "--no-security",
         "--no-usage",
+        "--no-version-lookup",
         "--fail-on-outdated-count",
         "1",
         "--format",
@@ -131,6 +134,7 @@ describe("repo-scanner bin", () => {
         repoPath,
         "--no-security",
         "--no-usage",
+        "--no-version-lookup",
         "--fail-on-vulns",
         "--format",
         "json",
@@ -180,6 +184,7 @@ describe("repo-scanner bin", () => {
         "--deps-debug",
         "--no-security",
         "--no-usage",
+        "--no-version-lookup",
       ]);
 
       expect(result.exitCode).toBe(0);

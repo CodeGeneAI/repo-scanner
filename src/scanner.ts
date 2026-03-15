@@ -86,6 +86,7 @@ export const scanRepo = async (
     ecosystems: options.dependencies.ecosystems,
     skipUsage: options.dependencies.skipUsage,
     skipSecurity: options.dependencies.skipSecurity,
+    skipVersionLookup: options.dependencies.skipVersionLookup,
     concurrency: options.dependencies.concurrency,
     componentGrouping: options.dependencies.componentGrouping,
     debugVulnerabilityKeys: options.dependencies.debugVulnerabilityKeys,

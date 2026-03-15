@@ -15,6 +15,7 @@ export interface DependencyOrchestratorOptions {
   readonly ecosystems?: readonly Ecosystem[];
   readonly skipUsage?: boolean;
   readonly skipSecurity?: boolean;
+  readonly skipVersionLookup?: boolean;
   readonly concurrency?: number;
   readonly componentGrouping?: DependencyComponentGroupingMode;
   readonly debugVulnerabilityKeys?: boolean;
@@ -33,6 +34,7 @@ export const scanDependencies = async (
     ecosystems: options.ecosystems,
     skipUsage: options.skipUsage ?? false,
     skipSecurity: options.skipSecurity ?? false,
+    skipVersionLookup: options.skipVersionLookup ?? false,
     concurrency: options.concurrency ?? os.cpus().length,
     componentGrouping: options.componentGrouping ?? "default",
     debugVulnerabilityKeys: options.debugVulnerabilityKeys ?? false,

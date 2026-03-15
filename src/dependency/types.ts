@@ -132,6 +132,7 @@ export interface DependencyScanOptions {
   readonly ecosystems?: readonly Ecosystem[];
   readonly skipUsage: boolean;
   readonly skipSecurity: boolean;
+  readonly skipVersionLookup?: boolean;
   readonly concurrency: number;
   readonly indexedUsageFiles?: readonly IndexedUsageFile[];
   readonly indexedFileContent?: ReadonlyMap<string, string>;

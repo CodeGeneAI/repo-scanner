@@ -34,6 +34,7 @@ describe("scanDependencySubsystem", () => {
         ecosystems: ["npm"],
         skipSecurity: true,
         skipUsage: true,
+        skipVersionLookup: true,
         concurrency: 1,
       });
 
@@ -76,6 +77,7 @@ describe("scanDependencySubsystem", () => {
         ecosystems: ["npm"],
         skipSecurity: true,
         skipUsage: true,
+        skipVersionLookup: true,
         concurrency: 1,
         componentGrouping: "workspace-package",
       });
@@ -120,6 +122,7 @@ describe("scanDependencySubsystem", () => {
         ecosystems: ["npm"],
         skipSecurity: true,
         skipUsage: true,
+        skipVersionLookup: true,
         concurrency: 1,
       });
 
@@ -164,6 +167,7 @@ describe("scanDependencySubsystem", () => {
         ecosystems: ["npm"],
         skipSecurity: true,
         skipUsage: true,
+        skipVersionLookup: true,
         concurrency: 1,
         debugVulnerabilityKeys: true,
       });

@@ -310,9 +310,10 @@ export const scanDependencySubsystem = async (
     const uniqueNames = [
       ...new Set(dependencies.map((dependency) => dependency.name)),
     ];
-    const latestVersions = registryClient
-      ? await registryClient.getLatestVersions(uniqueNames)
-      : new Map<string, string>();
+    const latestVersions =
+      registryClient && !options.skipVersionLookup
+        ? await registryClient.getLatestVersions(uniqueNames)
+        : new Map<string, string>();
 
     const seen = new Set<string>();
     const uniqueDeps = dependencies.filter((dependency) => {

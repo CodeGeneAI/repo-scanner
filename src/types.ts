@@ -134,6 +134,7 @@ export interface CliOptions {
   readonly ecosystems?: readonly Ecosystem[];
   readonly skipUsage: boolean;
   readonly skipSecurity: boolean;
+  readonly skipVersionLookup: boolean;
   readonly concurrency: number;
   readonly componentGrouping: DependencyComponentGroupingMode;
   readonly failOnVulns: boolean;
@@ -148,6 +149,7 @@ export interface DependencyScanConfig {
   readonly ecosystems?: readonly Ecosystem[];
   readonly skipUsage?: boolean;
   readonly skipSecurity?: boolean;
+  readonly skipVersionLookup?: boolean;
   readonly concurrency?: number;
   readonly componentGrouping?: DependencyComponentGroupingMode;
   readonly debugVulnerabilityKeys?: boolean;

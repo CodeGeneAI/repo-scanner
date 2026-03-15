@@ -62,6 +62,7 @@ Options:
                               Valid: npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan
   --no-usage                  Skip dependency usage scanning
   --no-security               Skip vulnerability checks
+  --no-version-lookup         Skip registry version lookups
   --concurrency <n>           Max dependency scan parallel operations (default: CPU count)
   --component-grouping <m>    Component grouping for dependency summaries
                               Valid: default,apps-only,services-only,workspace-package (default: default)
@@ -151,6 +152,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let ecosystems: Ecosystem[] | undefined;
   let skipUsage = false;
   let skipSecurity = false;
+  let skipVersionLookup = false;
   let concurrency = os.cpus().length;
   let componentGrouping: DependencyComponentGroupingMode = "default";
   let failOnVulns = false;
@@ -224,6 +226,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--no-security":
         skipSecurity = true;
         break;
+      case "--no-version-lookup":
+        skipVersionLookup = true;
+        break;
       case "--concurrency":
         concurrency = parseRequiredPositiveIntegerOption(
           args[++i],
@@ -292,6 +297,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     ecosystems,
     skipUsage,
     skipSecurity,
+    skipVersionLookup,
     concurrency,
     componentGrouping,
     failOnVulns,
