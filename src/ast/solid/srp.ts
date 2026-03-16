@@ -2,10 +2,13 @@ import type { FileAnalysis } from "../queries/types";
 import { computeScore } from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
-const WMC_ERROR = 20;
-const METHOD_COUNT_WARNING = 15;
-const IMPORT_FANOUT_WARNING = 10;
-const CLASS_LOC_WARNING = 300;
+const WMC_WARNING = 30;
+const WMC_ERROR = 50;
+const METHOD_COUNT_WARNING = 20;
+const IMPORT_FANOUT_WARNING = 15;
+const IMPORT_FANOUT_ERROR = 25;
+const CLASS_LOC_WARNING = 500;
+const CLASS_LOC_ERROR = 1000;
 
 export const analyzeSrp = (
   fileResults: ReadonlyMap<string, FileAnalysis>,
@@ -15,7 +18,21 @@ export const analyzeSrp = (
   for (const [file, analysis] of fileResults) {
     // Import fan-out per file
     const uniqueImportSources = new Set(analysis.imports.map((i) => i.source));
-    if (uniqueImportSources.size > IMPORT_FANOUT_WARNING) {
+    if (uniqueImportSources.size > IMPORT_FANOUT_ERROR) {
+      violations.push({
+        principle: "SRP",
+        file,
+        line: 1,
+        entity: file.split("/").pop() ?? file,
+        severity: "error",
+        message: `${uniqueImportSources.size} import sources (threshold: ${IMPORT_FANOUT_ERROR})`,
+        metric: {
+          name: "importFanOut",
+          value: uniqueImportSources.size,
+          threshold: IMPORT_FANOUT_ERROR,
+        },
+      });
+    } else if (uniqueImportSources.size > IMPORT_FANOUT_WARNING) {
       violations.push({
         principle: "SRP",
         file,
@@ -45,6 +62,16 @@ export const analyzeSrp = (
           message: `WMC ${wmc} (threshold: ${WMC_ERROR})`,
           metric: { name: "WMC", value: wmc, threshold: WMC_ERROR },
         });
+      } else if (wmc > WMC_WARNING) {
+        violations.push({
+          principle: "SRP",
+          file,
+          line: cls.line,
+          entity: cls.name,
+          severity: "warning",
+          message: `WMC ${wmc} (threshold: ${WMC_WARNING})`,
+          metric: { name: "WMC", value: wmc, threshold: WMC_WARNING },
+        });
       }
 
       if (cls.methods.length > METHOD_COUNT_WARNING) {
@@ -53,7 +80,7 @@ export const analyzeSrp = (
           file,
           line: cls.line,
           entity: cls.name,
-          severity: "warning",
+          severity: cls.methods.length > 40 ? "error" : "warning",
           message: `${cls.methods.length} methods (threshold: ${METHOD_COUNT_WARNING})`,
           metric: {
             name: "methodCount",
@@ -63,7 +90,21 @@ export const analyzeSrp = (
         });
       }
 
-      if (cls.loc > CLASS_LOC_WARNING) {
+      if (cls.loc > CLASS_LOC_ERROR) {
+        violations.push({
+          principle: "SRP",
+          file,
+          line: cls.line,
+          entity: cls.name,
+          severity: "error",
+          message: `${cls.loc} lines (threshold: ${CLASS_LOC_ERROR})`,
+          metric: {
+            name: "classLOC",
+            value: cls.loc,
+            threshold: CLASS_LOC_ERROR,
+          },
+        });
+      } else if (cls.loc > CLASS_LOC_WARNING) {
         violations.push({
           principle: "SRP",
           file,

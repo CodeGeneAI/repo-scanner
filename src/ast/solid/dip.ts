@@ -2,8 +2,18 @@ import type { FileAnalysis } from "../queries/types";
 import { computeScore } from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
-const INSTANTIATION_WARNING = 5;
-const INSTANTIATION_ERROR = 10;
+const INSTANTIATION_WARNING = 15;
+const INSTANTIATION_ERROR = 30;
+
+/** Test file patterns to exclude from DIP analysis. */
+const isTestFile = (file: string): boolean =>
+  file.includes(".test.") ||
+  file.includes(".spec.") ||
+  file.includes("_test.") ||
+  file.includes("test_") ||
+  file.includes("__tests__/") ||
+  file.includes("/tests/") ||
+  file.includes("/test/");
 
 export const analyzeDip = (
   fileResults: ReadonlyMap<string, FileAnalysis>,
@@ -11,6 +21,9 @@ export const analyzeDip = (
   const violations: Violation[] = [];
 
   for (const [file, analysis] of fileResults) {
+    // Skip test files — they naturally have many concrete instantiations
+    if (isTestFile(file)) continue;
+
     const count = analysis.instantiations.length;
 
     if (count >= INSTANTIATION_ERROR) {

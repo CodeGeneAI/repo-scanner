@@ -2,8 +2,8 @@ import type { FileAnalysis } from "../queries/types";
 import { computeScore } from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
-const FAT_INTERFACE_WARNING = 8;
-const FAT_INTERFACE_ERROR = 12;
+const FAT_INTERFACE_WARNING = 12;
+const FAT_INTERFACE_ERROR = 20;
 
 export const analyzeIsp = (
   fileResults: ReadonlyMap<string, FileAnalysis>,
