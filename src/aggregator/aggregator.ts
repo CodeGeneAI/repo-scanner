@@ -37,6 +37,7 @@ export const aggregate = (
     hasTests: false,
     hasTypedContracts: false,
     hasQualityGates: false,
+    isPolyglot: false,
   };
 
   const componentMap = new Map<string, Component>();
@@ -232,6 +233,7 @@ export const aggregate = (
 
   // Derive signals from detector presence
   if (ciSystems.size > 0) signals.hasCi = true;
+  if (languages.size > 1) signals.isPolyglot = true;
 
   const components = [...componentMap.values()].sort(
     (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),

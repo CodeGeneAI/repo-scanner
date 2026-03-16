@@ -330,5 +330,7 @@ export const renderTable = (
   w(`${check(result.signals.hasTests)} Tests  `);
   w(`${check(result.signals.hasTypedContracts)} Typed Contracts  `);
   w(`${check(result.signals.hasQualityGates)} Quality Gates\n`);
+  w(`${check(result.signals.hasQualityGates)} Quality Gates  `);
+  w(`${check(result.signals.isPolyglot)} Polyglot\n`);
   w("\n");
 };

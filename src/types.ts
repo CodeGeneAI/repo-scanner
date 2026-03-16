@@ -74,6 +74,7 @@ export interface RepoScanResult {
     readonly hasTests: boolean;
     readonly hasTypedContracts: boolean;
     readonly hasQualityGates: boolean;
+    readonly isPolyglot: boolean;
   };
   readonly scanPath: string;
   readonly timestamp: string;
