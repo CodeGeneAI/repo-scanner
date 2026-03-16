@@ -30,6 +30,12 @@ const LANGUAGE_EXTRACTORS: ReadonlyMap<
   [".rs", extractRust],
   [".java", extractJavaKotlin],
   [".kt", extractJavaKotlin],
+  [".cs", extractCSharp],
+  [".rb", extractRuby],
+  [".php", extractPhp],
+  [".swift", extractSwift],
+  [".dart", extractDart],
+  [".scala", extractScala],
 ]);
 
 interface ExtractedIdentifier {
@@ -287,6 +293,262 @@ function extractJavaKotlin(lines: readonly string[]): ExtractedIdentifier[] {
     const constMatch = trimmed.match(
       /(?:static\s+final|val)\s+(?:\w+\s+)?([A-Z][A-Z0-9_]+)\s*=/,
     );
+    if (constMatch) {
+      results.push({ name: constMatch[1]!, category: "constant" });
+    }
+  }
+  return results;
+}
+
+function extractCSharp(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    const ifaceMatch = trimmed.match(/interface\s+([A-Za-z_]\w*)/);
+    if (ifaceMatch) {
+      results.push({ name: ifaceMatch[1]!, category: "interface" });
+      continue;
+    }
+
+    const enumMatch = trimmed.match(/enum\s+([A-Za-z_]\w*)/);
+    if (enumMatch) {
+      results.push({ name: enumMatch[1]!, category: "enum" });
+      continue;
+    }
+
+    const delegateMatch = trimmed.match(/delegate\s+\w+\s+([A-Za-z_]\w*)/);
+    if (delegateMatch) {
+      results.push({ name: delegateMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    const classMatch = trimmed.match(
+      /(?:class|struct|record)\s+([A-Za-z_]\w*)/,
+    );
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    const constMatch = trimmed.match(
+      /(?:const|static\s+readonly)\s+\w+\s+([A-Z][A-Z0-9_]+)\s*=/,
+    );
+    if (constMatch) {
+      results.push({ name: constMatch[1]!, category: "constant" });
+      continue;
+    }
+
+    const methodMatch = trimmed.match(
+      /(?:public|private|protected|internal|static|virtual|override|async)\s+(?:\w+\s+)*([a-zA-Z_]\w*)\s*[<(]/,
+    );
+    if (methodMatch) {
+      results.push({ name: methodMatch[1]!, category: "function" });
+    }
+  }
+  return results;
+}
+
+function extractRuby(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    const defMatch = trimmed.match(/^def\s+([a-zA-Z_]\w*)/);
+    if (defMatch) {
+      results.push({ name: defMatch[1]!, category: "function" });
+      continue;
+    }
+
+    const classMatch = trimmed.match(/^class\s+([A-Z]\w*)/);
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    const moduleMatch = trimmed.match(/^module\s+([A-Z]\w*)/);
+    if (moduleMatch) {
+      results.push({ name: moduleMatch[1]!, category: "interface" });
+      continue;
+    }
+
+    if (line === trimmed) {
+      const constMatch = trimmed.match(/^([A-Z][A-Z0-9_]+)\s*=/);
+      if (constMatch) {
+        results.push({ name: constMatch[1]!, category: "constant" });
+      }
+    }
+  }
+  return results;
+}
+
+function extractPhp(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    const ifaceMatch = trimmed.match(/interface\s+([A-Za-z_]\w*)/);
+    if (ifaceMatch) {
+      results.push({ name: ifaceMatch[1]!, category: "interface" });
+      continue;
+    }
+
+    const enumMatch = trimmed.match(/enum\s+([A-Za-z_]\w*)/);
+    if (enumMatch) {
+      results.push({ name: enumMatch[1]!, category: "enum" });
+      continue;
+    }
+
+    const traitMatch = trimmed.match(/trait\s+([A-Za-z_]\w*)/);
+    if (traitMatch) {
+      results.push({ name: traitMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    const classMatch = trimmed.match(/class\s+([A-Za-z_]\w*)/);
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    const fnMatch = trimmed.match(/function\s+([a-zA-Z_]\w*)\s*\(/);
+    if (fnMatch) {
+      results.push({ name: fnMatch[1]!, category: "function" });
+      continue;
+    }
+
+    const constMatch = trimmed.match(
+      /(?:const\s+([A-Z][A-Z0-9_]+)|define\s*\(\s*['"]([A-Z][A-Z0-9_]+))/,
+    );
+    if (constMatch) {
+      results.push({
+        name: (constMatch[1] ?? constMatch[2])!,
+        category: "constant",
+      });
+    }
+  }
+  return results;
+}
+
+function extractSwift(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    const protoMatch = trimmed.match(/protocol\s+([A-Za-z_]\w*)/);
+    if (protoMatch) {
+      results.push({ name: protoMatch[1]!, category: "interface" });
+      continue;
+    }
+
+    const enumMatch = trimmed.match(/enum\s+([A-Za-z_]\w*)/);
+    if (enumMatch) {
+      results.push({ name: enumMatch[1]!, category: "enum" });
+      continue;
+    }
+
+    const typealiasMatch = trimmed.match(/typealias\s+([A-Za-z_]\w*)/);
+    if (typealiasMatch) {
+      results.push({ name: typealiasMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    const classMatch = trimmed.match(/(?:class|struct)\s+([A-Za-z_]\w*)/);
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    const funcMatch = trimmed.match(/func\s+([a-zA-Z_]\w*)\s*[<(]/);
+    if (funcMatch) {
+      results.push({ name: funcMatch[1]!, category: "function" });
+    }
+  }
+  return results;
+}
+
+function extractDart(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    const mixinMatch = trimmed.match(/mixin\s+([A-Za-z_]\w*)/);
+    if (mixinMatch) {
+      results.push({ name: mixinMatch[1]!, category: "interface" });
+      continue;
+    }
+
+    const enumMatch = trimmed.match(/enum\s+([A-Za-z_]\w*)/);
+    if (enumMatch) {
+      results.push({ name: enumMatch[1]!, category: "enum" });
+      continue;
+    }
+
+    const typedefMatch = trimmed.match(/typedef\s+([A-Za-z_]\w*)/);
+    if (typedefMatch) {
+      results.push({ name: typedefMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    const classMatch = trimmed.match(/class\s+([A-Za-z_]\w*)/);
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    const constMatch = trimmed.match(
+      /(?:const|final)\s+\w+\s+([A-Z][A-Z0-9_]+)\s*=/,
+    );
+    if (constMatch) {
+      results.push({ name: constMatch[1]!, category: "constant" });
+      continue;
+    }
+
+    // Top-level functions
+    if (line === trimmed) {
+      const fnMatch = trimmed.match(
+        /^(?:void|int|String|bool|double|Future|dynamic|[\w<>]+)\s+([a-zA-Z_]\w*)\s*\(/,
+      );
+      if (fnMatch) {
+        results.push({ name: fnMatch[1]!, category: "function" });
+      }
+    }
+  }
+  return results;
+}
+
+function extractScala(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    const traitMatch = trimmed.match(/^trait\s+([A-Za-z_]\w*)/);
+    if (traitMatch) {
+      results.push({ name: traitMatch[1]!, category: "interface" });
+      continue;
+    }
+
+    const typeMatch = trimmed.match(/^type\s+([A-Za-z_]\w*)\s*[=[]/);
+    if (typeMatch) {
+      results.push({ name: typeMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    const classMatch = trimmed.match(
+      /^(?:case\s+)?(?:class|object)\s+([A-Za-z_]\w*)/,
+    );
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    const defMatch = trimmed.match(/^def\s+([a-zA-Z_]\w*)/);
+    if (defMatch) {
+      results.push({ name: defMatch[1]!, category: "function" });
+      continue;
+    }
+
+    const constMatch = trimmed.match(/^val\s+([A-Z][A-Z0-9_]+)\s*[=:]/);
     if (constMatch) {
       results.push({ name: constMatch[1]!, category: "constant" });
     }

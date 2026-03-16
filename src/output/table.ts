@@ -52,6 +52,33 @@ export const renderTable = (
     }
   }
 
+  // Cross-Package Dependencies
+  if (
+    result.architecture.crossPackageDeps &&
+    result.architecture.crossPackageDeps.edges.length > 0
+  ) {
+    const cpd = result.architecture.crossPackageDeps;
+    w(section("Cross-Package Dependencies"));
+    w(`  Internal edges: ${cpd.edges.length}\n`);
+    const MAX_SHOWN = 20;
+    const shown = cpd.edges.slice(0, MAX_SHOWN);
+    for (const e of shown) {
+      const dev = e.isDev ? ` ${DIM}(dev)${RESET}` : "";
+      w(
+        `    ${YELLOW}${e.fromName}${RESET} → ${e.toName}  ${DIM}(${e.ecosystem})${RESET}${dev}\n`,
+      );
+    }
+    if (cpd.edges.length > MAX_SHOWN) {
+      w(`    ${DIM}... +${cpd.edges.length - MAX_SHOWN} more${RESET}\n`);
+    }
+    if (cpd.orphans.length > 0) {
+      w(`  Orphan components: ${cpd.orphans.length}\n`);
+      for (const o of cpd.orphans.slice(0, 10)) {
+        w(`    ${DIM}${o}${RESET}\n`);
+      }
+    }
+  }
+
   w(section("Inventory"));
   if (result.inventory.languageStats.length > 0) {
     w(
@@ -185,6 +212,61 @@ export const renderTable = (
       w(
         `    ${DIM}... +${result.inventory.largeFiles.length - MAX_SHOWN} more${RESET}\n`,
       );
+    }
+  }
+
+  // Code Annotations (TODO/FIXME/HACK/BUG/XXX)
+  if (
+    result.inventory.todoAnnotations &&
+    result.inventory.todoAnnotations.length > 0
+  ) {
+    const todos = result.inventory.todoAnnotations;
+    w(section("Code Annotations"));
+
+    // Summary by tag
+    const tagCounts = new Map<string, number>();
+    for (const a of todos) {
+      tagCounts.set(a.tag, (tagCounts.get(a.tag) ?? 0) + 1);
+    }
+    const summary = [...tagCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => `${count} ${tag}`)
+      .join(", ");
+    w(`  Found: ${todos.length} annotations (${summary})\n`);
+
+    const MAX_SHOWN = 20;
+    const shown = todos.slice(0, MAX_SHOWN);
+    for (const a of shown) {
+      const tag = a.tag.padEnd(6);
+      const loc = `${a.file}:${a.line}`;
+      const author = a.author ? ` ${CYAN}(${a.author})${RESET}` : "";
+      w(
+        `    ${YELLOW}${tag}${RESET} ${DIM}${loc}${RESET}${author}  ${a.text}\n`,
+      );
+    }
+    if (todos.length > MAX_SHOWN) {
+      w(`    ${DIM}... +${todos.length - MAX_SHOWN} more${RESET}\n`);
+    }
+  }
+
+  // Likely Dead Exports
+  if (result.inventory.deadExports && result.inventory.deadExports.length > 0) {
+    const dead = result.inventory.deadExports;
+    w(section("Likely Dead Exports"));
+    w(
+      `  Found: ${dead.length} exported symbol${dead.length > 1 ? "s" : ""} with no detected imports ${DIM}(heuristic)${RESET}\n`,
+    );
+    const MAX_SHOWN = 20;
+    const shown = dead.slice(0, MAX_SHOWN);
+    for (const d of shown) {
+      const kind = d.exportType.padEnd(10);
+      const sym = d.symbol.padEnd(24);
+      w(
+        `    ${YELLOW}${kind}${RESET} ${sym} ${DIM}${d.file}:${d.line}${RESET}  ${d.language}\n`,
+      );
+    }
+    if (dead.length > MAX_SHOWN) {
+      w(`    ${DIM}... +${dead.length - MAX_SHOWN} more${RESET}\n`);
     }
   }
 

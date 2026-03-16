@@ -1,5 +1,6 @@
 import type { LargeFileInfo } from "../types";
 import { mapWithConcurrency } from "../utils/concurrency";
+import { isGeneratedFile, isTestFile } from "../utils/file-filters";
 import type { FileIndex } from "../utils/file-index";
 import { countLines } from "../utils/fs";
 import { EXT_TO_LANGUAGE } from "./language-extensions";
@@ -8,14 +9,6 @@ import type { DetectorResult, Finding } from "./types";
 
 const DEFAULT_THRESHOLD_LINES = 500;
 const LOC_CONCURRENCY = 64;
-
-/** Returns true if the filename looks like a test/spec file. */
-const isTestFile = (name: string): boolean =>
-  name.includes(".test.") ||
-  name.includes(".spec.") ||
-  name.endsWith("_test.go") ||
-  name.startsWith("test_") ||
-  name.endsWith("_test.py");
 
 let thresholdLines = DEFAULT_THRESHOLD_LINES;
 
@@ -30,7 +23,12 @@ registerDetector({
     // Only consider recognized source code files, excluding tests
     const codeFiles = index
       .all()
-      .filter((f) => EXT_TO_LANGUAGE.has(f.ext) && !isTestFile(f.name));
+      .filter(
+        (f) =>
+          EXT_TO_LANGUAGE.has(f.ext) &&
+          !isTestFile(f.name, f.relativePath) &&
+          !isGeneratedFile(f.name, f.relativePath),
+      );
 
     const counted = await mapWithConcurrency(
       codeFiles,

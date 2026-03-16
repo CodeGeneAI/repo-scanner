@@ -10,17 +10,23 @@ import {
 } from "./graphql-extractors";
 import { extractProto } from "./grpc-extractors";
 import {
+  extractAspNet,
   extractExpress,
   extractFlask,
   extractGoHttp,
+  extractLaravel,
   extractNestJsRest,
   extractRails,
+  extractRustWeb,
   extractSpring,
+  isAspNetController,
   isExpressLike,
   isFlaskLike,
   isGoHttp,
+  isLaravelRoute,
   isNestJsController,
   isRailsRoutes,
+  isRustWebFramework,
   isSpringController,
 } from "./rest-extractors";
 import type { RawEndpoint } from "./types";
@@ -63,6 +69,18 @@ const RB_EXTRACTORS: readonly ExtractorEntry[] = [
   { check: (_c, rp) => isRailsRoutes(rp), extract: extractRails },
 ];
 
+const CS_EXTRACTORS: readonly ExtractorEntry[] = [
+  { check: isAspNetController, extract: extractAspNet },
+];
+
+const RS_EXTRACTORS: readonly ExtractorEntry[] = [
+  { check: isRustWebFramework, extract: extractRustWeb },
+];
+
+const PHP_EXTRACTORS: readonly ExtractorEntry[] = [
+  { check: (c, rp) => isLaravelRoute(c, rp), extract: extractLaravel },
+];
+
 // Map of extension → extractors
 const EXTENSION_MAP: Record<string, readonly ExtractorEntry[]> = {
   ".ts": TS_EXTRACTORS,
@@ -73,6 +91,9 @@ const EXTENSION_MAP: Record<string, readonly ExtractorEntry[]> = {
   ".java": JAVA_KT_EXTRACTORS,
   ".kt": JAVA_KT_EXTRACTORS,
   ".rb": RB_EXTRACTORS,
+  ".cs": CS_EXTRACTORS,
+  ".rs": RS_EXTRACTORS,
+  ".php": PHP_EXTRACTORS,
 };
 
 // Extensions to scan

@@ -52,10 +52,13 @@ export interface RepoScanResult {
       readonly sampleSize: number;
     }[];
     readonly largeFiles?: readonly LargeFileInfo[];
+    readonly todoAnnotations?: readonly TodoAnnotation[];
+    readonly deadExports?: readonly DeadExport[];
   };
   readonly architecture: {
     readonly monorepo: boolean;
     readonly components: readonly Component[];
+    readonly crossPackageDeps?: CrossPackageDependencyGraph;
   };
   readonly buildAndTest: {
     readonly buildCommands: readonly string[];
@@ -117,6 +120,44 @@ export interface LargeFileInfo {
   readonly relativePath: string;
   readonly lineCount: number;
   readonly language: string;
+}
+
+export interface PackageDependencyEdge {
+  readonly from: string;
+  readonly to: string;
+  readonly fromName: string;
+  readonly toName: string;
+  readonly ecosystem: string;
+  readonly isDev: boolean;
+}
+
+export interface CrossPackageDependencyGraph {
+  readonly edges: readonly PackageDependencyEdge[];
+  readonly nodes: readonly string[];
+  readonly orphans: readonly string[];
+}
+
+export interface DeadExport {
+  readonly symbol: string;
+  readonly file: string;
+  readonly line: number;
+  readonly language: string;
+  readonly exportType:
+    | "function"
+    | "class"
+    | "const"
+    | "type"
+    | "interface"
+    | "enum"
+    | "other";
+}
+
+export interface TodoAnnotation {
+  readonly tag: "TODO" | "FIXME" | "HACK" | "BUG" | "XXX";
+  readonly text: string;
+  readonly file: string;
+  readonly line: number;
+  readonly author?: string;
 }
 
 export interface ApiEndpoint {

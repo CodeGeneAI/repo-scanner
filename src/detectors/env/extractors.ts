@@ -690,6 +690,77 @@ const extractLua: LanguageExtractor = (lines) =>
     },
   ]);
 
+// ─── F# ─────────────────────────────────────────────────────────────
+
+const extractFSharp: LanguageExtractor = (lines) =>
+  applyLineRules(lines, [
+    {
+      regex:
+        /(?:System\.)?Environment\.GetEnvironmentVariable\(\s*["']([A-Za-z_]\w*)["']\)/g,
+      build: (m, line) => ({
+        varName: m[1]!,
+        line,
+        pattern: `Environment.GetEnvironmentVariable("${m[1]}")`,
+        accessType: "read" as const,
+      }),
+    },
+  ]);
+
+// ─── VB.NET ─────────────────────────────────────────────────────────
+
+const extractVbNet: LanguageExtractor = (lines) =>
+  applyLineRules(lines, [
+    {
+      regex:
+        /Environment\.GetEnvironmentVariable\(\s*["']([A-Za-z_]\w*)["']\)/g,
+      build: (m, line) => ({
+        varName: m[1]!,
+        line,
+        pattern: `Environment.GetEnvironmentVariable("${m[1]}")`,
+        accessType: "read" as const,
+      }),
+    },
+  ]);
+
+// ─── Elixir ─────────────────────────────────────────────────────────
+
+const extractElixir: LanguageExtractor = (lines) =>
+  applyLineRules(lines, [
+    {
+      regex: /System\.get_env\(\s*["']([A-Za-z_]\w*)["']\)/g,
+      build: (m, line) => ({
+        varName: m[1]!,
+        line,
+        pattern: `System.get_env("${m[1]}")`,
+        accessType: "read" as const,
+      }),
+    },
+    {
+      regex: /System\.fetch_env!\(\s*["']([A-Za-z_]\w*)["']\)/g,
+      build: (m, line) => ({
+        varName: m[1]!,
+        line,
+        pattern: `System.fetch_env!("${m[1]}")`,
+        accessType: "read" as const,
+      }),
+    },
+  ]);
+
+// ─── Perl ───────────────────────────────────────────────────────────
+
+const extractPerl: LanguageExtractor = (lines) =>
+  applyLineRules(lines, [
+    {
+      regex: /\$ENV\{\s*["']?([A-Za-z_]\w*)["']?\s*\}/g,
+      build: (m, line) => ({
+        varName: m[1]!,
+        line,
+        pattern: `$ENV{${m[1]}}`,
+        accessType: "read" as const,
+      }),
+    },
+  ]);
+
 // ─── Registry ────────────────────────────────────────────────────────
 
 const extractorsByExt = new Map<string, LanguageExtractor>([
@@ -718,6 +789,12 @@ const extractorsByExt = new Map<string, LanguageExtractor>([
   [".scala", extractScala],
   [".dart", extractDart],
   [".lua", extractLua],
+  [".fs", extractFSharp],
+  [".fsx", extractFSharp],
+  [".vb", extractVbNet],
+  [".ex", extractElixir],
+  [".exs", extractElixir],
+  [".pl", extractPerl],
 ]);
 
 /** Get the extractor function for a file extension, or undefined if unsupported. */

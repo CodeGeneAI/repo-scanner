@@ -2,11 +2,14 @@ import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
   Component,
+  CrossPackageDependencyGraph,
+  DeadExport,
   EnvVarInfo,
   LanguageStats,
   LargeFileInfo,
   RepoScanResult,
   RuntimeInfo,
+  TodoAnnotation,
 } from "../types";
 import { classifyComponent } from "./component-classifier";
 
@@ -45,6 +48,9 @@ export const aggregate = (
   let runtimes: readonly RuntimeInfo[] = [];
   let apiSurface: ApiSurface | undefined;
   let largeFiles: readonly LargeFileInfo[] | undefined;
+  let todoAnnotations: readonly TodoAnnotation[] | undefined;
+  let crossPackageDeps: CrossPackageDependencyGraph | undefined;
+  let deadExports: readonly DeadExport[] | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -184,6 +190,40 @@ export const aggregate = (
       }
     }
 
+    // Extract TODO annotations
+    if (
+      result.detectorId === "todo" &&
+      Array.isArray(result.metadata?.todoAnnotations)
+    ) {
+      const annotations = result.metadata.todoAnnotations as TodoAnnotation[];
+      if (annotations.length > 0) {
+        todoAnnotations = annotations;
+      }
+    }
+
+    // Extract cross-package dependency graph
+    if (
+      result.detectorId === "cross-package-deps" &&
+      result.metadata?.crossPackageDeps
+    ) {
+      const graph = result.metadata
+        .crossPackageDeps as CrossPackageDependencyGraph;
+      if (graph.edges.length > 0) {
+        crossPackageDeps = graph;
+      }
+    }
+
+    // Extract dead exports
+    if (
+      result.detectorId === "dead-export" &&
+      Array.isArray(result.metadata?.deadExports)
+    ) {
+      const exports = result.metadata.deadExports as DeadExport[];
+      if (exports.length > 0) {
+        deadExports = exports;
+      }
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -212,8 +252,10 @@ export const aggregate = (
       apiSurface,
       namingConventions,
       largeFiles,
+      todoAnnotations,
+      deadExports,
     },
-    architecture: { monorepo: isMonorepo, components },
+    architecture: { monorepo: isMonorepo, components, crossPackageDeps },
     buildAndTest: {
       buildCommands: sorted(buildCommands),
       testCommands: sorted(testCommands),

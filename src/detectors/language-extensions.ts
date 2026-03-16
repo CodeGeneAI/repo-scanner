@@ -36,4 +36,5 @@ export const EXT_TO_LANGUAGE: ReadonlyMap<string, string> = new Map([
   [".tcl", "Tcl"],
   [".fs", "F#"],
   [".fsx", "F#"],
+  [".vb", "VB.NET"],
 ]);

@@ -122,6 +122,48 @@ const VERSION_CHECKS: readonly VersionCheck[] = [
     },
   },
 
+  // ── Dart ────────────────────────────────────────────────
+  {
+    language: "Dart",
+    source: ".dart-version",
+    fileName: ".dart-version",
+    extract: firstLine,
+  },
+  {
+    language: "Dart",
+    source: "pubspec.yaml sdk",
+    fileName: "pubspec.yaml",
+    extract: (content) => {
+      const m = /sdk:\s*['"]?>=?\s*([0-9]+\.[0-9]+\.[0-9]+)/.exec(content);
+      return m?.[1];
+    },
+  },
+
+  // ── Elixir ─────────────────────────────────────────────
+  {
+    language: "Elixir",
+    source: ".elixir-version",
+    fileName: ".elixir-version",
+    extract: firstLine,
+  },
+  {
+    language: "Elixir",
+    source: "mix.exs elixir",
+    fileName: "mix.exs",
+    extract: (content) => {
+      const m = /elixir:\s*"~>\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)"/.exec(content);
+      return m?.[1];
+    },
+  },
+
+  // ── Swift ──────────────────────────────────────────────
+  {
+    language: "Swift",
+    source: ".swift-version",
+    fileName: ".swift-version",
+    extract: firstLine,
+  },
+
   // ── .NET ────────────────────────────────────────────────
   {
     language: ".NET",
@@ -190,6 +232,9 @@ const TOOL_VERSIONS_MAP: Record<string, string> = {
   java: "Java",
   php: "PHP",
   dotnet: ".NET",
+  dart: "Dart",
+  elixir: "Elixir",
+  swift: "Swift",
 };
 
 // ─── .csproj TargetFramework ────────────────────────────────────────

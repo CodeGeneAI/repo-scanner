@@ -302,6 +302,162 @@ export const isSpringController = (content: string): boolean =>
   content.includes("@RestController") ||
   /@(?:Get|Post|Put|Delete|Patch|Request)Mapping/.test(content);
 
+// ─── ASP.NET Core ──────────────────────────────────────────────────
+
+/** Extract REST endpoints from ASP.NET controller attributes. */
+export const extractAspNet = (
+  lines: readonly string[],
+  filePath: string,
+): RawEndpoint[] => {
+  const endpoints: RawEndpoint[] = [];
+  let controllerPrefix = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+
+    // [Route("api/[controller]")] or [Route("prefix")]
+    const routeMatch = /\[Route\(\s*["']([^"']+)["']\s*\)\]/.exec(line);
+    if (routeMatch) {
+      controllerPrefix = routeMatch[1] ?? "";
+      continue;
+    }
+
+    // [HttpGet], [HttpGet("path")], [HttpPost("path")]
+    const methodMatch =
+      /\[Http(Get|Post|Put|Delete|Patch)\s*(?:\(\s*["']([^"']*?)["']\s*\))?\]/.exec(
+        line,
+      );
+    if (methodMatch) {
+      const method = methodMatch[1]!.toUpperCase();
+      const routePath = methodMatch[2] ?? "";
+      const fullPath = joinPaths(controllerPrefix, routePath);
+      endpoints.push({
+        method,
+        path: fullPath || "/",
+        file: filePath,
+        line: i + 1,
+        framework: "ASP.NET",
+      });
+    }
+  }
+
+  return endpoints;
+};
+
+/** Check if content looks like an ASP.NET controller. */
+export const isAspNetController = (content: string): boolean =>
+  content.includes("[ApiController]") ||
+  content.includes("ControllerBase") ||
+  /\[Http(?:Get|Post|Put|Delete|Patch)/.test(content);
+
+// ─── Rust Actix/Axum ───────────────────────────────────────────────
+
+/** Extract REST endpoints from Rust web frameworks (Actix-web, Axum). */
+export const extractRustWeb = (
+  lines: readonly string[],
+  filePath: string,
+): RawEndpoint[] => {
+  const endpoints: RawEndpoint[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (isCommentLine(line)) continue;
+
+    // Actix macros: #[get("/path")], #[post("/path")]
+    const actixMatch =
+      /#\[(get|post|put|delete|patch)\(\s*["']([^"']+)["']/.exec(line);
+    if (actixMatch) {
+      endpoints.push({
+        method: actixMatch[1]!.toUpperCase(),
+        path: actixMatch[2]!,
+        file: filePath,
+        line: i + 1,
+        framework: "Actix",
+      });
+      continue;
+    }
+
+    // Axum: .route("/path", get(...)) or .route("/path", post(...))
+    const axumMatch =
+      /\.route\(\s*["']([^"']+)["']\s*,\s*(?:get|post|put|delete|patch|method_router::)?(get|post|put|delete|patch)/i.exec(
+        line,
+      );
+    if (axumMatch) {
+      endpoints.push({
+        method: axumMatch[2]!.toUpperCase(),
+        path: axumMatch[1]!,
+        file: filePath,
+        line: i + 1,
+        framework: "Axum",
+      });
+    }
+  }
+
+  return endpoints;
+};
+
+/** Check if content looks like Rust web framework code. */
+export const isRustWebFramework = (content: string): boolean =>
+  /#\[(get|post|put|delete|patch)\(/.test(content) ||
+  content.includes("actix_web") ||
+  content.includes("axum::Router") ||
+  /\.route\(\s*["']/.test(content);
+
+// ─── PHP Laravel ───────────────────────────────────────────────────
+
+const LARAVEL_ROUTE_PATTERN =
+  /Route::(get|post|put|delete|patch|any)\(\s*['"]([^'"]+)['"]/g;
+
+/** Extract REST endpoints from Laravel route definitions. */
+export const extractLaravel = (
+  lines: readonly string[],
+  filePath: string,
+): RawEndpoint[] => {
+  const endpoints: RawEndpoint[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (isCommentLine(line)) continue;
+    LARAVEL_ROUTE_PATTERN.lastIndex = 0;
+    let m: RegExpExecArray | null;
+
+    while ((m = LARAVEL_ROUTE_PATTERN.exec(line)) !== null) {
+      endpoints.push({
+        method: m[1]!.toUpperCase(),
+        path: m[2]!,
+        file: filePath,
+        line: i + 1,
+        framework: "Laravel",
+      });
+    }
+
+    // Route::resource('photos')
+    const resourceMatch = /Route::resource\(\s*['"]([^'"]+)['"]/.exec(line);
+    if (resourceMatch) {
+      const resource = resourceMatch[1]!;
+      for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"] as const) {
+        endpoints.push({
+          method,
+          path: `/${resource}`,
+          file: filePath,
+          line: i + 1,
+          framework: "Laravel",
+        });
+      }
+    }
+  }
+
+  return endpoints;
+};
+
+/** Check if content looks like Laravel routes. */
+export const isLaravelRoute = (
+  content: string,
+  relativePath: string,
+): boolean =>
+  /Route::(get|post|put|delete|patch|any|resource)\(/.test(content) ||
+  relativePath.includes("routes/");
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /** Join two URL path segments, handling slashes. */

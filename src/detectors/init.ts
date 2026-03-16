@@ -17,3 +17,6 @@ import "./runtime";
 import "./api";
 import "./code-quality";
 import "./large-file";
+import "./todo";
+import "./cross-package-deps";
+import "./dead-export";

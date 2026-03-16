@@ -103,6 +103,14 @@ const RUBY_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["hanami", "Hanami"],
 ]);
 
+/** Elixir package → framework name. */
+const ELIXIR_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
+  [":phoenix", "Phoenix"],
+  [":phoenix_live_view", "Phoenix LiveView"],
+  [":absinthe", "Absinthe"],
+  [":nerves", "Nerves"],
+]);
+
 /** .NET framework indicators in .csproj files. */
 const DOTNET_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["Microsoft.AspNetCore", "ASP.NET Core"],
@@ -280,7 +288,23 @@ registerDetector({
       }
     }
 
-    // 7. Check .csproj files for .NET frameworks (primary only)
+    // 7. Check mix.exs for Elixir frameworks (primary only)
+    for (const mixFile of index.getByNamePrimary("mix.exs")) {
+      const content = await readText(mixFile.path);
+      if (!content) continue;
+
+      for (const [dep, framework] of ELIXIR_FRAMEWORK_MAP) {
+        if (content.includes(dep)) {
+          addFinding(
+            framework,
+            0.95,
+            `Elixir dependency: ${dep} in ${mixFile.relativePath}`,
+          );
+        }
+      }
+    }
+
+    // 8. Check .csproj files for .NET frameworks (primary only)
     for (const csprojFile of index.getByExtensionPrimary(".csproj")) {
       const content = await readText(csprojFile.path);
       if (!content) continue;
