@@ -2,6 +2,7 @@
 import { CliParseError, getHelpText, parseArgs } from "./cli";
 import { evaluateDependencyPolicy } from "./dependency/policy";
 import "./detectors/init";
+import { setDuplicationOptions } from "./detectors/code-duplication";
 import { setLargeFileThreshold } from "./detectors/large-file";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
@@ -23,6 +24,10 @@ const shouldEnableDependencyScan = (options: ReturnType<typeof parseArgs>) =>
 const main = async () => {
   const options = parseArgs(process.argv);
   setLargeFileThreshold(options.largeFileThreshold);
+  setDuplicationOptions({
+    minTokens: options.minTokens,
+    minLines: options.minLines,
+  });
   const dependenciesEnabled = shouldEnableDependencyScan(options);
 
   if (options.showHelp) {

@@ -20,3 +20,4 @@ import "./large-file";
 import "./todo";
 import "./cross-package-deps";
 import "./dead-export";
+import "./code-duplication";

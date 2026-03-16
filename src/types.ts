@@ -54,6 +54,7 @@ export interface RepoScanResult {
     readonly largeFiles?: readonly LargeFileInfo[];
     readonly todoAnnotations?: readonly TodoAnnotation[];
     readonly deadExports?: readonly DeadExport[];
+    readonly codeDuplication?: CodeDuplicationResult;
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -175,6 +176,32 @@ export interface ApiSurface {
   readonly frameworksUsed: readonly string[];
 }
 
+export interface CodeDuplicationInstance {
+  readonly file: string;
+  readonly startLine: number;
+  readonly endLine: number;
+}
+
+export interface CodeDuplicationGroup {
+  readonly id: number;
+  readonly instances: readonly CodeDuplicationInstance[];
+  readonly tokenCount: number;
+  readonly lineCount: number;
+}
+
+export interface CodeDuplicationStats {
+  readonly filesScanned: number;
+  readonly totalTokens: number;
+  readonly duplicateGroups: number;
+  readonly duplicatedLines: number;
+  readonly duplicationPercentage: number;
+}
+
+export interface CodeDuplicationResult {
+  readonly groups: readonly CodeDuplicationGroup[];
+  readonly stats: CodeDuplicationStats;
+}
+
 export interface CliOptions {
   readonly path: string;
   readonly format: "table" | "json";
@@ -194,6 +221,8 @@ export interface CliOptions {
   readonly failOnOutdatedCount?: number;
   readonly outdatedThreshold: OutdatedThreshold;
   readonly largeFileThreshold: number;
+  readonly minTokens: number;
+  readonly minLines: number;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;

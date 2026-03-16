@@ -1,6 +1,7 @@
 import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
+  CodeDuplicationResult,
   Component,
   CrossPackageDependencyGraph,
   DeadExport,
@@ -52,6 +53,7 @@ export const aggregate = (
   let todoAnnotations: readonly TodoAnnotation[] | undefined;
   let crossPackageDeps: CrossPackageDependencyGraph | undefined;
   let deadExports: readonly DeadExport[] | undefined;
+  let codeDuplication: CodeDuplicationResult | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -225,6 +227,18 @@ export const aggregate = (
       }
     }
 
+    // Extract code duplication
+    if (
+      result.detectorId === "code-duplication" &&
+      result.metadata?.codeDuplication
+    ) {
+      const duplication = result.metadata
+        .codeDuplication as CodeDuplicationResult;
+      if (duplication.stats.duplicateGroups > 0) {
+        codeDuplication = duplication;
+      }
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -256,6 +270,7 @@ export const aggregate = (
       largeFiles,
       todoAnnotations,
       deadExports,
+      codeDuplication,
     },
     architecture: { monorepo: isMonorepo, components, crossPackageDeps },
     buildAndTest: {

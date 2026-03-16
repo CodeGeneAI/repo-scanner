@@ -75,6 +75,8 @@ Options:
   --outdated-threshold <lvl>  Update threshold for --fail-on-outdated
                               Valid: patch,minor,major (default: patch)
   --large-file-threshold <n>  Line count threshold for large file detection (default: 500)
+  --min-tokens <n>            Minimum token window for duplication detection (default: 50)
+  --min-lines <n>             Minimum duplicate lines to report (default: 6)
   --help, -h                  Show this help text
 `;
 
@@ -163,6 +165,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let failOnOutdatedCount: number | undefined;
   let outdatedThreshold: OutdatedThreshold = "patch";
   let largeFileThreshold = 500;
+  let minTokens = 50;
+  let minLines = 6;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -293,6 +297,15 @@ export const parseArgs = (argv: string[]): CliOptions => {
           "--large-file-threshold",
         );
         break;
+      case "--min-tokens":
+        minTokens = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--min-tokens",
+        );
+        break;
+      case "--min-lines":
+        minLines = parseRequiredPositiveIntegerOption(args[++i], "--min-lines");
+        break;
     }
   }
 
@@ -315,6 +328,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
     failOnOutdatedCount,
     outdatedThreshold,
     largeFileThreshold,
+    minTokens,
+    minLines,
   };
 };
 

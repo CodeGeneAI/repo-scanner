@@ -1,0 +1,6 @@
+const crlf = "windows";
+function test() {
+  const x = 1;
+  const y = 2;
+  return x + y;
+}
