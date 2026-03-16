@@ -1,4 +1,4 @@
-import type { Language, Tree, Node as TSNode } from "web-tree-sitter";
+import type { Language, Tree } from "web-tree-sitter";
 import type {
   ClassInfo,
   FileAnalysis,
@@ -8,8 +8,9 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
+import { countBranches, findEnclosingFunction } from "./utils";
 
-const BRANCH_TYPES = new Set([
+const PY_BRANCH_TYPES = new Set([
   "if_statement",
   "for_statement",
   "while_statement",
@@ -17,29 +18,7 @@ const BRANCH_TYPES = new Set([
   "conditional_expression",
 ]);
 
-const countBranches = (node: TSNode | null): number => {
-  if (!node) return 0;
-  let count = 0;
-  const walk = (n: TSNode | null): void => {
-    if (!n) return;
-    if (BRANCH_TYPES.has(n.type)) count++;
-    for (let i = 0; i < n.childCount; i++) walk(n.child(i));
-  };
-  walk(node);
-  return count;
-};
-
-const findEnclosingFunction = (node: TSNode | null): string => {
-  let current = node?.parent;
-  while (current) {
-    if (current.type === "function_definition") {
-      const nameNode = current.childForFieldName("name");
-      if (nameNode) return nameNode.text;
-    }
-    current = current.parent;
-  }
-  return "<module>";
-};
+const PY_FUNCTION_TYPES = new Set(["function_definition"]);
 
 export const extractAll = (
   tree: Tree,
@@ -87,7 +66,7 @@ export const extractAll = (
         methods.push({
           name: methodName?.text ?? "<anonymous>",
           line: child.startPosition.row + 1,
-          complexity: 1 + countBranches(methodBody),
+          complexity: 1 + countBranches(methodBody, PY_BRANCH_TYPES),
           isOverride: bodyText.includes("super()"),
           isEmpty: isNoop,
           throwsNotImplemented: throwsNI,
@@ -176,7 +155,7 @@ export const extractAll = (
       typeChecks.push({
         checkedType: capture.node.text,
         line: capture.node.startPosition.row + 1,
-        inFunction: findEnclosingFunction(capture.node),
+        inFunction: findEnclosingFunction(capture.node, PY_FUNCTION_TYPES),
       });
     }
   } catch {
@@ -194,7 +173,7 @@ export const extractAll = (
         instantiations.push({
           className: name,
           line: capture.node.startPosition.row + 1,
-          inFunction: findEnclosingFunction(capture.node),
+          inFunction: findEnclosingFunction(capture.node, PY_FUNCTION_TYPES),
         });
       }
     }

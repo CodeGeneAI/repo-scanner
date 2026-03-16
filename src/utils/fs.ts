@@ -1,5 +1,11 @@
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, stat } from "fs/promises";
 import path from "path";
+
+/** Maximum directory recursion depth to prevent symlink loops and pathological nesting. */
+const MAX_WALK_DEPTH = 50;
+
+/** Maximum file size in bytes to read into memory (5 MB). */
+const MAX_READ_SIZE = 5 * 1024 * 1024;
 
 const IGNORE_DIRS = new Set([
   "node_modules",
@@ -47,15 +53,21 @@ export interface WalkOptions {
 
 /**
  * Recursively walk a directory, yielding file paths.
- * Skips common non-source directories for performance.
+ * Skips common non-source directories, symlinks, and enforces a depth limit.
  */
 export async function* walkFiles(
   rootPath: string,
   options?: WalkOptions,
+  depth = 0,
 ): AsyncGenerator<string> {
+  if (depth > MAX_WALK_DEPTH) return;
+
   const entries = await readdir(rootPath, { withFileTypes: true });
 
   for (const entry of entries) {
+    // Skip symlinks entirely to prevent loops and directory escape
+    if (entry.isSymbolicLink()) continue;
+
     if (entry.isDirectory()) {
       if (IGNORE_DIRS.has(entry.name)) continue;
       if (entry.name.startsWith(".")) {
@@ -63,7 +75,7 @@ export async function* walkFiles(
           continue;
         }
       }
-      yield* walkFiles(path.join(rootPath, entry.name), options);
+      yield* walkFiles(path.join(rootPath, entry.name), options, depth + 1);
     } else if (entry.isFile()) {
       if (options?.extensions) {
         const ext = path.extname(entry.name).toLowerCase();
@@ -107,11 +119,14 @@ export async function findFiles(
 
 /**
  * Read a file as UTF-8 text, returning undefined on any error.
+ * Skips files larger than MAX_READ_SIZE to prevent OOM on huge files.
  */
 export const readText = async (
   filePath: string,
 ): Promise<string | undefined> => {
   try {
+    const fileStats = await stat(filePath);
+    if (fileStats.size > MAX_READ_SIZE) return undefined;
     return await readFile(filePath, "utf-8");
   } catch {
     return undefined;

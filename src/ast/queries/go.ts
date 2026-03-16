@@ -1,4 +1,4 @@
-import type { Language, Tree, Node as TSNode } from "web-tree-sitter";
+import type { Language, Tree } from "web-tree-sitter";
 import type {
   ClassInfo,
   FileAnalysis,
@@ -8,8 +8,9 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
+import { countBranches, findEnclosingFunction } from "./utils";
 
-const BRANCH_TYPES = new Set([
+const GO_BRANCH_TYPES = new Set([
   "if_statement",
   "for_statement",
   "expression_switch_statement",
@@ -20,32 +21,10 @@ const BRANCH_TYPES = new Set([
   "default_case",
 ]);
 
-const countBranches = (node: TSNode | null): number => {
-  if (!node) return 0;
-  let count = 0;
-  const walk = (n: TSNode | null): void => {
-    if (!n) return;
-    if (BRANCH_TYPES.has(n.type)) count++;
-    for (let i = 0; i < n.childCount; i++) walk(n.child(i));
-  };
-  walk(node);
-  return count;
-};
-
-const findEnclosingFunction = (node: TSNode | null): string => {
-  let current = node?.parent;
-  while (current) {
-    if (
-      current.type === "function_declaration" ||
-      current.type === "method_declaration"
-    ) {
-      const nameNode = current.childForFieldName("name");
-      if (nameNode) return nameNode.text;
-    }
-    current = current.parent;
-  }
-  return "<module>";
-};
+const GO_FUNCTION_TYPES = new Set([
+  "function_declaration",
+  "method_declaration",
+]);
 
 export const extractAll = (
   tree: Tree,
@@ -113,7 +92,8 @@ export const extractAll = (
       const method: MethodInfo = {
         name: nameCapture.node.text,
         line: nameCapture.node.startPosition.row + 1,
-        complexity: 1 + countBranches(bodyCapture?.node ?? null),
+        complexity:
+          1 + countBranches(bodyCapture?.node ?? null, GO_BRANCH_TYPES),
         isOverride: false, // Go has no inheritance
         isEmpty: bodyText.trim() === "{}" || bodyText.trim() === "{ }",
         throwsNotImplemented:
@@ -204,7 +184,7 @@ export const extractAll = (
       typeChecks.push({
         checkedType: capture.node.text,
         line: capture.node.startPosition.row + 1,
-        inFunction: findEnclosingFunction(capture.node),
+        inFunction: findEnclosingFunction(capture.node, GO_FUNCTION_TYPES),
       });
     }
   } catch {
@@ -221,7 +201,7 @@ export const extractAll = (
       instantiations.push({
         className: capture.node.text,
         line: capture.node.startPosition.row + 1,
-        inFunction: findEnclosingFunction(capture.node),
+        inFunction: findEnclosingFunction(capture.node, GO_FUNCTION_TYPES),
       });
     }
   } catch {

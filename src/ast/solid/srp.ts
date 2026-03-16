@@ -1,4 +1,5 @@
 import type { FileAnalysis } from "../queries/types";
+import { computeScore } from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
 const WMC_ERROR = 20;
@@ -87,16 +88,6 @@ export const analyzeSrp = (
       : `${violations.length} violation${violations.length > 1 ? "s" : ""}: ${summarizeViolations(violations)}`;
 
   return { score, confidence: 0.9, violations, summary };
-};
-
-const computeScore = (violations: readonly Violation[]): number => {
-  let penalty = 0;
-  for (const v of violations) {
-    if (v.severity === "error") penalty += 15;
-    else if (v.severity === "warning") penalty += 8;
-    else penalty += 3;
-  }
-  return Math.max(0, 100 - penalty);
 };
 
 const summarizeViolations = (violations: readonly Violation[]): string => {

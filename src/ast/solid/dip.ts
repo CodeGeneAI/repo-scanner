@@ -1,4 +1,5 @@
 import type { FileAnalysis } from "../queries/types";
+import { computeScore } from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
 const INSTANTIATION_WARNING = 5;
@@ -50,14 +51,4 @@ export const analyzeDip = (
       : `${violations.length} file${violations.length > 1 ? "s" : ""} with excessive concrete dependencies`;
 
   return { score, confidence: 0.85, violations, summary };
-};
-
-const computeScore = (violations: readonly Violation[]): number => {
-  let penalty = 0;
-  for (const v of violations) {
-    if (v.severity === "error") penalty += 15;
-    else if (v.severity === "warning") penalty += 8;
-    else penalty += 3;
-  }
-  return Math.max(0, 100 - penalty);
 };

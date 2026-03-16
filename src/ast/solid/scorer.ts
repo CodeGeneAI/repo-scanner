@@ -15,6 +15,18 @@ const WEIGHTS = {
 
 const MAX_WORST_FILES = 20;
 
+/** Penalty points per violation severity. */
+const SEVERITY_PENALTY = { error: 15, warning: 8, info: 3 } as const;
+
+/** Compute a 0-100 score from violations using standard penalty weights. */
+export const computeScore = (violations: readonly Violation[]): number => {
+  let penalty = 0;
+  for (const v of violations) {
+    penalty += SEVERITY_PENALTY[v.severity];
+  }
+  return Math.max(0, 100 - penalty);
+};
+
 /** Compute composite SOLID score from principle results. */
 export const computeCompositeScore = (principles: {
   srp: PrincipleResult;
@@ -62,16 +74,9 @@ export const computeWorstFiles = (
   // Score each file
   const fileScores: FileScore[] = [];
   for (const [file, violations] of byFile) {
-    let penalty = 0;
-    for (const v of violations) {
-      if (v.severity === "error") penalty += 15;
-      else if (v.severity === "warning") penalty += 8;
-      else penalty += 3;
-    }
-
     fileScores.push({
       file,
-      score: Math.max(0, 100 - penalty),
+      score: computeScore(violations),
       violations: violations.length,
       language: fileLanguages.get(file) ?? "unknown",
     });

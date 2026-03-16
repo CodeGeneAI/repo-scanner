@@ -1,4 +1,4 @@
-import type { Language, Tree, Node as TSNode } from "web-tree-sitter";
+import type { Language, Tree } from "web-tree-sitter";
 import type {
   ClassInfo,
   FileAnalysis,
@@ -8,8 +8,12 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
+import { countBranches, findEnclosingFunction } from "./utils";
 
-const BRANCH_TYPES = new Set([
+/** Estimated average lines per method body when exact LOC is unavailable. */
+const ESTIMATED_METHOD_LOC = 5;
+
+const RS_BRANCH_TYPES = new Set([
   "if_expression",
   "if_let_expression",
   "for_expression",
@@ -19,29 +23,7 @@ const BRANCH_TYPES = new Set([
   "else_clause",
 ]);
 
-const countBranches = (node: TSNode | null): number => {
-  if (!node) return 0;
-  let count = 0;
-  const walk = (n: TSNode | null): void => {
-    if (!n) return;
-    if (BRANCH_TYPES.has(n.type)) count++;
-    for (let i = 0; i < n.childCount; i++) walk(n.child(i));
-  };
-  walk(node);
-  return count;
-};
-
-const findEnclosingFunction = (node: TSNode | null): string => {
-  let current = node?.parent;
-  while (current) {
-    if (current.type === "function_item") {
-      const nameNode = current.childForFieldName("name");
-      if (nameNode) return nameNode.text;
-    }
-    current = current.parent;
-  }
-  return "<module>";
-};
+const RS_FUNCTION_TYPES = new Set(["function_item"]);
 
 export const extractAll = (
   tree: Tree,
@@ -101,7 +83,8 @@ export const extractAll = (
       const method: MethodInfo = {
         name: nameCapture.node.text,
         line: nameCapture.node.startPosition.row + 1,
-        complexity: 1 + countBranches(bodyCapture?.node ?? null),
+        complexity:
+          1 + countBranches(bodyCapture?.node ?? null, RS_BRANCH_TYPES),
         isOverride: false,
         isEmpty: bodyText.trim() === "{}" || bodyText.trim() === "{ }",
         throwsNotImplemented:
@@ -125,7 +108,7 @@ export const extractAll = (
       line: info.line,
       methods,
       fieldCount: info.fieldCount,
-      loc: info.loc + methods.length * 5,
+      loc: info.loc + methods.length * ESTIMATED_METHOD_LOC,
     });
   }
 
@@ -198,7 +181,7 @@ export const extractAll = (
         typeChecks.push({
           checkedType: name,
           line: capture.node.startPosition.row + 1,
-          inFunction: findEnclosingFunction(capture.node),
+          inFunction: findEnclosingFunction(capture.node, RS_FUNCTION_TYPES),
         });
       }
     }
@@ -216,7 +199,7 @@ export const extractAll = (
       instantiations.push({
         className: capture.node.text,
         line: capture.node.startPosition.row + 1,
-        inFunction: findEnclosingFunction(capture.node),
+        inFunction: findEnclosingFunction(capture.node, RS_FUNCTION_TYPES),
       });
     }
   } catch {

@@ -40,9 +40,19 @@ export const scanRepo = async (
   const index = await FileIndex.build(absolutePath);
   const detectors = getDetectors();
 
-  const results = await Promise.all(
+  // Use allSettled so one failing detector doesn't crash the entire scan
+  const settled = await Promise.allSettled(
     detectors.map((detector) => detector.detect(absolutePath, index)),
   );
+  const results = settled
+    .filter(
+      (
+        r,
+      ): r is PromiseFulfilledResult<
+        Awaited<ReturnType<(typeof detectors)[0]["detect"]>>
+      > => r.status === "fulfilled",
+    )
+    .map((r) => r.value);
 
   const durationMs = Math.round(performance.now() - start);
   const baseResult = aggregate(absolutePath, durationMs, results);

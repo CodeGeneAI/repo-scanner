@@ -24,7 +24,8 @@ const EXTRACTORS: ReadonlyMap<string, Extractor> = new Map([
   [".rs", extractRust],
   [".cs", extractCSharp],
   [".java", extractJava],
-  [".kt", extractJava], // Kotlin uses same grammar patterns as Java
+  // Note: Kotlin (.kt) intentionally excluded — its tree-sitter grammar
+  // produces different node types than Java's. Add a dedicated extractor if needed.
 ]);
 
 /**

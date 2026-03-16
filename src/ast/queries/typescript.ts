@@ -1,4 +1,4 @@
-import type { Language, Tree, Node as TSNode } from "web-tree-sitter";
+import type { Language, Tree } from "web-tree-sitter";
 import type {
   ClassInfo,
   FileAnalysis,
@@ -8,69 +8,29 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
+import {
+  bodyThrowsNotImplemented,
+  countBranches,
+  findEnclosingFunction,
+  isEmptyBody,
+} from "./utils";
 
-/** Count branching nodes within a subtree for cyclomatic complexity. */
-const countBranches = (node: TSNode | null): number => {
-  if (!node) return 0;
-  let count = 0;
-  const BRANCH_TYPES = new Set([
-    "if_statement",
-    "for_statement",
-    "for_in_statement",
-    "while_statement",
-    "do_statement",
-    "switch_case",
-    "catch_clause",
-    "ternary_expression",
-  ]);
+const TS_BRANCH_TYPES = new Set([
+  "if_statement",
+  "for_statement",
+  "for_in_statement",
+  "while_statement",
+  "do_statement",
+  "switch_case",
+  "catch_clause",
+  "ternary_expression",
+]);
 
-  const walk = (n: TSNode | null): void => {
-    if (!n) return;
-    if (BRANCH_TYPES.has(n.type)) count++;
-    for (let i = 0; i < n.childCount; i++) {
-      walk(n.child(i));
-    }
-  };
-  walk(node);
-  return count;
-};
-
-/** Check if a method body throws NotImplementedError or similar. */
-const bodyThrowsNotImplemented = (node: TSNode | null): boolean => {
-  if (!node) return false;
-  const text = node.text;
-  return (
-    text.includes("throw new Error") ||
-    text.includes("NotImplementedError") ||
-    text.includes("not implemented") ||
-    text.includes("TODO") ||
-    text.includes("FIXME")
-  );
-};
-
-/** Check if method body is empty (0-1 statements, or just return/pass). */
-const isEmptyBody = (node: TSNode | null): boolean => {
-  if (!node) return true;
-  const text = node.text.trim();
-  return text === "{}" || text === "{ }" || text === "{ return; }";
-};
-
-/** Find the nearest enclosing function/method name. */
-const findEnclosingFunction = (node: TSNode | null): string => {
-  let current = node?.parent;
-  while (current) {
-    if (
-      current.type === "function_declaration" ||
-      current.type === "method_definition" ||
-      current.type === "arrow_function"
-    ) {
-      const nameNode = current.childForFieldName("name");
-      if (nameNode) return nameNode.text;
-    }
-    current = current.parent;
-  }
-  return "<module>";
-};
+const TS_FUNCTION_TYPES = new Set([
+  "function_declaration",
+  "method_definition",
+  "arrow_function",
+]);
 
 export const extractAll = (
   tree: Tree,
@@ -115,7 +75,7 @@ export const extractAll = (
         methods.push({
           name: methodName?.text ?? "<anonymous>",
           line: child.startPosition.row + 1,
-          complexity: 1 + countBranches(methodBody),
+          complexity: 1 + countBranches(methodBody, TS_BRANCH_TYPES),
           isOverride: hasOverride,
           isEmpty: isEmptyBody(methodBody),
           throwsNotImplemented: bodyThrowsNotImplemented(methodBody),
@@ -236,7 +196,7 @@ export const extractAll = (
     instantiations.push({
       className,
       line: capture.node.startPosition.row + 1,
-      inFunction: findEnclosingFunction(capture.node),
+      inFunction: findEnclosingFunction(capture.node, TS_FUNCTION_TYPES),
     });
   }
 
@@ -250,7 +210,7 @@ export const extractAll = (
       typeChecks.push({
         checkedType: capture.node.text,
         line: capture.node.startPosition.row + 1,
-        inFunction: findEnclosingFunction(capture.node),
+        inFunction: findEnclosingFunction(capture.node, TS_FUNCTION_TYPES),
       });
     }
   } catch {

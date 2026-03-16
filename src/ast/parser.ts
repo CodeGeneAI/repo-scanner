@@ -1,8 +1,15 @@
 import path from "path";
 import { Language, Parser, type Tree } from "web-tree-sitter";
 
-let initialized = false;
+/** Promise-based init guard to prevent double-init race condition. */
+let initPromise: Promise<void> | null = null;
+
 const languageCache = new Map<string, InstanceType<typeof Language>>();
+const languageLoadPromises = new Map<
+  string,
+  Promise<InstanceType<typeof Language>>
+>();
+const parserCache = new Map<string, Parser>();
 
 const WASM_DIR = path.resolve(
   __dirname,
@@ -22,7 +29,6 @@ const EXT_TO_WASM: ReadonlyMap<string, string> = new Map([
   [".rs", "tree-sitter-rust.wasm"],
   [".cs", "tree-sitter-c_sharp.wasm"],
   [".java", "tree-sitter-java.wasm"],
-  [".kt", "tree-sitter-kotlin.wasm"],
 ]);
 
 /** Extensions supported by the AST parser. */
@@ -33,24 +39,46 @@ export interface ParseResult {
   readonly lang: InstanceType<typeof Language>;
 }
 
-/** Ensure Parser WASM runtime is initialized. */
-const ensureInit = async (): Promise<void> => {
-  if (!initialized) {
-    await Parser.init();
-    initialized = true;
+/** Ensure Parser WASM runtime is initialized (race-safe). */
+const ensureInit = (): Promise<void> => {
+  if (!initPromise) {
+    initPromise = Parser.init();
   }
+  return initPromise;
 };
 
-/** Load a language grammar, using the cache. */
+/** Load a language grammar, deduplicating concurrent loads. */
 const loadLanguage = async (
   wasmFile: string,
 ): Promise<InstanceType<typeof Language>> => {
   const cached = languageCache.get(wasmFile);
   if (cached) return cached;
 
-  const lang = await Language.load(path.join(WASM_DIR, wasmFile));
-  languageCache.set(wasmFile, lang);
-  return lang;
+  // Deduplicate concurrent loads of the same language
+  const existing = languageLoadPromises.get(wasmFile);
+  if (existing) return existing;
+
+  const promise = Language.load(path.join(WASM_DIR, wasmFile)).then((lang) => {
+    languageCache.set(wasmFile, lang);
+    languageLoadPromises.delete(wasmFile);
+    return lang;
+  });
+  languageLoadPromises.set(wasmFile, promise);
+  return promise;
+};
+
+/** Get or create a cached parser for a given language. */
+const getParser = (
+  wasmFile: string,
+  lang: InstanceType<typeof Language>,
+): Parser => {
+  const cached = parserCache.get(wasmFile);
+  if (cached) return cached;
+
+  const parser = new Parser();
+  parser.setLanguage(lang);
+  parserCache.set(wasmFile, parser);
+  return parser;
 };
 
 /**
@@ -67,8 +95,7 @@ export const parseFile = async (
   try {
     await ensureInit();
     const lang = await loadLanguage(wasmFile);
-    const parser = new Parser();
-    parser.setLanguage(lang);
+    const parser = getParser(wasmFile, lang);
     const tree = parser.parse(source);
     if (!tree) return null;
     return { tree, lang };

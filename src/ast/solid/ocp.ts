@@ -1,4 +1,5 @@
 import type { FileAnalysis, TypeCheckInfo } from "../queries/types";
+import { computeScore } from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
 const TYPE_CHECK_WARNING = 3;
@@ -58,14 +59,4 @@ export const analyzeOcp = (
       : `${violations.length} function${violations.length > 1 ? "s" : ""} with type-dispatch chains`;
 
   return { score, confidence: 0.7, violations, summary };
-};
-
-const computeScore = (violations: readonly Violation[]): number => {
-  let penalty = 0;
-  for (const v of violations) {
-    if (v.severity === "error") penalty += 15;
-    else if (v.severity === "warning") penalty += 8;
-    else penalty += 3;
-  }
-  return Math.max(0, 100 - penalty);
 };
