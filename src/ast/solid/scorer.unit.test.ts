@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeCompositeScore, computeScore } from "./scorer";
+import {
+  buildResult,
+  computeCompositeScore,
+  computeScore,
+  computeWorstFiles,
+} from "./scorer";
 import type { PrincipleResult, Violation } from "./types";
 
 /** Create a violation with a given severity. */
@@ -123,5 +128,98 @@ describe("computeCompositeScore", () => {
       dip: makePrinciple(score),
     };
     expect(computeCompositeScore(principles)).toBe(score);
+  });
+});
+
+/** Create a full PrincipleResult with violations. */
+const makePrincipleWithViolations = (
+  violations: Violation[],
+): PrincipleResult => ({
+  score: computeScore(violations),
+  confidence: 0.9,
+  violations,
+  summary: "",
+});
+
+/** Helper to create principles with no violations except those provided. */
+const emptyPrinciples = () => ({
+  srp: makePrinciple(100),
+  ocp: makePrinciple(100),
+  lsp: makePrinciple(100),
+  isp: makePrinciple(100),
+  dip: makePrinciple(100),
+});
+
+describe("computeWorstFiles", () => {
+  it("groups violations by file", () => {
+    const principles = {
+      ...emptyPrinciples(),
+      srp: makePrincipleWithViolations([
+        { ...makeViolation("error"), file: "a.ts" },
+        { ...makeViolation("warning"), file: "a.ts" },
+        { ...makeViolation("warning"), file: "b.ts" },
+      ]),
+    };
+
+    const result = computeWorstFiles(principles, new Map());
+
+    expect(result).toHaveLength(2);
+    const fileA = result.find((f) => f.file === "a.ts");
+    const fileB = result.find((f) => f.file === "b.ts");
+    expect(fileA).toBeDefined();
+    expect(fileA!.violations).toBe(2);
+    expect(fileB).toBeDefined();
+    expect(fileB!.violations).toBe(1);
+  });
+
+  it("sorts by score ascending (worst first)", () => {
+    const principles = {
+      ...emptyPrinciples(),
+      srp: makePrincipleWithViolations([
+        // b.ts has 1 warning = score 92
+        { ...makeViolation("warning"), file: "b.ts" },
+        // a.ts has 2 errors = score 70
+        { ...makeViolation("error"), file: "a.ts" },
+        { ...makeViolation("error"), file: "a.ts" },
+      ]),
+    };
+
+    const result = computeWorstFiles(principles, new Map());
+
+    expect(result.length).toBe(2);
+    expect(result[0]!.file).toBe("a.ts");
+    expect(result[0]!.score).toBeLessThan(result[1]!.score);
+  });
+
+  it("caps at MAX_WORST_FILES (20)", () => {
+    // Create 25 files, each with one error violation
+    const violations: Violation[] = Array.from({ length: 25 }, (_, i) => ({
+      ...makeViolation("error"),
+      file: `file${i}.ts`,
+    }));
+
+    const principles = {
+      ...emptyPrinciples(),
+      srp: makePrincipleWithViolations(violations),
+    };
+
+    const result = computeWorstFiles(principles, new Map());
+
+    expect(result).toHaveLength(20);
+  });
+});
+
+describe("buildResult", () => {
+  it("returns correct shape", () => {
+    const principles = emptyPrinciples();
+    const fileLanguages = new Map([["a.ts", "typescript"]]);
+
+    const result = buildResult(principles, fileLanguages, 10, 5);
+
+    expect(result.score).toBe(100);
+    expect(result.principles).toBe(principles);
+    expect(result.analyzedFiles).toBe(10);
+    expect(result.analyzedClasses).toBe(5);
+    expect(Array.isArray(result.worstFiles)).toBe(true);
   });
 });

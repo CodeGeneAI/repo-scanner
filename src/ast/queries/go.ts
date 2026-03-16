@@ -10,6 +10,9 @@ import type {
 } from "./types";
 import { countBranches, findEnclosingFunction } from "./utils";
 
+/** Estimated average lines per method body when exact LOC is unavailable. */
+const ESTIMATED_METHOD_LOC = 5;
+
 const GO_BRANCH_TYPES = new Set([
   "if_statement",
   "for_statement",
@@ -113,8 +116,7 @@ export const extractAll = (
   // Build classes from structs + methods
   for (const [name, info] of structMap) {
     const methods = methodsByStruct.get(name) ?? [];
-    const totalLoc =
-      info.loc + methods.reduce((sum, m) => sum + m.complexity, 0);
+    const totalLoc = info.loc + methods.length * ESTIMATED_METHOD_LOC;
     classes.push({
       name,
       line: info.line,

@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileIndex } from "../utils/file-index";
+import { setSolidOptions } from "./solid-health";
 import "./init";
 import { getDetectors } from "./registry";
 import type { Detector } from "./types";
@@ -38,5 +39,12 @@ describe("solid-health detector", () => {
 
     expect(result.detectorId).toBe("solid-health");
     expect(result.findings).toHaveLength(0);
+  });
+
+  it("exports setSolidOptions as a callable function", () => {
+    expect(typeof setSolidOptions).toBe("function");
+    // Should not throw when called with valid options
+    expect(() => setSolidOptions({ enabled: false })).not.toThrow();
+    expect(() => setSolidOptions({})).not.toThrow();
   });
 });

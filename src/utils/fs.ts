@@ -146,14 +146,14 @@ const stripTrailingCommas = (text: string): string =>
 export const readJson = async <T>(filePath: string): Promise<T | undefined> => {
   try {
     const content = await readFile(filePath, "utf-8");
-    return JSON.parse(content) as T;
-  } catch {
     try {
-      const content = await readFile(filePath, "utf-8");
-      return JSON.parse(stripTrailingCommas(content)) as T;
+      return JSON.parse(content) as T;
     } catch {
-      return undefined;
+      // Retry with JSONC support (strip trailing commas)
+      return JSON.parse(stripTrailingCommas(content)) as T;
     }
+  } catch {
+    return undefined;
   }
 };
 

@@ -27,19 +27,14 @@ describe("parseFile", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null for empty source", async () => {
+  it("returns a valid tree for empty source", async () => {
     const result = await parseFile("", ".ts");
 
-    // tree-sitter parses empty strings into a tree with just a "program" root,
-    // so the parser may still return a result. If it does, the tree should be valid.
-    // If the implementation returns null for empty source, that is also acceptable.
-    if (result === null) {
-      expect(result).toBeNull();
-    } else {
-      expect(result.tree).toBeDefined();
-      expect(result.tree.rootNode.type).toBe("program");
-      expect(result.tree.rootNode.childCount).toBe(0);
-    }
+    // tree-sitter parses empty strings into a tree with just a "program" root
+    expect(result).not.toBeNull();
+    expect(result!.tree).toBeDefined();
+    expect(result!.tree.rootNode.type).toBe("program");
+    expect(result!.tree.rootNode.childCount).toBe(0);
   });
 
   it("tree has correct root node type for TypeScript", async () => {
