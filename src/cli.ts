@@ -74,6 +74,7 @@ Options:
   --fail-on-outdated-count <n> Exit with code 1 when outdated matches >= n
   --outdated-threshold <lvl>  Update threshold for --fail-on-outdated
                               Valid: patch,minor,major (default: patch)
+  --large-file-threshold <n>  Line count threshold for large file detection (default: 500)
   --help, -h                  Show this help text
 `;
 
@@ -161,6 +162,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let failOnOutdated = false;
   let failOnOutdatedCount: number | undefined;
   let outdatedThreshold: OutdatedThreshold = "patch";
+  let largeFileThreshold = 500;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -285,6 +287,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
         outdatedThreshold = parsed;
         break;
       }
+      case "--large-file-threshold":
+        largeFileThreshold = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--large-file-threshold",
+        );
+        break;
     }
   }
 
@@ -306,6 +314,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     failOnOutdated,
     failOnOutdatedCount,
     outdatedThreshold,
+    largeFileThreshold,
   };
 };
 

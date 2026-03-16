@@ -51,6 +51,7 @@ export interface RepoScanResult {
       readonly percentage: number;
       readonly sampleSize: number;
     }[];
+    readonly largeFiles?: readonly LargeFileInfo[];
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -112,6 +113,12 @@ export interface RuntimeInfo {
   readonly file: string;
 }
 
+export interface LargeFileInfo {
+  readonly relativePath: string;
+  readonly lineCount: number;
+  readonly language: string;
+}
+
 export interface ApiEndpoint {
   readonly method: string;
   readonly path: string;
@@ -144,6 +151,7 @@ export interface CliOptions {
   readonly failOnOutdated: boolean;
   readonly failOnOutdatedCount?: number;
   readonly outdatedThreshold: OutdatedThreshold;
+  readonly largeFileThreshold: number;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;

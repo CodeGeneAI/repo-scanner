@@ -166,6 +166,28 @@ export const renderTable = (
     }
   }
 
+  // Large Files
+  if (result.inventory.largeFiles && result.inventory.largeFiles.length > 0) {
+    w(section("Large Files"));
+    w(
+      `  Found: ${result.inventory.largeFiles.length} file(s) exceeding line threshold\n`,
+    );
+    const MAX_SHOWN = 20;
+    const shown = result.inventory.largeFiles.slice(0, MAX_SHOWN);
+    for (const lf of shown) {
+      const lines = lf.lineCount.toLocaleString().padStart(8);
+      const lang = lf.language.padEnd(14);
+      w(
+        `    ${YELLOW}${lines} lines${RESET}  ${lang} ${DIM}${lf.relativePath}${RESET}\n`,
+      );
+    }
+    if (result.inventory.largeFiles.length > MAX_SHOWN) {
+      w(
+        `    ${DIM}... +${result.inventory.largeFiles.length - MAX_SHOWN} more${RESET}\n`,
+      );
+    }
+  }
+
   if (result.dependencies) {
     w(section("Dependencies"));
 

@@ -1,66 +1,10 @@
-import { readFile } from "fs/promises";
 import type { LanguageStats } from "../types";
 import { mapWithConcurrency } from "../utils/concurrency";
 import type { FileIndex, IndexedFile } from "../utils/file-index";
+import { countLines } from "../utils/fs";
+import { EXT_TO_LANGUAGE } from "./language-extensions";
 import { registerDetector } from "./registry";
 import type { DetectorResult, Finding } from "./types";
-
-/** Count newlines in a file. Returns 0 on read errors. */
-const countLines = async (filePath: string): Promise<number> => {
-  try {
-    const content = await readFile(filePath, "utf-8");
-    if (content.length === 0) return 0;
-    let count = 0;
-    for (let i = 0; i < content.length; i++) {
-      if (content.charCodeAt(i) === 10) count++;
-    }
-    // A non-empty file with no trailing newline still has at least 1 line
-    if (content.charCodeAt(content.length - 1) !== 10) count++;
-    return count;
-  } catch {
-    return 0;
-  }
-};
-
-/** Extension → language name mapping. */
-const EXT_TO_LANGUAGE: ReadonlyMap<string, string> = new Map([
-  [".ts", "TypeScript"],
-  [".tsx", "TypeScript"],
-  [".js", "JavaScript"],
-  [".jsx", "JavaScript"],
-  [".mjs", "JavaScript"],
-  [".cjs", "JavaScript"],
-  [".py", "Python"],
-  [".go", "Go"],
-  [".rs", "Rust"],
-  [".java", "Java"],
-  [".cs", "C#"],
-  [".rb", "Ruby"],
-  [".php", "PHP"],
-  [".swift", "Swift"],
-  [".dart", "Dart"],
-  [".c", "C"],
-  [".h", "C"],
-  [".cpp", "C++"],
-  [".cc", "C++"],
-  [".cxx", "C++"],
-  [".hpp", "C++"],
-  [".kt", "Kotlin"],
-  [".scala", "Scala"],
-  [".ex", "Elixir"],
-  [".exs", "Elixir"],
-  [".zig", "Zig"],
-  [".lua", "Lua"],
-  [".r", "R"],
-  [".R", "R"],
-  [".pl", "Perl"],
-  [".sh", "Shell"],
-  [".bash", "Shell"],
-  [".zsh", "Shell"],
-  [".tcl", "Tcl"],
-  [".fs", "F#"],
-  [".fsx", "F#"],
-]);
 
 /** Confidence based on file count. */
 const fileCountConfidence = (count: number): number => {

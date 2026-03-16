@@ -2,6 +2,7 @@
 import { CliParseError, getHelpText, parseArgs } from "./cli";
 import { evaluateDependencyPolicy } from "./dependency/policy";
 import "./detectors/init";
+import { setLargeFileThreshold } from "./detectors/large-file";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { scanRepo } from "./scanner";
@@ -21,6 +22,7 @@ const shouldEnableDependencyScan = (options: ReturnType<typeof parseArgs>) =>
 
 const main = async () => {
   const options = parseArgs(process.argv);
+  setLargeFileThreshold(options.largeFileThreshold);
   const dependenciesEnabled = shouldEnableDependencyScan(options);
 
   if (options.showHelp) {

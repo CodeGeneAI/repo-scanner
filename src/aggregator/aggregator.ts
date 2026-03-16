@@ -4,6 +4,7 @@ import type {
   Component,
   EnvVarInfo,
   LanguageStats,
+  LargeFileInfo,
   RepoScanResult,
   RuntimeInfo,
 } from "../types";
@@ -43,6 +44,7 @@ export const aggregate = (
   let envVars: readonly EnvVarInfo[] = [];
   let runtimes: readonly RuntimeInfo[] = [];
   let apiSurface: ApiSurface | undefined;
+  let largeFiles: readonly LargeFileInfo[] | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -171,6 +173,17 @@ export const aggregate = (
       apiSurface = result.metadata.apiSurface as ApiSurface;
     }
 
+    // Extract large files
+    if (
+      result.detectorId === "large-file" &&
+      Array.isArray(result.metadata?.largeFiles)
+    ) {
+      const files = result.metadata.largeFiles as LargeFileInfo[];
+      if (files.length > 0) {
+        largeFiles = files;
+      }
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -198,6 +211,7 @@ export const aggregate = (
       runtimes,
       apiSurface,
       namingConventions,
+      largeFiles,
     },
     architecture: { monorepo: isMonorepo, components },
     buildAndTest: {

@@ -16,3 +16,4 @@ import "./naming-convention";
 import "./runtime";
 import "./api";
 import "./code-quality";
+import "./large-file";

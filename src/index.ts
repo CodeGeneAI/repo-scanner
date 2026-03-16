@@ -12,6 +12,7 @@ export type {
   EnvVarInfo,
   EnvVarUsage,
   LanguageStats,
+  LargeFileInfo,
   RepoScanResult,
   RuntimeInfo,
   ScanRepoOptions,

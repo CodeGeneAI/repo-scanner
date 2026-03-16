@@ -141,3 +141,20 @@ export const readJson = async <T>(filePath: string): Promise<T | undefined> => {
     }
   }
 };
+
+/** Count newlines in a file. Returns 0 on read errors. */
+export const countLines = async (filePath: string): Promise<number> => {
+  try {
+    const content = await readFile(filePath, "utf-8");
+    if (content.length === 0) return 0;
+    let count = 0;
+    for (let i = 0; i < content.length; i++) {
+      if (content.charCodeAt(i) === 10) count++;
+    }
+    // A non-empty file with no trailing newline still has at least 1 line
+    if (content.charCodeAt(content.length - 1) !== 10) count++;
+    return count;
+  } catch {
+    return 0;
+  }
+};
