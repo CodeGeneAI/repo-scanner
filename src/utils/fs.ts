@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from "fs/promises";
+import { readdir } from "fs/promises";
 import path from "path";
 
 /** Maximum directory recursion depth to prevent symlink loops and pathological nesting. */
@@ -62,6 +62,7 @@ export async function* walkFiles(
 ): AsyncGenerator<string> {
   if (depth > MAX_WALK_DEPTH) return;
 
+  // Keep readdir from fs/promises — Bun has no Dirent-returning equivalent
   const entries = await readdir(rootPath, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -120,14 +121,15 @@ export async function findFiles(
 /**
  * Read a file as UTF-8 text, returning undefined on any error.
  * Skips files larger than MAX_READ_SIZE to prevent OOM on huge files.
+ * Uses Bun's native file I/O for performance.
  */
 export const readText = async (
   filePath: string,
 ): Promise<string | undefined> => {
   try {
-    const fileStats = await stat(filePath);
-    if (fileStats.size > MAX_READ_SIZE) return undefined;
-    return await readFile(filePath, "utf-8");
+    const file = Bun.file(filePath);
+    if (file.size > MAX_READ_SIZE) return undefined;
+    return await file.text();
   } catch {
     return undefined;
   }
@@ -142,10 +144,11 @@ const stripTrailingCommas = (text: string): string =>
 /**
  * Read and parse a JSON file, returning undefined on any error.
  * Supports JSONC (trailing commas).
+ * Uses Bun's native file I/O for performance.
  */
 export const readJson = async <T>(filePath: string): Promise<T | undefined> => {
   try {
-    const content = await readFile(filePath, "utf-8");
+    const content = await Bun.file(filePath).text();
     try {
       return JSON.parse(content) as T;
     } catch {
@@ -157,10 +160,10 @@ export const readJson = async <T>(filePath: string): Promise<T | undefined> => {
   }
 };
 
-/** Count newlines in a file. Returns 0 on read errors. */
+/** Count newlines in a file. Returns 0 on read errors. Uses Bun's native file I/O. */
 export const countLines = async (filePath: string): Promise<number> => {
   try {
-    const content = await readFile(filePath, "utf-8");
+    const content = await Bun.file(filePath).text();
     if (content.length === 0) return 0;
     let count = 0;
     for (let i = 0; i < content.length; i++) {

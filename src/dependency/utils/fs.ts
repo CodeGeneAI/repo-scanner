@@ -1,4 +1,4 @@
-import { readdir, readFile } from "fs/promises";
+import { readdir } from "fs/promises";
 import path from "path";
 
 const IGNORE_DIRS = new Set([
@@ -34,6 +34,7 @@ export async function* walkFiles(
   rootPath: string,
   extensions?: ReadonlySet<string>,
 ): AsyncGenerator<string> {
+  // Keep readdir from fs/promises — Bun has no Dirent-returning equivalent
   const entries = await readdir(rootPath, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -82,12 +83,13 @@ export async function findFiles(
 
 /**
  * Read a file as UTF-8 text, returning undefined if it doesn't exist or is binary.
+ * Uses Bun's native file I/O for performance.
  */
 export const readTextFile = async (
   filePath: string,
 ): Promise<string | undefined> => {
   try {
-    const content = await readFile(filePath, "utf-8");
+    const content = await Bun.file(filePath).text();
     // Quick binary check: if there's a null byte in the first 8KB, skip it
     if (content.slice(0, 8192).includes("\0")) return undefined;
     return content;
@@ -99,12 +101,13 @@ export const readTextFile = async (
 /**
  * Read a file as UTF-8 text, returning undefined on any error.
  * Unlike readTextFile, this does not perform a binary check.
+ * Uses Bun's native file I/O for performance.
  */
 export const readText = async (
   filePath: string,
 ): Promise<string | undefined> => {
   try {
-    return await readFile(filePath, "utf-8");
+    return await Bun.file(filePath).text();
   } catch {
     return undefined;
   }
@@ -119,18 +122,18 @@ const stripTrailingCommas = (text: string): string =>
 /**
  * Read and parse a JSON file, returning undefined on any error.
  * Supports JSONC (trailing commas) for compatibility with bun.lock.
+ * Uses Bun's native file I/O for performance.
  */
 export const readJson = async <T>(filePath: string): Promise<T | undefined> => {
   try {
-    const content = await readFile(filePath, "utf-8");
-    return JSON.parse(content) as T;
-  } catch {
-    // Retry with trailing comma stripping (JSONC)
+    const content = await Bun.file(filePath).text();
     try {
-      const content = await readFile(filePath, "utf-8");
-      return JSON.parse(stripTrailingCommas(content)) as T;
+      return JSON.parse(content) as T;
     } catch {
-      return undefined;
+      // Retry with trailing comma stripping (JSONC)
+      return JSON.parse(stripTrailingCommas(content)) as T;
     }
+  } catch {
+    return undefined;
   }
 };
