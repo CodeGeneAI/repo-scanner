@@ -77,6 +77,8 @@ Options:
   --large-file-threshold <n>  Line count threshold for large file detection (default: 500)
   --min-tokens <n>            Minimum token window for duplication detection (default: 50)
   --min-lines <n>             Minimum duplicate lines to report (default: 6)
+  --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
+  --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
   --help, -h                  Show this help text
 `;
 
@@ -167,6 +169,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let largeFileThreshold = 500;
   let minTokens = 50;
   let minLines = 6;
+  let solid = false;
+  let solidThreshold = 80;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -306,6 +310,15 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--min-lines":
         minLines = parseRequiredPositiveIntegerOption(args[++i], "--min-lines");
         break;
+      case "--solid":
+        solid = true;
+        break;
+      case "--solid-threshold":
+        solidThreshold = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--solid-threshold",
+        );
+        break;
     }
   }
 
@@ -330,6 +343,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
     largeFileThreshold,
     minTokens,
     minLines,
+    solid,
+    solidThreshold,
   };
 };
 

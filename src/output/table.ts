@@ -301,6 +301,74 @@ export const renderTable = (
     }
   }
 
+  // SOLID Health
+  if (result.inventory.solidHealth) {
+    const sh = result.inventory.solidHealth;
+    const scoreColor =
+      sh.score >= 80 ? GREEN : sh.score >= 50 ? YELLOW : "\x1b[31m";
+    w(section("SOLID Health"));
+    w(
+      `  Score: ${BOLD}${scoreColor}${sh.score}/100${RESET}  ${DIM}(${sh.analyzedFiles} files, ${sh.analyzedClasses} classes)${RESET}\n\n`,
+    );
+
+    const confidenceLabel = (c: number) =>
+      c >= 0.8 ? "high" : c >= 0.6 ? "medium" : "low";
+
+    const principles = [
+      { key: "SRP", data: sh.principles.srp },
+      { key: "OCP", data: sh.principles.ocp },
+      { key: "LSP", data: sh.principles.lsp },
+      { key: "ISP", data: sh.principles.isp },
+      { key: "DIP", data: sh.principles.dip },
+    ] as const;
+
+    for (const { key, data } of principles) {
+      const pColor =
+        data.score >= 80 ? GREEN : data.score >= 50 ? YELLOW : "\x1b[31m";
+      const conf = confidenceLabel(data.confidence);
+      const violCount = data.violations.length;
+      w(
+        `  ${BOLD}${key}${RESET}  ${pColor}${String(data.score).padStart(3)}/100${RESET}  ${DIM}(${conf} confidence)${RESET}  ${violCount > 0 ? `${violCount} violation${violCount > 1 ? "s" : ""}` : `${GREEN}clean${RESET}`}\n`,
+      );
+    }
+
+    if (sh.worstFiles.length > 0) {
+      w(`\n  ${BOLD}Worst Files:${RESET}\n`);
+      const MAX_SHOWN = 10;
+      for (const f of sh.worstFiles.slice(0, MAX_SHOWN)) {
+        const fColor =
+          f.score >= 80 ? GREEN : f.score >= 50 ? YELLOW : "\x1b[31m";
+        w(
+          `    ${fColor}${String(f.score).padStart(3)}/100${RESET}  ${f.file}  ${DIM}(${f.violations} violations)${RESET}\n`,
+        );
+      }
+      if (sh.worstFiles.length > MAX_SHOWN) {
+        w(`    ${DIM}... +${sh.worstFiles.length - MAX_SHOWN} more${RESET}\n`);
+      }
+    }
+
+    // Top violations
+    const allViolations = [
+      ...sh.principles.srp.violations,
+      ...sh.principles.ocp.violations,
+      ...sh.principles.lsp.violations,
+      ...sh.principles.isp.violations,
+      ...sh.principles.dip.violations,
+    ];
+    if (allViolations.length > 0) {
+      w(`\n  ${BOLD}Top Violations:${RESET}\n`);
+      const topViolations = allViolations
+        .filter((v) => v.severity === "error" || v.severity === "warning")
+        .slice(0, 10);
+      for (const v of topViolations) {
+        const sev = v.severity === "error" ? "\x1b[31m" : YELLOW;
+        w(
+          `    ${sev}${v.principle.padEnd(4)}${RESET} ${DIM}${v.file}:${v.line}${RESET}  ${v.entity}: ${v.message}\n`,
+        );
+      }
+    }
+  }
+
   if (result.dependencies) {
     w(section("Dependencies"));
 

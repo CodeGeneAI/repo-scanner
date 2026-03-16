@@ -1,3 +1,4 @@
+import type { SolidHealthResult } from "../ast/solid/types";
 import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
@@ -54,6 +55,7 @@ export const aggregate = (
   let crossPackageDeps: CrossPackageDependencyGraph | undefined;
   let deadExports: readonly DeadExport[] | undefined;
   let codeDuplication: CodeDuplicationResult | undefined;
+  let solidHealth: SolidHealthResult | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -239,6 +241,11 @@ export const aggregate = (
       }
     }
 
+    // Extract SOLID health
+    if (result.detectorId === "solid-health" && result.metadata?.solidHealth) {
+      solidHealth = result.metadata.solidHealth as SolidHealthResult;
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -271,6 +278,7 @@ export const aggregate = (
       todoAnnotations,
       deadExports,
       codeDuplication,
+      solidHealth,
     },
     architecture: { monorepo: isMonorepo, components, crossPackageDeps },
     buildAndTest: {

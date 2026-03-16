@@ -21,3 +21,4 @@ import "./todo";
 import "./cross-package-deps";
 import "./dead-export";
 import "./code-duplication";
+import "./solid-health";

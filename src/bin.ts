@@ -4,6 +4,7 @@ import { evaluateDependencyPolicy } from "./dependency/policy";
 import "./detectors/init";
 import { setDuplicationOptions } from "./detectors/code-duplication";
 import { setLargeFileThreshold } from "./detectors/large-file";
+import { setSolidOptions } from "./detectors/solid-health";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { scanRepo } from "./scanner";
@@ -27,6 +28,10 @@ const main = async () => {
   setDuplicationOptions({
     minTokens: options.minTokens,
     minLines: options.minLines,
+  });
+  setSolidOptions({
+    enabled: options.solid,
+    threshold: options.solidThreshold,
   });
   const dependenciesEnabled = shouldEnableDependencyScan(options);
 

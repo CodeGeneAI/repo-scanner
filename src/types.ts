@@ -1,3 +1,4 @@
+import type { SolidHealthResult } from "./ast/solid/types";
 import type {
   DependencyComponentGroupingMode,
   DepScannerResult,
@@ -5,6 +6,8 @@ import type {
   OutdatedThreshold,
   VulnerabilitySeverity,
 } from "./dependency/types";
+
+export type { SolidHealthResult } from "./ast/solid/types";
 
 export type ComponentKind =
   | "app"
@@ -55,6 +58,7 @@ export interface RepoScanResult {
     readonly todoAnnotations?: readonly TodoAnnotation[];
     readonly deadExports?: readonly DeadExport[];
     readonly codeDuplication?: CodeDuplicationResult;
+    readonly solidHealth?: SolidHealthResult;
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -223,6 +227,8 @@ export interface CliOptions {
   readonly largeFileThreshold: number;
   readonly minTokens: number;
   readonly minLines: number;
+  readonly solid: boolean;
+  readonly solidThreshold: number;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;

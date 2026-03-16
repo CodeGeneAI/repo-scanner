@@ -23,5 +23,6 @@ export type {
   RepoScanResult,
   RuntimeInfo,
   ScanRepoOptions,
+  SolidHealthResult,
   TodoAnnotation,
 } from "./types";
