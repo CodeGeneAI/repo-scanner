@@ -195,4 +195,27 @@ describe("repo-scanner bin", () => {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
+
+  it("emits dry-check compatibility json when --dry-check is enabled", async () => {
+    const repoPath = await createCliFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--dry-check",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(new TextDecoder().decode(result.stdout));
+      expect(payload.scanPath).toBeDefined();
+      expect(payload.stats).toBeDefined();
+      expect(Array.isArray(payload.groups)).toBeTrue();
+      expect(payload.inventory).toBeUndefined();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
 });

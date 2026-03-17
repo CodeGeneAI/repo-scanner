@@ -56,6 +56,7 @@ Usage: repo-scanner [options]
 Options:
   --path <dir>                Directory to scan (default: cwd)
   --format <fmt>              Output format: table | json (default: table)
+  --dry-check                 Run duplication-only scan with dry-check output contract
   --deps                      Enable deep dependency analysis
   --deps-debug                Emit dependency debug diagnostics to stderr
   --ecosystems <list>         Comma-separated ecosystems to scan (default: all)
@@ -77,6 +78,10 @@ Options:
   --large-file-threshold <n>  Line count threshold for large file detection (default: 500)
   --min-tokens <n>            Minimum token window for duplication detection (default: 50)
   --min-lines <n>             Minimum duplicate lines to report (default: 6)
+  --extensions <list>         Comma-separated file extensions for duplication scan
+  --min-unique-ratio <f>      Min distinct/total token ratio for duplication filtering (default: 0.10)
+  --max-literal-ratio <f>     Max literal token ratio for duplication filtering (default: 0.50)
+  --no-barrel-filter          Disable barrel re-export duplication filtering
   --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
   --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
   --help, -h                  Show this help text
@@ -120,6 +125,14 @@ const parsePositiveInteger = (raw: string): number | undefined => {
   return parsed;
 };
 
+const parseUnitInterval = (raw: string): number | undefined => {
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    return undefined;
+  }
+  return parsed;
+};
+
 const isFlagToken = (raw: string | undefined): boolean =>
   raw?.startsWith("--") ?? false;
 
@@ -152,6 +165,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let pathArg = process.cwd();
   let format: "table" | "json" = "table";
   let showHelp = false;
+  let dryCheck = false;
   let deps = false;
   let depsDebug = false;
   let ecosystems: Ecosystem[] | undefined;
@@ -169,6 +183,10 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let largeFileThreshold = 500;
   let minTokens = 50;
   let minLines = 6;
+  let extensions: string[] = [];
+  let minUniqueRatio = 0.1;
+  let maxLiteralRatio = 0.5;
+  let ignoreBarrelExports = true;
   let solid = false;
   let solidThreshold = 80;
 
@@ -196,6 +214,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       }
       case "--deps":
         deps = true;
+        break;
+      case "--dry-check":
+        dryCheck = true;
         break;
       case "--deps-debug":
         depsDebug = true;
@@ -310,6 +331,34 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--min-lines":
         minLines = parseRequiredPositiveIntegerOption(args[++i], "--min-lines");
         break;
+      case "--extensions":
+        extensions = (args[++i] ?? "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+          .map((value) => (value.startsWith(".") ? value : `.${value}`));
+        break;
+      case "--min-unique-ratio": {
+        const raw = args[++i] ?? "";
+        minUniqueRatio =
+          parseUnitInterval(raw) ??
+          failCliParse(
+            `Error: invalid min-unique-ratio "${raw}". Value must be between 0 and 1.`,
+          );
+        break;
+      }
+      case "--max-literal-ratio": {
+        const raw = args[++i] ?? "";
+        maxLiteralRatio =
+          parseUnitInterval(raw) ??
+          failCliParse(
+            `Error: invalid max-literal-ratio "${raw}". Value must be between 0 and 1.`,
+          );
+        break;
+      }
+      case "--no-barrel-filter":
+        ignoreBarrelExports = false;
+        break;
       case "--solid":
         solid = true;
         break;
@@ -326,6 +375,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     path: pathArg,
     format,
     showHelp,
+    dryCheck,
     deps,
     depsDebug,
     ecosystems,
@@ -343,6 +393,10 @@ export const parseArgs = (argv: string[]): CliOptions => {
     largeFileThreshold,
     minTokens,
     minLines,
+    extensions,
+    minUniqueRatio,
+    maxLiteralRatio,
+    ignoreBarrelExports,
     solid,
     solidThreshold,
   };

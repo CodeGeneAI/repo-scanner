@@ -211,6 +211,7 @@ export interface CliOptions {
   readonly path: string;
   readonly format: "table" | "json";
   readonly showHelp: boolean;
+  readonly dryCheck: boolean;
   readonly deps: boolean;
   readonly depsDebug: boolean;
   readonly ecosystems?: readonly Ecosystem[];
@@ -228,6 +229,10 @@ export interface CliOptions {
   readonly largeFileThreshold: number;
   readonly minTokens: number;
   readonly minLines: number;
+  readonly extensions: readonly string[];
+  readonly minUniqueRatio: number;
+  readonly maxLiteralRatio: number;
+  readonly ignoreBarrelExports: boolean;
   readonly solid: boolean;
   readonly solidThreshold: number;
 }

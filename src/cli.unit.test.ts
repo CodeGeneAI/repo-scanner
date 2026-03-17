@@ -5,6 +5,7 @@ describe("parseArgs", () => {
   it("parses default values", () => {
     const result = parseArgs(["bun", "repo-scanner"]);
 
+    expect(result.dryCheck).toBeFalse();
     expect(result.deps).toBeFalse();
     expect(result.depsDebug).toBeFalse();
     expect(result.skipSecurity).toBeFalse();
@@ -17,6 +18,10 @@ describe("parseArgs", () => {
     expect(result.failOnOutdated).toBeFalse();
     expect(result.failOnOutdatedCount).toBeUndefined();
     expect(result.outdatedThreshold).toBe("patch");
+    expect(result.extensions).toEqual([]);
+    expect(result.minUniqueRatio).toBe(0.1);
+    expect(result.maxLiteralRatio).toBe(0.5);
+    expect(result.ignoreBarrelExports).toBeTrue();
   });
 
   it("parses dependency options", () => {
@@ -70,5 +75,26 @@ describe("parseArgs", () => {
     ]);
 
     expect(result.ecosystems).toEqual(["npm", "pypi", "go"]);
+  });
+
+  it("parses dry-check compatibility flags", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--dry-check",
+      "--extensions",
+      "ts,py",
+      "--min-unique-ratio",
+      "0.2",
+      "--max-literal-ratio",
+      "0.8",
+      "--no-barrel-filter",
+    ]);
+
+    expect(result.dryCheck).toBeTrue();
+    expect(result.extensions).toEqual([".ts", ".py"]);
+    expect(result.minUniqueRatio).toBe(0.2);
+    expect(result.maxLiteralRatio).toBe(0.8);
+    expect(result.ignoreBarrelExports).toBeFalse();
   });
 });
