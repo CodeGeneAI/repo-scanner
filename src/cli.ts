@@ -84,6 +84,8 @@ Options:
   --no-barrel-filter          Disable barrel re-export duplication filtering
   --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
   --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
+  --env-include-tests         Include test files in env var detection
+  --version, -v               Show version number
   --help, -h                  Show this help text
 `;
 
@@ -165,6 +167,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let pathArg = process.cwd();
   let format: "table" | "json" = "table";
   let showHelp = false;
+  let showVersion = false;
   let dryCheck = false;
   let deps = false;
   let depsDebug = false;
@@ -189,11 +192,16 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let ignoreBarrelExports = true;
   let solid = false;
   let solidThreshold = 80;
+  let envIncludeTests = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
 
     switch (arg) {
+      case "--version":
+      case "-v":
+        showVersion = true;
+        break;
       case "--help":
       case "-h":
         showHelp = true;
@@ -359,6 +367,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--no-barrel-filter":
         ignoreBarrelExports = false;
         break;
+      case "--env-include-tests":
+        envIncludeTests = true;
+        break;
       case "--solid":
         solid = true;
         break;
@@ -375,6 +386,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     path: pathArg,
     format,
     showHelp,
+    showVersion,
     dryCheck,
     deps,
     depsDebug,
@@ -399,7 +411,13 @@ export const parseArgs = (argv: string[]): CliOptions => {
     ignoreBarrelExports,
     solid,
     solidThreshold,
+    envIncludeTests,
   };
 };
 
 export const getHelpText = () => HELP_TEXT;
+
+export const getVersion = async (): Promise<string> => {
+  const { default: pkg } = await import("../package.json");
+  return pkg.version;
+};

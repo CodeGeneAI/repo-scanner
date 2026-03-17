@@ -1,4 +1,5 @@
 import type { EnvVarInfo, EnvVarUsage } from "../../types";
+import { isTestFile } from "../../utils/file-filters";
 import type { FileIndex } from "../../utils/file-index";
 import { readText } from "../../utils/fs";
 import { registerDetector } from "../registry";
@@ -15,6 +16,13 @@ import { getExtractorForExtension, SUPPORTED_EXTENSIONS } from "./extractors";
 import { detectFrameworkPrefix, inferType, isRequired } from "./inference";
 import type { ExtractorMatch } from "./types";
 
+let includeTestFiles = false;
+
+/** Include env vars found in test files (disabled by default). */
+export const setEnvIncludeTestFiles = (include: boolean): void => {
+  includeTestFiles = include;
+};
+
 /** Matches with their source file path attached. */
 interface FileMatch extends ExtractorMatch {
   readonly file: string;
@@ -23,8 +31,10 @@ interface FileMatch extends ExtractorMatch {
 /** Process source files using language extractors. */
 const extractFromSourceFiles = async (
   index: FileIndex,
+  includeTestFiles: boolean,
 ): Promise<FileMatch[]> => {
   const allMatches: FileMatch[] = [];
+  const matcher = index.ignoreMatcher;
 
   for (const ext of SUPPORTED_EXTENSIONS) {
     const extractor = getExtractorForExtension(ext);
@@ -32,6 +42,11 @@ const extractFromSourceFiles = async (
 
     const files = index.getByExtensionPrimary(ext);
     for (const file of files) {
+      if (!includeTestFiles && isTestFile(file.name, file.relativePath))
+        continue;
+      // Check scoped .scanignore rules for env detector
+      if (matcher?.ignores(file.relativePath, false, "env")) continue;
+
       const content = await readText(file.path);
       if (!content) continue;
 
@@ -171,7 +186,7 @@ registerDetector({
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
     // Extract from source files and config files concurrently
     const [sourceMatches, configMatches] = await Promise.all([
-      extractFromSourceFiles(index),
+      extractFromSourceFiles(index, includeTestFiles),
       extractFromConfigFiles(index),
     ]);
 

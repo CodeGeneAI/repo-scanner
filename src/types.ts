@@ -22,6 +22,7 @@ export interface Component {
   readonly name: string;
   readonly path: string;
   readonly kind: ComponentKind;
+  readonly secondaryKinds?: readonly ComponentKind[];
   readonly description: string;
   readonly confidence: number;
   readonly evidence: readonly string[];
@@ -44,6 +45,13 @@ export interface RepoScanResult {
     readonly frameworks: readonly string[];
     readonly datastores: readonly string[];
     readonly dependencyManagers: readonly string[];
+    readonly containerization: readonly string[];
+    readonly iac: readonly string[];
+    readonly testing: readonly string[];
+    readonly buildTools: readonly string[];
+    readonly linting: readonly string[];
+    readonly codeQuality: readonly string[];
+    readonly deploymentPlatforms: readonly string[];
     readonly repoTools: readonly string[];
     readonly envVars: readonly EnvVarInfo[];
     readonly runtimes: readonly RuntimeInfo[];
@@ -211,6 +219,7 @@ export interface CliOptions {
   readonly path: string;
   readonly format: "table" | "json";
   readonly showHelp: boolean;
+  readonly showVersion: boolean;
   readonly dryCheck: boolean;
   readonly deps: boolean;
   readonly depsDebug: boolean;
@@ -235,6 +244,7 @@ export interface CliOptions {
   readonly ignoreBarrelExports: boolean;
   readonly solid: boolean;
   readonly solidThreshold: number;
+  readonly envIncludeTests: boolean;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;

@@ -1,4 +1,5 @@
 import type { RepoScanResult } from "../types";
+import { deriveProtocol } from "../utils/protocol";
 
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
@@ -11,22 +12,6 @@ const check = (v: boolean) => (v ? `${GREEN}✓${RESET}` : `${DIM}✗${RESET}`);
 const section = (title: string) => `\n${BOLD}${CYAN}${title}${RESET}\n`;
 const list = (items: readonly string[]) =>
   items.length > 0 ? items.join(", ") : `${DIM}(none)${RESET}`;
-
-/** Derive protocol from method. */
-const deriveProtocol = (method: string): string => {
-  switch (method) {
-    case "QUERY":
-    case "MUTATION":
-    case "SUBSCRIPTION":
-      return "GraphQL";
-    case "RPC":
-      return "gRPC";
-    case "WS":
-      return "WebSocket";
-    default:
-      return "REST";
-  }
-};
 
 export const renderTable = (
   result: RepoScanResult,
@@ -46,8 +31,12 @@ export const renderTable = (
     w(`  Components (${result.architecture.components.length}):\n`);
     for (const c of result.architecture.components) {
       const desc = c.description ? ` ${DIM}— ${c.description}${RESET}` : "";
+      const secondary =
+        c.secondaryKinds && c.secondaryKinds.length > 0
+          ? ` ${DIM}(+${c.secondaryKinds.join(", +")})${RESET}`
+          : "";
       w(
-        `    ${YELLOW}${c.kind.padEnd(8)}${RESET} ${c.name}${desc} ${DIM}${c.path}${RESET}\n`,
+        `    ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${desc} ${DIM}${c.path}${RESET}\n`,
       );
     }
   }
@@ -101,7 +90,22 @@ export const renderTable = (
   w(`  Frameworks:   ${list(result.inventory.frameworks)}\n`);
   w(`  Datastores:   ${list(result.inventory.datastores)}\n`);
   w(`  Dep Managers: ${list(result.inventory.dependencyManagers)}\n`);
-  w(`  Repo Tools:   ${list(result.inventory.repoTools)}\n`);
+  if (result.inventory.containerization.length > 0)
+    w(`  Containers:   ${list(result.inventory.containerization)}\n`);
+  if (result.inventory.iac.length > 0)
+    w(`  IaC:          ${list(result.inventory.iac)}\n`);
+  if (result.inventory.testing.length > 0)
+    w(`  Testing:      ${list(result.inventory.testing)}\n`);
+  if (result.inventory.buildTools.length > 0)
+    w(`  Build Tools:  ${list(result.inventory.buildTools)}\n`);
+  if (result.inventory.linting.length > 0)
+    w(`  Linting:      ${list(result.inventory.linting)}\n`);
+  if (result.inventory.codeQuality.length > 0)
+    w(`  Code Quality: ${list(result.inventory.codeQuality)}\n`);
+  if (result.inventory.deploymentPlatforms.length > 0)
+    w(`  Deploy:       ${list(result.inventory.deploymentPlatforms)}\n`);
+  if (result.inventory.repoTools.length > 0)
+    w(`  Other Tools:  ${list(result.inventory.repoTools)}\n`);
 
   if (result.inventory.envVars.length > 0) {
     w(section("Environment Variables"));

@@ -1,6 +1,8 @@
 import type { ApiSurface } from "../../types";
+import { isTestFile } from "../../utils/file-filters";
 import type { FileIndex } from "../../utils/file-index";
 import { readText } from "../../utils/fs";
+import { deriveProtocol } from "../../utils/protocol";
 import { registerDetector } from "../registry";
 import type { DetectorResult } from "../types";
 import {
@@ -120,29 +122,13 @@ const EXTENSION_MAP: Record<string, readonly ExtractorEntry[]> = {
 // Extensions to scan
 const SCAN_EXTENSIONS = Object.keys(EXTENSION_MAP);
 
-// ─── Protocol derivation ────────────────────────────────────────────
-
-const deriveProtocol = (method: string): string => {
-  switch (method) {
-    case "QUERY":
-    case "MUTATION":
-    case "SUBSCRIPTION":
-      return "GraphQL";
-    case "RPC":
-      return "gRPC";
-    case "WS":
-      return "WebSocket";
-    default:
-      return "REST";
-  }
-};
-
 // ─── Detector ───────────────────────────────────────────────────────
 
 registerDetector({
   id: "api-surface",
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
     const allEndpoints: RawEndpoint[] = [];
+    const matcher = index.ignoreMatcher;
 
     // Scan source files by extension
     for (const ext of SCAN_EXTENSIONS) {
@@ -150,6 +136,8 @@ registerDetector({
       const files = index.getByExtensionPrimary(ext);
 
       for (const f of files) {
+        if (isTestFile(f.name, f.relativePath)) continue;
+        if (matcher?.ignores(f.relativePath, false, "api")) continue;
         const content = await readText(f.path);
         if (!content) continue;
 

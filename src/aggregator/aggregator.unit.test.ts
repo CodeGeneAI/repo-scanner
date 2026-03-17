@@ -130,7 +130,7 @@ describe("aggregate", () => {
 
     const result = aggregate(scanPath, durationMs, results);
     expect(result.signals.hasDeploymentPlatform).toBe(true);
-    expect(result.inventory.repoTools).toContain("Vercel");
+    expect(result.inventory.deploymentPlatforms).toContain("Vercel");
   });
 
   it("merges commands from multiple detectors", () => {

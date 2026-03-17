@@ -1,13 +1,16 @@
 import { readdir } from "fs/promises";
 import path from "path";
+import type { IgnoreMatcher } from "./scanignore";
+import { buildIgnoreMatcher, readScanignore } from "./scanignore";
 
 /** Maximum directory recursion depth to prevent symlink loops and pathological nesting. */
-const MAX_WALK_DEPTH = 50;
+export const MAX_WALK_DEPTH = 50;
 
 /** Maximum file size in bytes to read into memory (5 MB). */
 const MAX_READ_SIZE = 5 * 1024 * 1024;
 
-const IGNORE_DIRS = new Set([
+/** Directories to always skip during filesystem walks. */
+export const IGNORE_DIRS = new Set([
   "node_modules",
   "vendor",
   ".git",
@@ -53,6 +56,10 @@ export interface WalkOptions {
   extensions?: ReadonlySet<string>;
   /** Include specific dot-prefixed directories (.github, .circleci, etc.) */
   includeDotDirs?: boolean;
+  /** Ignore matcher for .scanignore support. */
+  ignoreMatcher?: IgnoreMatcher;
+  /** Root path for computing relative paths (used internally for ignore matching). */
+  rootForRelative?: string;
 }
 
 /**
@@ -66,12 +73,36 @@ export async function* walkFiles(
 ): AsyncGenerator<string> {
   if (depth > MAX_WALK_DEPTH) return;
 
+  const relativeRoot = options?.rootForRelative ?? rootPath;
+  let matcher = options?.ignoreMatcher;
+
+  // Check for a .scanignore file in this directory (nested/additive)
+  if (depth > 0) {
+    const childRules = await readScanignore(rootPath);
+    if (childRules.length > 0) {
+      const dirRel = path.relative(relativeRoot, rootPath);
+      if (matcher) {
+        matcher = matcher.child(dirRel, childRules);
+      } else {
+        // No parent matcher — create a fresh one scoped to this directory
+        matcher = buildIgnoreMatcher(
+          childRules.map((r) =>
+            r.anchored ? { ...r, pattern: `${dirRel}/${r.pattern}` } : r,
+          ),
+        );
+      }
+    }
+  }
+
   // Keep readdir from fs/promises — Bun has no Dirent-returning equivalent
   const entries = await readdir(rootPath, { withFileTypes: true });
 
   for (const entry of entries) {
     // Skip symlinks entirely to prevent loops and directory escape
     if (entry.isSymbolicLink()) continue;
+
+    const fullPath = path.join(rootPath, entry.name);
+    const relativePath = path.relative(relativeRoot, fullPath);
 
     if (entry.isDirectory()) {
       if (IGNORE_DIRS.has(entry.name)) continue;
@@ -80,13 +111,23 @@ export async function* walkFiles(
           continue;
         }
       }
-      yield* walkFiles(path.join(rootPath, entry.name), options, depth + 1);
+      // Check .scanignore rules
+      if (matcher?.ignores(relativePath, true)) continue;
+
+      yield* walkFiles(
+        fullPath,
+        { ...options, ignoreMatcher: matcher, rootForRelative: relativeRoot },
+        depth + 1,
+      );
     } else if (entry.isFile()) {
       if (options?.extensions) {
         const ext = path.extname(entry.name).toLowerCase();
         if (!options.extensions.has(ext)) continue;
       }
-      yield path.join(rootPath, entry.name);
+      // Check .scanignore rules
+      if (matcher?.ignores(relativePath, false)) continue;
+
+      yield fullPath;
     }
   }
 }

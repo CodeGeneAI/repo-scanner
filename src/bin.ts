@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 import fs from "fs";
 import path from "path";
-import { CliParseError, getHelpText, parseArgs } from "./cli";
+import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import { scanForDuplicates } from "./code-duplication/scanner";
 import { evaluateDependencyPolicy } from "./dependency/policy";
+import { setEnvIncludeTestFiles } from "./detectors/env";
 import "./detectors/init";
 import { setDuplicationOptions } from "./detectors/code-duplication";
 import { setLargeFileThreshold } from "./detectors/large-file";
@@ -59,6 +60,13 @@ const main = async () => {
     enabled: options.solid,
     threshold: options.solidThreshold,
   });
+  setEnvIncludeTestFiles(options.envIncludeTests);
+
+  if (options.showVersion) {
+    const version = await getVersion();
+    process.stdout.write(`${version}\n`);
+    process.exit(0);
+  }
 
   if (options.showHelp) {
     process.stdout.write(getHelpText());

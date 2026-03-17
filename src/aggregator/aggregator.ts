@@ -13,18 +13,28 @@ import type {
   RuntimeInfo,
   TodoAnnotation,
 } from "../types";
+import type { FileIndex } from "../utils/file-index";
 import { classifyComponent } from "./component-classifier";
+import { detectSecondaryKinds } from "./content-signals";
 
 /** Merge all detector results into a single RepoScanResult. */
 export const aggregate = (
   scanPath: string,
   durationMs: number,
   results: readonly DetectorResult[],
+  index?: FileIndex,
 ): RepoScanResult => {
   const languages = new Set<string>();
   const frameworks = new Set<string>();
   const datastores = new Set<string>();
   const dependencyManagers = new Set<string>();
+  const containerization = new Set<string>();
+  const iac = new Set<string>();
+  const testing = new Set<string>();
+  const buildTools = new Set<string>();
+  const linting = new Set<string>();
+  const codeQuality = new Set<string>();
+  const deploymentPlatforms = new Set<string>();
   const repoTools = new Set<string>();
   const ciSystems = new Set<string>();
   const buildCommands = new Set<string>();
@@ -73,13 +83,13 @@ export const aggregate = (
     "dependency-manager": dependencyManagers,
     "repo-tools": repoTools,
     ci: ciSystems,
-    linting: repoTools,
-    containerization: repoTools,
-    iac: repoTools,
-    testing: repoTools,
-    build: repoTools,
-    "code-quality": repoTools,
-    "deployment-platform": repoTools,
+    linting,
+    containerization,
+    iac,
+    testing,
+    build: buildTools,
+    "code-quality": codeQuality,
+    "deployment-platform": deploymentPlatforms,
   };
 
   /** Minimum confidence threshold for language findings. */
@@ -120,10 +130,14 @@ export const aggregate = (
       for (const hint of result.componentHints) {
         if (!componentMap.has(hint.path)) {
           const kind = classifyComponent(hint);
+          const secondary = index
+            ? detectSecondaryKinds(hint.path, kind, index)
+            : [];
           componentMap.set(hint.path, {
             name: hint.name ?? hint.path.split("/").pop() ?? hint.path,
             path: hint.path,
             kind,
+            ...(secondary.length > 0 ? { secondaryKinds: secondary } : {}),
             description: hint.description ?? "",
             confidence: 0.8,
             evidence: [],
@@ -271,6 +285,13 @@ export const aggregate = (
       frameworks: sorted(frameworks),
       datastores: sorted(datastores),
       dependencyManagers: sorted(dependencyManagers),
+      containerization: sorted(containerization),
+      iac: sorted(iac),
+      testing: sorted(testing),
+      buildTools: sorted(buildTools),
+      linting: sorted(linting),
+      codeQuality: sorted(codeQuality),
+      deploymentPlatforms: sorted(deploymentPlatforms),
       repoTools: sorted(repoTools),
       envVars,
       runtimes,

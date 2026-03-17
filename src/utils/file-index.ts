@@ -1,5 +1,7 @@
 import path from "path";
 import { walkFiles } from "./fs";
+import type { IgnoreMatcher } from "./scanignore";
+import { buildIgnoreMatcher, readScanignore } from "./scanignore";
 
 /** Directory names that indicate secondary content (examples, test fixtures, playgrounds, etc.) */
 const SECONDARY_DIR_NAMES = new Set([
@@ -55,16 +57,25 @@ export class FileIndex {
   private readonly byName = new Map<string, IndexedFile[]>();
   private readonly byExt = new Map<string, IndexedFile[]>();
   readonly rootPath: string;
+  /** The ignore matcher (if a .scanignore was found). Detectors use this for scoped filtering. */
+  readonly ignoreMatcher?: IgnoreMatcher;
 
-  constructor(rootPath: string) {
+  constructor(rootPath: string, ignoreMatcher?: IgnoreMatcher) {
     this.rootPath = rootPath;
+    this.ignoreMatcher = ignoreMatcher;
   }
 
   /** Build the index by walking the filesystem once. */
   static async build(rootPath: string): Promise<FileIndex> {
-    const index = new FileIndex(rootPath);
+    const rootRules = await readScanignore(rootPath);
+    const ignoreMatcher =
+      rootRules.length > 0 ? buildIgnoreMatcher(rootRules) : undefined;
+
+    const index = new FileIndex(rootPath, ignoreMatcher);
     for await (const filePath of walkFiles(rootPath, {
       includeDotDirs: true,
+      ignoreMatcher,
+      rootForRelative: rootPath,
     })) {
       const name = path.basename(filePath);
       const ext = path.extname(name).toLowerCase();

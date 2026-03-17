@@ -5,27 +5,51 @@ Universal repository structure scanner. Detects languages, frameworks, monorepo 
 ## Usage
 
 ```bash
+# basic scan
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo
+
+# JSON output
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --format json
+
 # enable dependency intelligence
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps
+
 # JSON + dependency scan controls
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --format json --deps --ecosystems npm,pypi --no-security
+
 # CI-style failure when matching vulnerabilities are found
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps --fail-on-vulns --severity-threshold high
+
 # quota-style failure gates
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps --fail-on-vulns-count 3 --fail-on-outdated-count 5
+
 # adjust large-file LOC threshold
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --large-file-threshold 1000
+
+# code duplication detection (dry-check mode)
+bun packages/repo-scanner/src/bin.ts --path /path/to/repo --dry-check
+
+# SOLID principles analysis
+bun packages/repo-scanner/src/bin.ts --path /path/to/repo --solid
+
+# exclude test files from env var detection (default) or include them
+bun packages/repo-scanner/src/bin.ts --path /path/to/repo --env-include-tests
+
+# version
+bun packages/repo-scanner/src/bin.ts --version
 ```
 
 ## Features
 
 - Single filesystem walk → in-memory index → all detectors query without disk I/O
 - 20 independent detectors covering structure, code health, and dependency intelligence
-- Component discovery with path-based classification (app, service, package, infra, script)
+- Component discovery with multi-label classification (primary kind + secondary kinds from content signals)
+- Categorized tooling output (containers, IaC, testing, build tools, linting, deploy, etc.)
+- `.scanignore` file support with gitignore syntax and scoped rules per detector
+- Code duplication detection with configurable thresholds
+- SOLID principles analysis via tree-sitter AST
 - Confidence scores and evidence on all findings
-- Zero runtime dependencies
+- Zero runtime dependencies (except optional tree-sitter for SOLID)
 - ~140ms for a 1800-package monorepo
 - Built-in dependency intelligence subsystem exposed via API (`scanDependencies`) and CLI (`--deps`)
 
@@ -46,6 +70,7 @@ bun packages/repo-scanner/src/bin.ts --path /path/to/repo --large-file-threshold
 | linting | Linter & formatter detection |
 | build | Build system & command extraction |
 | repo-tools | Git hooks, changesets, AI config |
+| deployment-platform | Hosting/deployment platform detection |
 | env | Environment variable extraction |
 | naming-convention | Code naming pattern analysis |
 | runtime | Runtime version detection |
@@ -53,6 +78,8 @@ bun packages/repo-scanner/src/bin.ts --path /path/to/repo --large-file-threshold
 | large-file | LOC-heavy source file detection |
 | todo | TODO/FIXME/HACK/BUG/XXX annotation scanning |
 | dead-export | Unused export detection (heuristic) |
+| code-duplication | Token-based code duplication detection |
+| solid-health | SOLID principles violation analysis |
 
 ## Detector × Language Coverage Matrix
 
@@ -79,6 +106,122 @@ Coverage status: ✅ good coverage | 🟡 partial/minimal | 🟥 not covered | �
 | **repo-tools** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
 
 > **Note:** `ci`, `containerization`, `iac`, and `repo-tools` are language-agnostic detectors that work by file/config presence rather than language-specific patterns.
+
+## `.scanignore`
+
+Drop a `.scanignore` file in your repo root (or any subdirectory) to exclude paths from scanning. Uses gitignore syntax with support for nested files (additive).
+
+### Basic usage
+
+```scanignore
+# Ignore benchmarks everywhere
+**/bench/
+
+# Ignore specific root directories
+scripts/
+tools/
+
+# Negate (un-ignore)
+!tools/critical-tool/
+```
+
+### Scoped rules
+
+By default, ignored paths are excluded from the **entire scan**. Scoped rules let you exclude paths from specific detectors only — the files stay indexed but individual detectors skip them.
+
+Two syntaxes:
+
+**Section headers** — scope all subsequent rules until the next header:
+
+```scanignore
+# Global ignores (excluded from everything)
+**/bench/
+
+# Only exclude from env var detection
+[env]
+/e2e/
+**/*.test.ts
+**/*.spec.ts
+
+# Only exclude from API surface detection
+[api]
+**/*.test.ts
+
+# Reset to global
+[]
+some-global-pattern/
+```
+
+**Inline prefix** — scope a single rule:
+
+```scanignore
+env:e2e/
+env:**/*.test.ts
+api:**/*.spec.ts
+```
+
+### Nesting
+
+`.scanignore` files are additive — a child `.scanignore` in a subdirectory adds rules on top of the parent, never removes them. This works like `.gitignore` nesting.
+
+```
+repo/
+  .scanignore          # root rules
+  packages/
+    agent-sdk/
+      .scanignore      # adds rules scoped to packages/agent-sdk/
+```
+
+### Available scopes
+
+Scopes correspond to detector IDs: `env`, `api`, `language`, `framework`, `testing`, `linting`, `build`, `containerization`, `iac`, `datastore`, etc.
+
+## Component classification
+
+Components discovered in monorepos are classified with a **primary kind** based on directory path and optional **secondary kinds** based on content signals.
+
+### Primary kind (path-based)
+
+| Path prefix | Kind |
+|-------------|------|
+| `apps/`, `app/` | app |
+| `services/`, `service/` | service |
+| `packages/`, `libs/`, `pkg/` | package |
+| `infra/`, `terraform/`, `deploy/`, `pulumi/`, `cdk/` | infra |
+| `scripts/`, `tools/`, `tooling/` | script |
+
+### Secondary kinds (content-based signals)
+
+| Signal | Secondary kind |
+|--------|---------------|
+| `index.html`, `vite.config.*`, `next.config.*`, `vercel.json`, `netlify.toml` | +app |
+| `Dockerfile`, `nest-cli.json`, `server.ts`, `main.ts` | +service |
+| `tsconfig.build.json`, `tsup.config.*`, `rollup.config.*` | +package |
+
+Example output:
+```
+    package  (+app) @acme/ui — Component library  packages/ui
+    service  (+app) @acme/api — API gateway  services/api
+    package  @acme/shared — Shared utils  packages/shared
+```
+
+## Inventory categories
+
+The scan output categorizes detected tooling into specific groups instead of a single bucket:
+
+| Category | Examples |
+|----------|---------|
+| Frameworks | NestJS, React, Tailwind CSS |
+| Datastores | PostgreSQL, Redis, AWS S3 |
+| Dep Managers | Bun, npm, pip |
+| Containers | Docker, Docker Compose, Helm |
+| IaC | Terraform, Pulumi, AWS CDK |
+| Testing | Vitest, Playwright, Jest |
+| Build Tools | Turborepo, Nx, Make |
+| Linting | Biome, ESLint, Prettier |
+| Code Quality | SonarQube, CodeClimate |
+| Deploy | Vercel, Railway, Fly.io |
+| Other Tools | Husky, Changesets, Nix |
 
 ## Language support by detector
 
@@ -139,8 +282,14 @@ Used by: **language**, **large-file**, **todo**
 | TypeScript/JavaScript | NestJS (REST, GraphQL, WebSocket), Express |
 | Python | Flask, FastAPI |
 | Go | net/http, gorilla/mux |
+| Rust | Actix-web, Axum, Rocket |
 | Java/Kotlin | Spring (RequestMapping, GetMapping, etc.) |
 | Ruby | Rails routes |
+| PHP | Laravel |
+| Elixir | Phoenix |
+| Swift | Vapor |
+| Scala | Play Framework |
+| C# | ASP.NET |
 | GraphQL | `.graphql`, `.gql` schema files |
 | gRPC | `.proto` service definitions |
 
@@ -214,39 +363,121 @@ Used by: **language**, **large-file**, **todo**
 ```ts
 import { scanRepo } from "@codegeneai/repo-scanner";
 
+// Basic scan
+const result = await scanRepo("/path/to/repo");
+
+// With dependency intelligence
 const result = await scanRepo("/path/to/repo", {
   dependencies: {
     enabled: true,
-    skipSecurity: true,
+    ecosystems: ["npm", "pypi"],
+    skipSecurity: false,
+    skipUsage: false,
+    concurrency: 4,
   },
 });
+
+// Access results
+result.inventory.languages;          // ["TypeScript", "Python"]
+result.inventory.frameworks;         // ["NestJS", "React"]
+result.inventory.containerization;   // ["Docker", "Docker Compose"]
+result.inventory.testing;            // ["Vitest", "Playwright"]
+result.inventory.deploymentPlatforms; // ["Vercel", "Railway"]
+result.inventory.envVars;            // EnvVarInfo[]
+result.inventory.apiSurface;         // { endpoints, protocols, frameworksUsed }
+
+result.architecture.monorepo;        // true
+result.architecture.components;      // Component[] with kind + secondaryKinds
+result.architecture.crossPackageDeps; // { edges, nodes, orphans }
+
+result.buildAndTest.ciSystems;       // ["GitHub Actions"]
+result.signals.hasIaC;               // boolean
+result.signals.hasContainerization;  // boolean
+```
+
+### Exported types
+
+```ts
+import type {
+  RepoScanResult,
+  Component,
+  ComponentKind,
+  EnvVarInfo,
+  ApiEndpoint,
+  ApiSurface,
+  LanguageStats,
+  RuntimeInfo,
+  LargeFileInfo,
+  TodoAnnotation,
+  DeadExport,
+  CrossPackageDependencyGraph,
+  CodeDuplicationResult,
+  SolidHealthResult,
+  ScanRepoOptions,
+  DependencyScanConfig,
+} from "@codegeneai/repo-scanner";
 ```
 
 ## CLI options
 
 ### General
 
-- `--path <dir>` — Directory to scan (default: cwd)
-- `--format <fmt>` — Output format: `table` | `json` (default: table)
-- `--large-file-threshold <n>` — Line count threshold for large file detection (default: 500)
-- `--help`, `-h` — Show help text
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--path <dir>` | Directory to scan | cwd |
+| `--format <fmt>` | Output format: `table` or `json` | `table` |
+| `--version`, `-v` | Show version number | |
+| `--help`, `-h` | Show help text | |
+
+### Scan tuning
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--large-file-threshold <n>` | Line count threshold for large file detection | 500 |
+| `--env-include-tests` | Include test files in env var detection | off |
+
+### Code duplication
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--dry-check` | Run duplication-only scan with dry-check output contract | |
+| `--min-tokens <n>` | Minimum token window for duplication detection | 50 |
+| `--min-lines <n>` | Minimum duplicate lines to report | 6 |
+| `--extensions <list>` | Comma-separated file extensions for duplication scan | |
+| `--min-unique-ratio <f>` | Min distinct/total token ratio for duplication filtering | 0.10 |
+| `--max-literal-ratio <f>` | Max literal token ratio for duplication filtering | 0.50 |
+| `--no-barrel-filter` | Disable barrel re-export duplication filtering | |
+
+### SOLID analysis
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--solid` | Enable SOLID principles analysis (uses tree-sitter AST) | off |
+| `--solid-threshold <n>` | SOLID score threshold for reporting | 80 |
 
 ### Dependency scanning
 
 Use `--deps` to enable. Optional flags:
 
-- `--ecosystems <list>` — Comma-separated ecosystems to scan
-- `--deps-debug` — Print dependency vulnerability-key diagnostics to stderr
-- `--no-usage` — Skip dependency usage scanning
-- `--no-security` — Skip vulnerability checks
-- `--no-version-lookup` — Skip registry version lookups
-- `--concurrency <n>` — Max parallel dependency scan operations
-- `--component-grouping <default|apps-only|services-only|workspace-package>`
-- `--fail-on-vulns` — Exit code 1 when vulnerabilities match threshold
-- `--fail-on-vulns-count <n>` — Exit code 1 when vulnerability matches >= n
-- `--severity-threshold <unknown|low|moderate|high|critical>` (default: low)
-- `--fail-on-outdated` — Exit code 1 when updates match outdated threshold
-- `--fail-on-outdated-count <n>` — Exit code 1 when outdated matches >= n
-- `--outdated-threshold <patch|minor|major>` (default: patch)
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--deps` | Enable deep dependency analysis | off |
+| `--ecosystems <list>` | Comma-separated ecosystems to scan | all |
+| `--deps-debug` | Emit dependency debug diagnostics to stderr | |
+| `--no-usage` | Skip dependency usage scanning | |
+| `--no-security` | Skip vulnerability checks | |
+| `--no-version-lookup` | Skip registry version lookups | |
+| `--concurrency <n>` | Max parallel dependency scan operations | CPU count |
+| `--component-grouping <mode>` | Component grouping for dependency summaries | `default` |
+| `--fail-on-vulns` | Exit code 1 when vulnerabilities match threshold | |
+| `--fail-on-vulns-count <n>` | Exit code 1 when vulnerability matches >= n | |
+| `--severity-threshold <lvl>` | Vulnerability threshold (`unknown`/`low`/`moderate`/`high`/`critical`) | `low` |
+| `--fail-on-outdated` | Exit code 1 when updates match outdated threshold | |
+| `--fail-on-outdated-count <n>` | Exit code 1 when outdated matches >= n | |
+| `--outdated-threshold <lvl>` | Update threshold (`patch`/`minor`/`major`) | `patch` |
+
+Valid ecosystems: `npm`, `pypi`, `go`, `cargo`, `rubygems`, `maven`, `nuget`, `packagist`, `cocoapods`, `pub`, `conan`
+
+Valid component grouping modes: `default`, `apps-only`, `services-only`, `workspace-package`
 
 Dependency JSON output includes summary lists (`topOutdated`, `topVulnerable`), component-level grouping (`byComponent`), and a machine-readable `policyEvaluation` block when dependency scanning is enabled.

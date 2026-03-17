@@ -1,30 +1,14 @@
 import { readdir } from "fs/promises";
 import path from "path";
+import { IGNORE_DIRS, MAX_WALK_DEPTH } from "../../utils/fs";
+import type { IgnoreMatcher } from "../../utils/scanignore";
+import { buildIgnoreMatcher, readScanignore } from "../../utils/scanignore";
 
-const IGNORE_DIRS = new Set([
-  "node_modules",
-  "vendor",
-  ".git",
-  "dist",
-  "build",
-  "target",
-  "__pycache__",
-  ".tox",
-  ".venv",
-  "venv",
-  ".mypy_cache",
-  ".gradle",
-  "bin",
-  "obj",
-  ".dart_tool",
-  ".pub-cache",
-  "Pods",
-  ".next",
-  ".nuxt",
-  ".output",
-  "coverage",
-  ".turbo",
-]);
+export interface DepWalkOptions {
+  extensions?: ReadonlySet<string>;
+  ignoreMatcher?: IgnoreMatcher;
+  rootForRelative?: string;
+}
 
 /**
  * Recursively walk a directory, yielding file paths.
@@ -32,8 +16,37 @@ const IGNORE_DIRS = new Set([
  */
 export async function* walkFiles(
   rootPath: string,
-  extensions?: ReadonlySet<string>,
+  extensionsOrOptions?: ReadonlySet<string> | DepWalkOptions,
+  depth = 0,
 ): AsyncGenerator<string> {
+  if (depth > MAX_WALK_DEPTH) return;
+
+  // Support both legacy (extensions Set) and new (options object) signatures
+  const options: DepWalkOptions | undefined =
+    extensionsOrOptions instanceof Set
+      ? { extensions: extensionsOrOptions }
+      : (extensionsOrOptions as DepWalkOptions | undefined);
+
+  const relativeRoot = options?.rootForRelative ?? rootPath;
+  let matcher = options?.ignoreMatcher;
+
+  // Check for nested .scanignore
+  if (depth > 0) {
+    const childRules = await readScanignore(rootPath);
+    if (childRules.length > 0) {
+      const dirRel = path.relative(relativeRoot, rootPath);
+      if (matcher) {
+        matcher = matcher.child(dirRel, childRules);
+      } else {
+        matcher = buildIgnoreMatcher(
+          childRules.map((r) =>
+            r.anchored ? { ...r, pattern: `${dirRel}/${r.pattern}` } : r,
+          ),
+        );
+      }
+    }
+  }
+
   // Keep readdir from fs/promises — Bun has no Dirent-returning equivalent
   const entries = await readdir(rootPath, { withFileTypes: true });
 
@@ -42,13 +55,31 @@ export async function* walkFiles(
       if (IGNORE_DIRS.has(entry.name) || entry.name.startsWith(".")) {
         continue;
       }
-      yield* walkFiles(path.join(rootPath, entry.name), extensions);
+      const fullPath = path.join(rootPath, entry.name);
+      const relativePath = path.relative(relativeRoot, fullPath);
+
+      if (matcher?.ignores(relativePath, true)) continue;
+
+      yield* walkFiles(
+        fullPath,
+        {
+          ...options,
+          ignoreMatcher: matcher,
+          rootForRelative: relativeRoot,
+        } as DepWalkOptions,
+        depth + 1,
+      );
     } else if (entry.isFile()) {
-      if (extensions) {
+      if (options?.extensions) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (!extensions.has(ext)) continue;
+        if (!options.extensions.has(ext)) continue;
       }
-      yield path.join(rootPath, entry.name);
+      const fullPath = path.join(rootPath, entry.name);
+      const relativePath = path.relative(relativeRoot, fullPath);
+
+      if (matcher?.ignores(relativePath, false)) continue;
+
+      yield fullPath;
     }
   }
 }
