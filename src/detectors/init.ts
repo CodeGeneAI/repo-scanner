@@ -24,3 +24,5 @@ import "./code-duplication";
 import "./solid-health";
 import "./code-quality";
 import "./deployment-platform";
+import "./external-services";
+import "./complexity-hotspots";

@@ -3,10 +3,12 @@ import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
   CodeDuplicationResult,
+  ComplexityHotspot,
   Component,
   CrossPackageDependencyGraph,
   DeadExport,
   EnvVarInfo,
+  ExternalService,
   LanguageStats,
   LargeFileInfo,
   RepoScanResult,
@@ -14,6 +16,11 @@ import type {
   TodoAnnotation,
 } from "../types";
 import type { FileIndex } from "../utils/file-index";
+import {
+  computeBlastRadius,
+  detectCircularDeps,
+  detectLayerViolations,
+} from "./architecture-analysis";
 import { classifyComponent } from "./component-classifier";
 import { detectSecondaryKinds } from "./content-signals";
 
@@ -67,6 +74,8 @@ export const aggregate = (
   let deadExports: readonly DeadExport[] | undefined;
   let codeDuplication: CodeDuplicationResult | undefined;
   let solidHealth: SolidHealthResult | undefined;
+  let complexityHotspots: readonly ComplexityHotspot[] | undefined;
+  let externalServices: readonly ExternalService[] | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -262,6 +271,29 @@ export const aggregate = (
       solidHealth = result.metadata.solidHealth as SolidHealthResult;
     }
 
+    // Extract complexity hotspots
+    if (
+      result.detectorId === "complexity-hotspots" &&
+      Array.isArray(result.metadata?.complexityHotspots)
+    ) {
+      const hotspots = result.metadata
+        .complexityHotspots as ComplexityHotspot[];
+      if (hotspots.length > 0) {
+        complexityHotspots = hotspots;
+      }
+    }
+
+    // Extract external services
+    if (
+      result.detectorId === "external-services" &&
+      Array.isArray(result.metadata?.externalServices)
+    ) {
+      const services = result.metadata.externalServices as ExternalService[];
+      if (services.length > 0) {
+        externalServices = services;
+      }
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -272,9 +304,38 @@ export const aggregate = (
   if (ciSystems.size > 0) signals.hasCi = true;
   if (languages.size > 1) signals.isPolyglot = true;
 
-  const components = [...componentMap.values()].sort(
+  let components = [...componentMap.values()].sort(
     (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),
   );
+
+  // Architecture analysis (requires both graph and components)
+  let circularDeps: readonly (readonly string[])[] | undefined;
+  let layerViolations: ReturnType<typeof detectLayerViolations> | undefined;
+  let highImpactComponents:
+    | ReturnType<typeof computeBlastRadius>["highImpact"]
+    | undefined;
+
+  if (crossPackageDeps && crossPackageDeps.edges.length > 0) {
+    const cycles = detectCircularDeps(crossPackageDeps);
+    if (cycles.length > 0) circularDeps = cycles;
+
+    const violations = detectLayerViolations(crossPackageDeps, components);
+    if (violations.length > 0) layerViolations = violations;
+
+    const { radiusMap, highImpact } = computeBlastRadius(
+      crossPackageDeps,
+      components,
+    );
+
+    // Attach blast radius to each component
+    if (radiusMap.size > 0) {
+      components = components.map((c) => {
+        const br = radiusMap.get(c.path);
+        return br ? { ...c, blastRadius: br } : c;
+      });
+      if (highImpact.length > 0) highImpactComponents = highImpact;
+    }
+  }
 
   return {
     inventory: {
@@ -302,8 +363,17 @@ export const aggregate = (
       deadExports,
       codeDuplication,
       solidHealth,
+      complexityHotspots,
+      externalServices,
     },
-    architecture: { monorepo: isMonorepo, components, crossPackageDeps },
+    architecture: {
+      monorepo: isMonorepo,
+      components,
+      crossPackageDeps,
+      circularDeps,
+      layerViolations,
+      highImpactComponents,
+    },
     buildAndTest: {
       buildCommands: sorted(buildCommands),
       testCommands: sorted(testCommands),

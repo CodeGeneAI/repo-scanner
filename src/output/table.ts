@@ -35,8 +35,12 @@ export const renderTable = (
         c.secondaryKinds && c.secondaryKinds.length > 0
           ? ` ${DIM}(+${c.secondaryKinds.join(", +")})${RESET}`
           : "";
+      const blast =
+        c.blastRadius && c.blastRadius.score > 0
+          ? ` ${DIM}[blast: ${c.blastRadius.score}]${RESET}`
+          : "";
       w(
-        `    ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${desc} ${DIM}${c.path}${RESET}\n`,
+        `    ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${blast}${desc} ${DIM}${c.path}${RESET}\n`,
       );
     }
   }
@@ -65,6 +69,64 @@ export const renderTable = (
       for (const o of cpd.orphans.slice(0, 10)) {
         w(`    ${DIM}${o}${RESET}\n`);
       }
+    }
+  }
+
+  // Architecture Issues (circular deps + layer violations)
+  const hasArchIssues =
+    (result.architecture.circularDeps &&
+      result.architecture.circularDeps.length > 0) ||
+    (result.architecture.layerViolations &&
+      result.architecture.layerViolations.length > 0);
+
+  if (hasArchIssues) {
+    w(section("Architecture Issues"));
+    const MAX_SHOWN = 10;
+
+    if (
+      result.architecture.circularDeps &&
+      result.architecture.circularDeps.length > 0
+    ) {
+      const cycles = result.architecture.circularDeps;
+      w(`  ${YELLOW}Circular dependencies: ${cycles.length}${RESET}\n`);
+      for (const cycle of cycles.slice(0, MAX_SHOWN)) {
+        w(`    ${YELLOW}${cycle.join(" → ")} → ${cycle[0]}${RESET}\n`);
+      }
+      if (cycles.length > MAX_SHOWN) {
+        w(`    ${DIM}... +${cycles.length - MAX_SHOWN} more${RESET}\n`);
+      }
+    }
+
+    if (
+      result.architecture.layerViolations &&
+      result.architecture.layerViolations.length > 0
+    ) {
+      const violations = result.architecture.layerViolations;
+      w(`  ${YELLOW}Layer violations: ${violations.length}${RESET}\n`);
+      for (const v of violations.slice(0, MAX_SHOWN)) {
+        w(
+          `    ${YELLOW}${v.from}${RESET} → ${v.to}  ${DIM}(${v.reason})${RESET}\n`,
+        );
+      }
+      if (violations.length > MAX_SHOWN) {
+        w(`    ${DIM}... +${violations.length - MAX_SHOWN} more${RESET}\n`);
+      }
+    }
+  }
+
+  // High Impact Components
+  if (
+    result.architecture.highImpactComponents &&
+    result.architecture.highImpactComponents.length > 0
+  ) {
+    w(section("High Impact Components"));
+    for (const hic of result.architecture.highImpactComponents) {
+      const scoreColor =
+        hic.score > 70 ? "\x1b[31m" : hic.score > 30 ? YELLOW : GREEN;
+      const score = `${hic.score}`.padStart(3);
+      w(
+        `    ${scoreColor}${score}${RESET}  ${hic.name}  ${DIM}(${hic.transitiveDependents} transitive dependents)  ${hic.path}${RESET}\n`,
+      );
     }
   }
 
@@ -370,6 +432,49 @@ export const renderTable = (
           `    ${sev}${v.principle.padEnd(4)}${RESET} ${DIM}${v.file}:${v.line}${RESET}  ${v.entity}: ${v.message}\n`,
         );
       }
+    }
+  }
+
+  // Complexity Hotspots
+  if (
+    result.inventory.complexityHotspots &&
+    result.inventory.complexityHotspots.length > 0
+  ) {
+    const hotspots = result.inventory.complexityHotspots;
+    w(section("Complexity Hotspots"));
+    w(`  Top ${hotspots.length} files by complexity × churn:\n`);
+    for (const h of hotspots) {
+      const scoreColor =
+        h.score > 70 ? "\x1b[31m" : h.score > 30 ? YELLOW : GREEN;
+      const score = `${h.score}`.padStart(3);
+      const complexity = `${h.complexity}`.padStart(4);
+      const churn = `${h.churn}`.padStart(4);
+      const lang = h.language.padEnd(12);
+      w(
+        `    ${scoreColor}${score}${RESET}  ${DIM}complexity=${complexity} churn=${churn}${RESET}  ${lang} ${DIM}${h.file}${RESET}\n`,
+      );
+    }
+  }
+
+  // External Services
+  if (
+    result.inventory.externalServices &&
+    result.inventory.externalServices.length > 0
+  ) {
+    const services = result.inventory.externalServices;
+    w(section("External Services"));
+
+    // Group by category
+    const byCategory = new Map<string, (typeof services)[number][]>();
+    for (const svc of services) {
+      const group = byCategory.get(svc.category);
+      if (group) group.push(svc);
+      else byCategory.set(svc.category, [svc]);
+    }
+
+    for (const [category, svcs] of byCategory) {
+      const names = svcs.map((s) => s.name).join(", ");
+      w(`  ${YELLOW}${category}${RESET} (${svcs.length}): ${names}\n`);
     }
   }
 

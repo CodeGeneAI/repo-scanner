@@ -18,6 +18,12 @@ export type ComponentKind =
   | "script"
   | "unknown";
 
+export interface BlastRadius {
+  readonly directDependents: number;
+  readonly transitiveDependents: number;
+  readonly score: number; // 0–100
+}
+
 export interface Component {
   readonly name: string;
   readonly path: string;
@@ -26,6 +32,7 @@ export interface Component {
   readonly description: string;
   readonly confidence: number;
   readonly evidence: readonly string[];
+  readonly blastRadius?: BlastRadius;
 }
 
 export interface LanguageStats {
@@ -67,11 +74,16 @@ export interface RepoScanResult {
     readonly deadExports?: readonly DeadExport[];
     readonly codeDuplication?: CodeDuplicationResult;
     readonly solidHealth?: SolidHealthResult;
+    readonly complexityHotspots?: readonly ComplexityHotspot[];
+    readonly externalServices?: readonly ExternalService[];
   };
   readonly architecture: {
     readonly monorepo: boolean;
     readonly components: readonly Component[];
     readonly crossPackageDeps?: CrossPackageDependencyGraph;
+    readonly circularDeps?: readonly (readonly string[])[];
+    readonly layerViolations?: readonly LayerViolation[];
+    readonly highImpactComponents?: readonly HighImpactComponent[];
   };
   readonly buildAndTest: {
     readonly buildCommands: readonly string[];
@@ -213,6 +225,35 @@ export interface CodeDuplicationStats {
 export interface CodeDuplicationResult {
   readonly groups: readonly CodeDuplicationGroup[];
   readonly stats: CodeDuplicationStats;
+}
+
+export interface LayerViolation {
+  readonly from: string;
+  readonly to: string;
+  readonly fromKind: ComponentKind;
+  readonly toKind: ComponentKind;
+  readonly reason: string;
+}
+
+export interface HighImpactComponent {
+  readonly name: string;
+  readonly path: string;
+  readonly score: number;
+  readonly transitiveDependents: number;
+}
+
+export interface ComplexityHotspot {
+  readonly file: string;
+  readonly complexity: number;
+  readonly churn: number;
+  readonly score: number;
+  readonly language: string;
+}
+
+export interface ExternalService {
+  readonly name: string;
+  readonly category: string;
+  readonly evidence: readonly string[];
 }
 
 export interface CliOptions {
