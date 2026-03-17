@@ -32,6 +32,7 @@ export interface DetectorResult {
     readonly hasIaC: boolean;
     readonly hasTests: boolean;
     readonly hasTypedContracts: boolean;
+    readonly hasQualityGates: boolean;
   }>;
 }
 

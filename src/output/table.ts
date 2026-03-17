@@ -224,6 +224,7 @@ export const renderTable = (
   w(`${check(result.signals.hasContainerization)} Containers  `);
   w(`${check(result.signals.hasIaC)} IaC  `);
   w(`${check(result.signals.hasTests)} Tests  `);
-  w(`${check(result.signals.hasTypedContracts)} Typed Contracts\n`);
+  w(`${check(result.signals.hasTypedContracts)} Typed Contracts  `);
+  w(`${check(result.signals.hasQualityGates)} Quality Gates\n`);
   w("\n");
 };

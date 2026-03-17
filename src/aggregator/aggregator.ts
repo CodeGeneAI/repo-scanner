@@ -32,6 +32,7 @@ export const aggregate = (
     hasIaC: false,
     hasTests: false,
     hasTypedContracts: false,
+    hasQualityGates: false,
   };
 
   const componentMap = new Map<string, Component>();
@@ -63,6 +64,7 @@ export const aggregate = (
     iac: repoTools,
     testing: repoTools,
     build: repoTools,
+    "code-quality": repoTools,
   };
 
   /** Minimum confidence threshold for language findings. */

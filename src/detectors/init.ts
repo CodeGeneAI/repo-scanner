@@ -15,3 +15,4 @@ import "./env";
 import "./naming-convention";
 import "./runtime";
 import "./api";
+import "./code-quality";
