@@ -148,6 +148,127 @@ describe("monorepo detector", () => {
     expect(result.detectorId).toBe("monorepo");
   });
 
+  it("detects Pants monorepo from pants.toml", async () => {
+    await writeFile(
+      path.join(tmpDir, "pants.toml"),
+      "[GLOBAL]\npants_version = '2.18.0'\n",
+    );
+
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const result: DetectorResult = await detector.detect(tmpDir, index);
+    const values = result.findings.map((f) => f.value);
+
+    expect(values).toContain("Pants");
+  });
+
+  it("detects Bazel monorepo from MODULE.bazel", async () => {
+    await writeFile(
+      path.join(tmpDir, "MODULE.bazel"),
+      'module(name = "myproject")\n',
+    );
+
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const result: DetectorResult = await detector.detect(tmpDir, index);
+    const values = result.findings.map((f) => f.value);
+
+    expect(values).toContain("Bazel");
+  });
+
+  it("detects Gradle multi-project from settings.gradle", async () => {
+    await writeFile(
+      path.join(tmpDir, "settings.gradle"),
+      "rootProject.name = 'my-app'\ninclude ':module-a', ':module-b'\n",
+    );
+    await mkdir(path.join(tmpDir, "module-a"), { recursive: true });
+    await writeFile(path.join(tmpDir, "module-a", "build.gradle"), "");
+    await mkdir(path.join(tmpDir, "module-b"), { recursive: true });
+    await writeFile(path.join(tmpDir, "module-b", "build.gradle"), "");
+
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const result: DetectorResult = await detector.detect(tmpDir, index);
+    const values = result.findings.map((f) => f.value);
+
+    expect(values).toContain("Gradle multi-project");
+    const compPaths = result.componentHints!.map((h) => h.path);
+    expect(compPaths).toContain("module-a");
+    expect(compPaths).toContain("module-b");
+  });
+
+  it("detects Gradle multi-project from settings.gradle.kts (Kotlin DSL)", async () => {
+    await writeFile(
+      path.join(tmpDir, "settings.gradle.kts"),
+      'rootProject.name = "my-app"\ninclude("core")\ninclude("api")\n',
+    );
+
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const result: DetectorResult = await detector.detect(tmpDir, index);
+    const values = result.findings.map((f) => f.value);
+
+    expect(values).toContain("Gradle multi-project (Kotlin DSL)");
+    const compPaths = result.componentHints!.map((h) => h.path);
+    expect(compPaths).toContain("core");
+    expect(compPaths).toContain("api");
+  });
+
+  it("detects Maven multi-module from pom.xml", async () => {
+    await writeFile(
+      path.join(tmpDir, "pom.xml"),
+      `<project>
+        <modules>
+          <module>core</module>
+          <module>web</module>
+        </modules>
+      </project>`,
+    );
+    await mkdir(path.join(tmpDir, "core"), { recursive: true });
+    await writeFile(
+      path.join(tmpDir, "core", "pom.xml"),
+      "<project></project>",
+    );
+    await mkdir(path.join(tmpDir, "web"), { recursive: true });
+    await writeFile(path.join(tmpDir, "web", "pom.xml"), "<project></project>");
+
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const result: DetectorResult = await detector.detect(tmpDir, index);
+    const values = result.findings.map((f) => f.value);
+
+    expect(values).toContain("Maven multi-module");
+    const compPaths = result.componentHints!.map((h) => h.path);
+    expect(compPaths).toContain("core");
+    expect(compPaths).toContain("web");
+  });
+
+  it("detects uv workspace from pyproject.toml", async () => {
+    await writeFile(
+      path.join(tmpDir, "pyproject.toml"),
+      `[project]
+name = "my-project"
+
+[tool.uv.workspace]
+members = ["packages/*"]
+`,
+    );
+    await mkdir(path.join(tmpDir, "packages", "lib-a"), { recursive: true });
+    await writeFile(
+      path.join(tmpDir, "packages", "lib-a", "pyproject.toml"),
+      '[project]\nname = "lib-a"\n',
+    );
+
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const result: DetectorResult = await detector.detect(tmpDir, index);
+    const values = result.findings.map((f) => f.value);
+
+    expect(values).toContain("uv workspace");
+    const compPaths = result.componentHints!.map((h) => h.path);
+    expect(compPaths).toContain("packages/lib-a");
+  });
+
   it("returns no findings for a non-monorepo", async () => {
     await writeFile(
       path.join(tmpDir, "package.json"),

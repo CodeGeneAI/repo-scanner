@@ -23,6 +23,10 @@ const MONOREPO_MARKERS: ReadonlyMap<string, string> = new Map([
   ["pnpm-workspace.yaml", "pnpm workspaces"],
   ["go.work", "Go workspaces"],
   ["melos.yaml", "Melos (Dart)"],
+  ["pants.toml", "Pants"],
+  ["WORKSPACE", "Bazel"],
+  ["WORKSPACE.bazel", "Bazel"],
+  ["MODULE.bazel", "Bazel"],
 ]);
 
 /** Extension-based monorepo markers (matched by extension, not exact name). */
@@ -167,6 +171,106 @@ registerDetector({
         confidence: 1.0,
         evidence: ["build.sbt contains multi-project definitions"],
       });
+    }
+
+    // Check Gradle multi-project (settings.gradle / settings.gradle.kts)
+    for (const settingsName of ["settings.gradle", "settings.gradle.kts"]) {
+      const settingsContent = await readText(path.join(rootPath, settingsName));
+      if (settingsContent) {
+        // Find all include statements, then extract quoted module names from them
+        const includeLinePattern = /include\s*\(?([^)\n]+)\)?/g;
+        const quotedModulePattern = /['"](:?[^'"]+)['"]/g;
+        let hasIncludes = false;
+        let lineMatch: RegExpExecArray | null;
+        while (
+          (lineMatch = includeLinePattern.exec(settingsContent)) !== null
+        ) {
+          const args = lineMatch[1]!;
+          let qm: RegExpExecArray | null;
+          while ((qm = quotedModulePattern.exec(args)) !== null) {
+            hasIncludes = true;
+            const modulePath = qm[1]!.replace(/^:/, "").replace(/:/g, "/");
+            if (
+              modulePath &&
+              !componentHints.some((c) => c.path === modulePath)
+            ) {
+              componentHints.push({
+                path: modulePath,
+                name: path.basename(modulePath),
+              });
+            }
+          }
+          quotedModulePattern.lastIndex = 0;
+        }
+        if (hasIncludes) {
+          isMonorepo = true;
+          const toolName =
+            settingsName === "settings.gradle.kts"
+              ? "Gradle multi-project (Kotlin DSL)"
+              : "Gradle multi-project";
+          findings.push({
+            value: toolName,
+            confidence: 1.0,
+            evidence: [`${settingsName} contains include directives`],
+          });
+        }
+      }
+    }
+
+    // Check Maven multi-module (pom.xml with <modules>)
+    const pomXml = await readText(path.join(rootPath, "pom.xml"));
+    if (pomXml?.includes("<modules>")) {
+      const moduleRegex = /<module>([^<]+)<\/module>/g;
+      let hasModules = false;
+      let mm: RegExpExecArray | null;
+      while ((mm = moduleRegex.exec(pomXml)) !== null) {
+        hasModules = true;
+        const modulePath = mm[1]!.trim();
+        if (modulePath && !componentHints.some((c) => c.path === modulePath)) {
+          componentHints.push({
+            path: modulePath,
+            name: path.basename(modulePath),
+          });
+        }
+      }
+      if (hasModules) {
+        isMonorepo = true;
+        findings.push({
+          value: "Maven multi-module",
+          confidence: 1.0,
+          evidence: ["pom.xml contains <modules>"],
+        });
+      }
+    }
+
+    // Check Python uv workspaces (pyproject.toml with [tool.uv.workspace])
+    const pyprojectToml = await readText(path.join(rootPath, "pyproject.toml"));
+    if (pyprojectToml?.includes("[tool.uv.workspace]")) {
+      isMonorepo = true;
+      findings.push({
+        value: "uv workspace",
+        confidence: 1.0,
+        evidence: ["pyproject.toml contains [tool.uv.workspace]"],
+      });
+      // Extract members = ["packages/*", ...] and discover components
+      const membersMatch = pyprojectToml.match(
+        /\[tool\.uv\.workspace\][^[]*members\s*=\s*\[([^\]]*)\]/s,
+      );
+      if (membersMatch) {
+        const memberEntries = membersMatch[1]!.match(/["']([^"']+)["']/g);
+        for (const entry of memberEntries ?? []) {
+          const memberGlob = entry.replace(/["']/g, "");
+          const parentDir = memberGlob.split("/")[0]!;
+          if (parentDir && parentDir !== "*") {
+            const newComponents = await discoverComponents(index, parentDir);
+            for (const comp of newComponents) {
+              if (!componentHints.some((c) => c.path === comp.path)) {
+                componentHints.push(comp);
+              }
+            }
+          }
+        }
+      }
     }
 
     // Check Dart Melos monorepo components (pubspec.yaml in subdirs)
