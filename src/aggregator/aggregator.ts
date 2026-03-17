@@ -22,15 +22,16 @@ import {
   detectLayerViolations,
 } from "./architecture-analysis";
 import { classifyComponent } from "./component-classifier";
+import { enrichComponents } from "./component-enrichment";
 import { detectSecondaryKinds } from "./content-signals";
 
 /** Merge all detector results into a single RepoScanResult. */
-export const aggregate = (
+export const aggregate = async (
   scanPath: string,
   durationMs: number,
   results: readonly DetectorResult[],
   index?: FileIndex,
-): RepoScanResult => {
+): Promise<RepoScanResult> => {
   const languages = new Set<string>();
   const frameworks = new Set<string>();
   const datastores = new Set<string>();
@@ -335,6 +336,11 @@ export const aggregate = (
       });
       if (highImpact.length > 0) highImpactComponents = highImpact;
     }
+  }
+
+  // Enrich components with per-component metadata
+  if (index) {
+    components = await enrichComponents(components, index, results);
   }
 
   return {

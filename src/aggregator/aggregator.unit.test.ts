@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { DetectorResult } from "../detectors/types";
 import { aggregate } from "./aggregator";
 
-describe("aggregate", () => {
+describe("aggregate", async () => {
   const scanPath = "/tmp/test-repo";
   const durationMs = 42;
 
-  it("merges findings from multiple detectors into correct categories", () => {
+  it("merges findings from multiple detectors into correct categories", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -33,7 +33,7 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.inventory.languages).toContain("TypeScript");
     expect(result.inventory.languages).toContain("Python");
@@ -41,7 +41,7 @@ describe("aggregate", () => {
     expect(result.buildAndTest.ciSystems).toContain("GitHub Actions");
   });
 
-  it("deduplicates values within a category", () => {
+  it("deduplicates values within a category", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -52,7 +52,7 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     // Set-based dedup means TypeScript appears once
     expect(
@@ -60,7 +60,7 @@ describe("aggregate", () => {
     ).toHaveLength(1);
   });
 
-  it("sets signals correctly from detector signals", () => {
+  it("sets signals correctly from detector signals", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "ci",
@@ -80,7 +80,7 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.signals.hasCi).toBe(true);
     expect(result.signals.hasReadme).toBe(true);
@@ -88,7 +88,7 @@ describe("aggregate", () => {
     expect(result.signals.hasIaC).toBe(false);
   });
 
-  it("derives hasCi from ci detector findings", () => {
+  it("derives hasCi from ci detector findings", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "ci",
@@ -98,11 +98,11 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
     expect(result.signals.hasCi).toBe(true);
   });
 
-  it("derives hasContainerization from containerization signals", () => {
+  it("derives hasContainerization from containerization signals", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "containerization",
@@ -113,11 +113,11 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
     expect(result.signals.hasContainerization).toBe(true);
   });
 
-  it("derives hasDeploymentPlatform from deployment-platform signals", () => {
+  it("derives hasDeploymentPlatform from deployment-platform signals", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "deployment-platform",
@@ -128,12 +128,12 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
     expect(result.signals.hasDeploymentPlatform).toBe(true);
     expect(result.inventory.deploymentPlatforms).toContain("Vercel");
   });
 
-  it("merges commands from multiple detectors", () => {
+  it("merges commands from multiple detectors", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "build",
@@ -152,14 +152,14 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.buildAndTest.buildCommands).toContain("npm run build");
     expect(result.buildAndTest.testCommands).toContain("npm test");
     expect(result.buildAndTest.testCommands).toContain("vitest run");
   });
 
-  it("sets monorepo flag from monorepo detector findings", () => {
+  it("sets monorepo flag from monorepo detector findings", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "monorepo",
@@ -174,7 +174,7 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.architecture.monorepo).toBe(true);
     expect(result.architecture.components).toHaveLength(2);
@@ -183,7 +183,7 @@ describe("aggregate", () => {
     expect(names).toContain("bar");
   });
 
-  it("sets monorepo false when no monorepo findings", () => {
+  it("sets monorepo false when no monorepo findings", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "monorepo",
@@ -191,19 +191,19 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
     expect(result.architecture.monorepo).toBe(false);
   });
 
-  it("includes scanPath and durationMs in result", () => {
-    const result = aggregate(scanPath, durationMs, []);
+  it("includes scanPath and durationMs in result", async () => {
+    const result = await aggregate(scanPath, durationMs, []);
 
     expect(result.scanPath).toBe(scanPath);
     expect(result.durationMs).toBe(durationMs);
     expect(result.timestamp).toBeDefined();
   });
 
-  it("returns sorted arrays", () => {
+  it("returns sorted arrays", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -215,12 +215,12 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.inventory.languages).toEqual(["Go", "Python", "TypeScript"]);
   });
 
-  it("forwards languageStats and totals from language detector metadata", () => {
+  it("forwards languageStats and totals from language detector metadata", async () => {
     const stats = [
       { name: "TypeScript", fileCount: 10, linesOfCode: 500, percentage: 71.4 },
       { name: "Python", fileCount: 4, linesOfCode: 200, percentage: 28.6 },
@@ -240,14 +240,14 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.inventory.languageStats).toEqual(stats);
     expect(result.inventory.totalFiles).toBe(14);
     expect(result.inventory.totalLinesOfCode).toBe(700);
   });
 
-  it("returns empty languageStats and zero totals when metadata is absent", () => {
+  it("returns empty languageStats and zero totals when metadata is absent", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -255,22 +255,22 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
 
     expect(result.inventory.languageStats).toEqual([]);
     expect(result.inventory.totalFiles).toBe(0);
     expect(result.inventory.totalLinesOfCode).toBe(0);
   });
 
-  it("returns zero totals when no language detector present", () => {
-    const result = aggregate(scanPath, durationMs, []);
+  it("returns zero totals when no language detector present", async () => {
+    const result = await aggregate(scanPath, durationMs, []);
 
     expect(result.inventory.languageStats).toEqual([]);
     expect(result.inventory.totalFiles).toBe(0);
     expect(result.inventory.totalLinesOfCode).toBe(0);
   });
 
-  it("uses OR semantics for signals across detectors", () => {
+  it("uses OR semantics for signals across detectors", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -286,7 +286,7 @@ describe("aggregate", () => {
       },
     ];
 
-    const result = aggregate(scanPath, durationMs, results);
+    const result = await aggregate(scanPath, durationMs, results);
     expect(result.signals.hasTests).toBe(true);
   });
 });

@@ -42,6 +42,64 @@ export const renderTable = (
       w(
         `    ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${blast}${desc} ${DIM}${c.path}${RESET}\n`,
       );
+
+      // Per-component metadata
+      if (c.metadata) {
+        const m = c.metadata;
+        const meta: string[] = [];
+        if (m.platform) meta.push(m.platform);
+        if (m.frameworks && m.frameworks.length > 0)
+          meta.push(m.frameworks.join(", "));
+        if (m.runtime)
+          meta.push(
+            `${m.runtime.name}${m.runtime.version ? " " + m.runtime.version : ""}`,
+          );
+        if (m.lineCount) meta.push(`${m.lineCount.toLocaleString()} lines`);
+        if (m.ports && m.ports.length > 0)
+          meta.push(
+            `port${m.ports.length > 1 ? "s" : ""}: ${m.ports.join(", ")}`,
+          );
+        if (m.entryPoint) meta.push(`entry: ${m.entryPoint}`);
+        if (m.version) meta.push(`v${m.version}`);
+        if (m.private) meta.push("private");
+        if (m.deployTarget) meta.push(m.deployTarget);
+
+        if (meta.length > 0) {
+          w(`             ${DIM}${meta.join(" · ")}${RESET}\n`);
+        }
+
+        // Boolean flags
+        const flags: string[] = [];
+        if (m.hasReadme) flags.push("readme");
+        if (m.hasDockerfile) flags.push("docker");
+        if (m.hasTests) flags.push("tests");
+        if (m.hasMigrations) flags.push("migrations");
+        if (flags.length > 0) {
+          w(`             ${DIM}[${flags.join(", ")}]${RESET}\n`);
+        }
+
+        // Datastores, services, env, api
+        if (m.datastores && m.datastores.length > 0)
+          w(
+            `             ${DIM}datastores: ${m.datastores.join(", ")}${RESET}\n`,
+          );
+        if (m.externalServices && m.externalServices.length > 0)
+          w(
+            `             ${DIM}services: ${m.externalServices.map((s) => s.name).join(", ")}${RESET}\n`,
+          );
+        if (m.envVars && m.envVars.length > 0)
+          w(
+            `             ${DIM}env: ${m.envVars.length} var${m.envVars.length !== 1 ? "s" : ""}${RESET}\n`,
+          );
+        if (m.apiSurface)
+          w(
+            `             ${DIM}api: ${m.apiSurface.endpointCount} endpoints (${m.apiSurface.protocols.join(", ")})${RESET}\n`,
+          );
+        if (m.observability && m.observability.length > 0)
+          w(
+            `             ${DIM}observability: ${m.observability.join(", ")}${RESET}\n`,
+          );
+      }
     }
   }
 

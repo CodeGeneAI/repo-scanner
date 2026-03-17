@@ -24,6 +24,43 @@ export interface BlastRadius {
   readonly score: number; // 0–100
 }
 
+export type ComponentPlatform =
+  | "web"
+  | "api"
+  | "cli"
+  | "worker"
+  | "library"
+  | "mobile"
+  | "desktop";
+
+export interface ComponentMetadata {
+  readonly frameworks?: readonly string[];
+  readonly platform?: ComponentPlatform;
+  readonly entryPoint?: string;
+  readonly ports?: readonly number[];
+  readonly envVars?: readonly string[];
+  readonly runtime?: { readonly name: string; readonly version?: string };
+  readonly datastores?: readonly string[];
+  readonly externalServices?: readonly {
+    readonly name: string;
+    readonly category: string;
+  }[];
+  readonly apiSurface?: {
+    readonly endpointCount: number;
+    readonly protocols: readonly string[];
+  };
+  readonly lineCount?: number;
+  readonly version?: string;
+  readonly private?: boolean;
+  readonly hasReadme?: boolean;
+  readonly hasDockerfile?: boolean;
+  readonly hasTests?: boolean;
+  readonly hasMigrations?: boolean;
+  // Reasonable heuristics tier
+  readonly observability?: readonly string[];
+  readonly deployTarget?: string;
+}
+
 export interface Component {
   readonly name: string;
   readonly path: string;
@@ -33,6 +70,7 @@ export interface Component {
   readonly confidence: number;
   readonly evidence: readonly string[];
   readonly blastRadius?: BlastRadius;
+  readonly metadata?: ComponentMetadata;
 }
 
 export interface LanguageStats {

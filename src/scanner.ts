@@ -55,7 +55,7 @@ export const scanRepo = async (
     .map((r) => r.value);
 
   const durationMs = Math.round(performance.now() - start);
-  const baseResult = aggregate(absolutePath, durationMs, results, index);
+  const baseResult = await aggregate(absolutePath, durationMs, results, index);
 
   if (!options?.dependencies?.enabled) {
     return baseResult;
