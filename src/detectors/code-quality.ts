@@ -167,9 +167,61 @@ const COVERAGE_CHECKS: readonly QualityCheck[] = [
   },
 ];
 
+// ── Enforcement checks (pre-commit hooks, CI-based linting) ──────────────────
+
+const ENFORCEMENT_CHECKS: readonly QualityCheck[] = [
+  {
+    detect: (idx) =>
+      idx.hasFilePrimary(".pre-commit-config.yaml") ||
+      idx.hasFilePrimary(".pre-commit-config.yml"),
+    name: "pre-commit",
+    evidence: ".pre-commit-config.yaml",
+  },
+  {
+    detect: (idx) => {
+      // Husky pre-commit hook that runs linting/quality commands
+      for (const f of idx.getByNamePrimary("pre-commit")) {
+        if (f.relativePath.startsWith(".husky/")) return true;
+      }
+      return false;
+    },
+    name: "Husky pre-commit",
+    evidence: ".husky/pre-commit hook",
+    asyncValidate: async (idx) => {
+      for (const f of idx.getByNamePrimary("pre-commit")) {
+        if (!f.relativePath.startsWith(".husky/")) continue;
+        const content = await readText(f.path);
+        if (
+          content &&
+          (content.includes("lint") ||
+            content.includes("format") ||
+            content.includes("biome") ||
+            content.includes("eslint") ||
+            content.includes("prettier") ||
+            content.includes("quality"))
+        )
+          return true;
+      }
+      return false;
+    },
+  },
+  {
+    detect: (idx) =>
+      idx.hasFilePrimary("lint-staged.config.js") ||
+      idx.hasFilePrimary("lint-staged.config.mjs") ||
+      idx.hasFilePrimary("lint-staged.config.cjs") ||
+      idx.hasFilePrimary(".lintstagedrc") ||
+      idx.hasFilePrimary(".lintstagedrc.json") ||
+      idx.hasFilePrimary(".lintstagedrc.yml"),
+    name: "lint-staged",
+    evidence: "lint-staged config file",
+  },
+];
+
 const ALL_CHECKS: readonly QualityCheck[] = [
   ...PLATFORM_CHECKS,
   ...COVERAGE_CHECKS,
+  ...ENFORCEMENT_CHECKS,
 ];
 
 registerDetector({

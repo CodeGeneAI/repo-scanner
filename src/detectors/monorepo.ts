@@ -122,9 +122,32 @@ registerDetector({
         : (rootPkg.workspaces.packages ?? []);
 
       for (const glob of globs) {
-        const parentDir = glob.split("/")[0]!;
-        if (parentDir && parentDir !== "*") {
-          componentHints.push(...(await discoverComponents(index, parentDir)));
+        // Skip negation patterns (e.g. "!packages/**/test/**")
+        if (glob.startsWith("!")) continue;
+
+        const isLiteral = !glob.includes("*");
+        if (isLiteral) {
+          // Literal workspace path (e.g. "e2e") — treat as a direct component
+          const manifestFile = index
+            .getByNamePrimary("package.json")
+            .find((f) => f.relativePath === `${glob}/package.json`);
+          if (manifestFile) {
+            const pkg = await readJson<PackageJson>(manifestFile.path);
+            componentHints.push({
+              path: glob,
+              name: pkg?.name ?? glob.split("/").pop()!,
+              description: pkg?.description,
+              manifestPath: manifestFile.path,
+              manifestName: "package.json",
+            });
+          }
+        } else {
+          const parentDir = glob.split("/")[0]!;
+          if (parentDir && parentDir !== "*") {
+            componentHints.push(
+              ...(await discoverComponents(index, parentDir)),
+            );
+          }
         }
       }
     }

@@ -7,12 +7,12 @@ interface ClassifyInput {
 }
 
 const PATH_RULES: readonly [RegExp, ComponentKind][] = [
-  [/^(?:apps|app)\//, "app"],
-  [/^(?:services|service)\//, "service"],
-  [/^(?:packages|libs|pkg)\//, "package"],
-  [/^(?:infra|terraform|deploy|pulumi|cdk)\//, "infra"],
-  [/^(?:scripts|tools|tooling)\//, "script"],
-  [/^(?:e2e|test|tests|__tests__)\//, "script"],
+  [/^(?:apps|app)(?:\/|$)/, "app"],
+  [/^(?:services|service)(?:\/|$)/, "service"],
+  [/^(?:packages|libs|pkg)(?:\/|$)/, "package"],
+  [/^(?:infra|terraform|deploy|pulumi|cdk)(?:\/|$)/, "infra"],
+  [/^(?:scripts|tools|tooling)(?:\/|$)/, "script"],
+  [/^(?:e2e|test|tests|__tests__)(?:\/|$)/, "script"],
 ];
 
 export const classifyComponent = (input: ClassifyInput): ComponentKind => {
