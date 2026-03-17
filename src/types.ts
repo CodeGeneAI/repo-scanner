@@ -80,6 +80,7 @@ export interface RepoScanResult {
     readonly hasTypedContracts: boolean;
     readonly hasQualityGates: boolean;
     readonly isPolyglot: boolean;
+    readonly hasDeploymentPlatform: boolean;
   };
   readonly scanPath: string;
   readonly timestamp: string;

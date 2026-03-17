@@ -21,6 +21,8 @@ const LOCKFILE_TO_MANAGER: ReadonlyMap<string, string> = new Map([
   ["mix.lock", "Mix (Elixir)"],
   ["uv.lock", "uv"],
   ["packages.lock.json", "NuGet"],
+  ["Berksfile.lock", "Berkshelf"],
+  ["conan.lock", "Conan"],
 ]);
 
 /** JS package managers — mutually exclusive group (lockfile wins). */
@@ -42,6 +44,12 @@ const MANIFEST_TO_MANAGER: ReadonlyMap<string, string> = new Map([
   ["pom.xml", "Maven"],
   ["Package.swift", "Swift PM"],
   ["mix.exs", "Mix (Elixir)"],
+  ["build.sbt", "SBT"],
+  ["conanfile.txt", "Conan"],
+  ["conanfile.py", "Conan"],
+  ["vcpkg.json", "vcpkg"],
+  ["environment.yml", "Conda"],
+  ["environment.yaml", "Conda"],
 ]);
 
 registerDetector({
@@ -88,7 +96,10 @@ registerDetector({
     }
 
     // NuGet via .csproj presence (if not already detected via lockfile)
-    if (!seen.has("NuGet") && index.getByExtension(".csproj").length > 0) {
+    if (
+      !seen.has("NuGet") &&
+      index.getByExtensionPrimary(".csproj").length > 0
+    ) {
       findings.push({
         value: "NuGet",
         confidence: 0.8,
@@ -109,6 +120,36 @@ registerDetector({
           });
           break;
         }
+      }
+    }
+
+    // Gradle Wrapper detection
+    if (
+      seen.has("Gradle") &&
+      (index.hasFilePrimary("gradlew") || index.hasFilePrimary("gradlew.bat"))
+    ) {
+      const existing = findings.find((f) => f.value === "Gradle");
+      if (existing) {
+        const idx = findings.indexOf(existing);
+        findings[idx] = {
+          ...existing,
+          evidence: [...existing.evidence, "Gradle Wrapper (gradlew)"],
+        };
+      }
+    }
+
+    // Maven Wrapper detection
+    if (
+      seen.has("Maven") &&
+      (index.hasFilePrimary("mvnw") || index.hasFilePrimary("mvnw.cmd"))
+    ) {
+      const existing = findings.find((f) => f.value === "Maven");
+      if (existing) {
+        const idx = findings.indexOf(existing);
+        findings[idx] = {
+          ...existing,
+          evidence: [...existing.evidence, "Maven Wrapper (mvnw)"],
+        };
       }
     }
 

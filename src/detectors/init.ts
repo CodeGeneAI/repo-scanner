@@ -22,3 +22,5 @@ import "./cross-package-deps";
 import "./dead-export";
 import "./code-duplication";
 import "./solid-health";
+import "./code-quality";
+import "./deployment-platform";

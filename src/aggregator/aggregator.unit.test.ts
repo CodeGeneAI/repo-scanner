@@ -117,6 +117,22 @@ describe("aggregate", () => {
     expect(result.signals.hasContainerization).toBe(true);
   });
 
+  it("derives hasDeploymentPlatform from deployment-platform signals", () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "deployment-platform",
+        findings: [
+          { value: "Vercel", confidence: 1.0, evidence: ["vercel.json"] },
+        ],
+        signals: { hasDeploymentPlatform: true },
+      },
+    ];
+
+    const result = aggregate(scanPath, durationMs, results);
+    expect(result.signals.hasDeploymentPlatform).toBe(true);
+    expect(result.inventory.repoTools).toContain("Vercel");
+  });
+
   it("merges commands from multiple detectors", () => {
     const results: DetectorResult[] = [
       {

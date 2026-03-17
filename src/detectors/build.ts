@@ -3,11 +3,8 @@ import type { FileIndex } from "../utils/file-index";
 import { isSecondaryPath } from "../utils/file-index";
 import { readJson } from "../utils/fs";
 import { registerDetector } from "./registry";
+import type { PackageJson } from "./shared";
 import type { DetectorResult, Finding } from "./types";
-
-interface PackageJson {
-  scripts?: Record<string, string>;
-}
 
 interface BuildCheck {
   detect: (index: FileIndex) => boolean;
@@ -106,6 +103,115 @@ const BUILD_CHECKS: readonly BuildCheck[] = [
       idx.getByExtensionPrimary(".sln").length > 0,
     name: "MSBuild",
     evidence: ".csproj / .sln files",
+  },
+
+  // Scala
+  {
+    detect: (idx) => idx.hasFilePrimary("build.sbt"),
+    name: "SBT",
+    evidence: "build.sbt",
+  },
+
+  // Rust
+  {
+    detect: (idx) => idx.hasFilePrimary("Cargo.toml"),
+    name: "Cargo",
+    evidence: "Cargo.toml",
+  },
+
+  // Go
+  {
+    detect: (idx) => idx.hasFilePrimary("go.mod"),
+    name: "Go Build",
+    evidence: "go.mod",
+  },
+
+  // Python
+  {
+    detect: (idx) =>
+      idx.hasFilePrimary("setup.py") || idx.hasFilePrimary("setup.cfg"),
+    name: "Setuptools",
+    evidence: "setup.py / setup.cfg",
+  },
+  {
+    detect: (idx) => idx.hasFilePrimary("pyproject.toml"),
+    name: "pyproject.toml",
+    evidence: "pyproject.toml",
+  },
+
+  // JS bundlers
+  {
+    detect: (idx) =>
+      idx
+        .all()
+        .some(
+          (f) =>
+            f.name.startsWith("esbuild.") && !isSecondaryPath(f.relativePath),
+        ) || idx.hasFilePrimary("esbuild.mjs"),
+    name: "esbuild",
+    evidence: "esbuild config",
+  },
+  {
+    detect: (idx) =>
+      idx
+        .all()
+        .some(
+          (f) =>
+            f.name.startsWith("tsup.config.") &&
+            !isSecondaryPath(f.relativePath),
+        ),
+    name: "tsup",
+    evidence: "tsup.config.*",
+  },
+
+  // C/C++
+  {
+    detect: (idx) => idx.hasFilePrimary("meson.build"),
+    name: "Meson",
+    evidence: "meson.build",
+  },
+
+  // Elixir
+  {
+    detect: (idx) => idx.hasFilePrimary("mix.exs"),
+    name: "Mix",
+    evidence: "mix.exs",
+  },
+
+  // Swift
+  {
+    detect: (idx) => idx.hasFilePrimary("Package.swift"),
+    name: "Swift PM",
+    evidence: "Package.swift",
+  },
+
+  // Dart/Flutter
+  {
+    detect: (idx) => idx.hasFilePrimary("pubspec.yaml"),
+    name: "Pub",
+    evidence: "pubspec.yaml",
+  },
+
+  // PHP
+  {
+    detect: (idx) => idx.hasFilePrimary("composer.json"),
+    name: "Composer",
+    evidence: "composer.json",
+  },
+
+  // Java (Ant)
+  {
+    detect: (idx) => idx.hasFilePrimary("build.xml"),
+    name: "Ant",
+    evidence: "build.xml",
+  },
+
+  // Just (polyglot)
+  {
+    detect: (idx) =>
+      idx.hasFilePrimary("justfile") || idx.hasFilePrimary("Justfile"),
+    name: "Just",
+    evidence: "justfile / Justfile",
   },
 ];
 

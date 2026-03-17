@@ -36,6 +36,14 @@ const LANGUAGE_EXTRACTORS: ReadonlyMap<
   [".swift", extractSwift],
   [".dart", extractDart],
   [".scala", extractScala],
+  [".ex", extractElixir],
+  [".exs", extractElixir],
+  [".c", extractCpp],
+  [".cpp", extractCpp],
+  [".cc", extractCpp],
+  [".cxx", extractCpp],
+  [".h", extractCpp],
+  [".hpp", extractCpp],
 ]);
 
 interface ExtractedIdentifier {
@@ -551,6 +559,142 @@ function extractScala(lines: readonly string[]): ExtractedIdentifier[] {
     const constMatch = trimmed.match(/^val\s+([A-Z][A-Z0-9_]+)\s*[=:]/);
     if (constMatch) {
       results.push({ name: constMatch[1]!, category: "constant" });
+    }
+  }
+  return results;
+}
+
+function extractElixir(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    // Modules: defmodule ModuleName
+    const moduleMatch = trimmed.match(/defmodule\s+([A-Z][\w.]*)/);
+    if (moduleMatch) {
+      results.push({ name: moduleMatch[1]!, category: "class" });
+      continue;
+    }
+
+    // Public functions: def function_name
+    const defMatch = trimmed.match(/^def\s+([a-z_]\w*)/);
+    if (defMatch) {
+      results.push({ name: defMatch[1]!, category: "function" });
+      continue;
+    }
+
+    // Private functions: defp function_name
+    const defpMatch = trimmed.match(/^defp\s+([a-z_]\w*)/);
+    if (defpMatch) {
+      results.push({ name: defpMatch[1]!, category: "function" });
+      continue;
+    }
+
+    // Module attributes as constants: @attr_name value
+    const attrMatch = trimmed.match(/^@([a-z_]\w*)\s+/);
+    if (
+      attrMatch &&
+      !attrMatch[1]!.startsWith("doc") &&
+      !attrMatch[1]!.startsWith("moduledoc") &&
+      !attrMatch[1]!.startsWith("spec") &&
+      !attrMatch[1]!.startsWith("type") &&
+      !attrMatch[1]!.startsWith("callback") &&
+      !attrMatch[1]!.startsWith("behaviour") &&
+      !attrMatch[1]!.startsWith("impl")
+    ) {
+      results.push({ name: attrMatch[1]!, category: "constant" });
+    }
+  }
+  return results;
+}
+
+function extractCpp(lines: readonly string[]): ExtractedIdentifier[] {
+  const results: ExtractedIdentifier[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+
+    // Skip comments and preprocessor (except #define constants)
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("/*") ||
+      trimmed.startsWith("*")
+    )
+      continue;
+
+    // #define CONSTANT_NAME
+    const defineMatch = trimmed.match(/^#define\s+([A-Z_]\w*)/);
+    if (defineMatch) {
+      results.push({ name: defineMatch[1]!, category: "constant" });
+      continue;
+    }
+
+    // class ClassName
+    const classMatch = trimmed.match(
+      /^(?:class|struct)\s+([A-Za-z_]\w*)(?:\s|{|:)/,
+    );
+    if (classMatch) {
+      results.push({ name: classMatch[1]!, category: "class" });
+      continue;
+    }
+
+    // enum (class)? EnumName
+    const enumMatch = trimmed.match(/^enum\s+(?:class\s+)?([A-Za-z_]\w*)/);
+    if (enumMatch) {
+      results.push({ name: enumMatch[1]!, category: "enum" });
+      continue;
+    }
+
+    // typedef ... TypeName;
+    const typedefMatch = trimmed.match(/^typedef\s+.*\s+([A-Za-z_]\w*)\s*;/);
+    if (typedefMatch) {
+      results.push({ name: typedefMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    // using TypeName = ...
+    const usingMatch = trimmed.match(/^using\s+([A-Za-z_]\w*)\s*=/);
+    if (usingMatch) {
+      results.push({ name: usingMatch[1]!, category: "type-alias" });
+      continue;
+    }
+
+    // namespace NamespaceName
+    const nsMatch = trimmed.match(/^namespace\s+([A-Za-z_]\w*)/);
+    if (nsMatch) {
+      results.push({ name: nsMatch[1]!, category: "class" });
+      continue;
+    }
+
+    // const type CONSTANT_NAME = (SCREAMING_SNAKE_CASE)
+    const constMatch = trimmed.match(
+      /(?:const|constexpr)\s+\w+\s+([A-Z][A-Z0-9_]+)\s*[=;]/,
+    );
+    if (constMatch) {
+      results.push({ name: constMatch[1]!, category: "constant" });
+      continue;
+    }
+
+    // Function definitions at indent 0: ReturnType functionName(
+    if (line === trimmed) {
+      const fnMatch = trimmed.match(
+        /^(?:static\s+)?(?:inline\s+)?(?:virtual\s+)?(?:[\w:*&<>]+\s+)+([a-zA-Z_]\w*)\s*\(/,
+      );
+      if (
+        fnMatch &&
+        ![
+          "if",
+          "for",
+          "while",
+          "switch",
+          "return",
+          "catch",
+          "sizeof",
+          "alignof",
+          "decltype",
+        ].includes(fnMatch[1]!)
+      ) {
+        results.push({ name: fnMatch[1]!, category: "function" });
+      }
     }
   }
   return results;

@@ -22,6 +22,7 @@ const MONOREPO_MARKERS: ReadonlyMap<string, string> = new Map([
   ["rush.json", "Rush"],
   ["pnpm-workspace.yaml", "pnpm workspaces"],
   ["go.work", "Go workspaces"],
+  ["melos.yaml", "Melos (Dart)"],
 ]);
 
 /** Extension-based monorepo markers (matched by extension, not exact name). */
@@ -133,6 +134,61 @@ registerDetector({
         confidence: 1.0,
         evidence: ["Cargo.toml contains [workspace]"],
       });
+    }
+
+    // Check Elixir umbrella project
+    const mixExs = await readText(path.join(rootPath, "mix.exs"));
+    if (mixExs?.includes("apps_path")) {
+      isMonorepo = true;
+      findings.push({
+        value: "Elixir umbrella",
+        confidence: 1.0,
+        evidence: ["mix.exs contains apps_path (umbrella project)"],
+      });
+      // Discover apps under apps/ directory
+      const appsComponents = await discoverComponents(index, "apps");
+      for (const comp of appsComponents) {
+        if (!componentHints.some((c) => c.path === comp.path)) {
+          componentHints.push(comp);
+        }
+      }
+    }
+
+    // Check Scala SBT multi-project build
+    const buildSbt = await readText(path.join(rootPath, "build.sbt"));
+    if (
+      buildSbt &&
+      (/lazy\s+val\s+\w+\s*=\s*\(?project/.test(buildSbt) ||
+        buildSbt.includes(".aggregate("))
+    ) {
+      isMonorepo = true;
+      findings.push({
+        value: "SBT multi-project",
+        confidence: 1.0,
+        evidence: ["build.sbt contains multi-project definitions"],
+      });
+    }
+
+    // Check Dart Melos monorepo components (pubspec.yaml in subdirs)
+    if (findings.some((f) => f.value === "Melos (Dart)")) {
+      for (const pubspec of index.getByNamePrimary("pubspec.yaml")) {
+        const relDir = pubspec.relativePath.split("/").slice(0, -1).join("/");
+        if (
+          relDir &&
+          relDir !== "." &&
+          !componentHints.some((c) => c.path === relDir)
+        ) {
+          const content = await readJson<{
+            name?: string;
+            description?: string;
+          }>(pubspec.path);
+          componentHints.push({
+            path: relDir,
+            name: content?.name ?? path.basename(relDir),
+            description: content?.description,
+          });
+        }
+      }
     }
 
     // Scan conventional component dirs

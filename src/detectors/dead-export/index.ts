@@ -10,6 +10,7 @@ import type { DetectorResult, Finding } from "../types";
 import {
   extractCSharpExports,
   extractDartExports,
+  extractElixirExports,
   extractFSharpExports,
   extractGoExports,
   extractJavaExports,
@@ -26,6 +27,7 @@ import {
 import {
   extractDartImportedSymbols,
   extractDotNetImportedSymbols,
+  extractElixirReferencedSymbols,
   extractGoReferencedSymbols,
   extractJavaImportedSymbols,
   extractPhpImportedSymbols,
@@ -83,6 +85,8 @@ const EXPORT_EXTRACTORS: Record<string, ExportExtractor> = {
   ".swift": extractSwiftExports,
   ".scala": extractScalaExports,
   ".dart": extractDartExports,
+  ".ex": extractElixirExports,
+  ".exs": extractElixirExports,
 };
 
 const IMPORT_EXTRACTORS: Record<string, ImportExtractor> = {
@@ -106,6 +110,8 @@ const IMPORT_EXTRACTORS: Record<string, ImportExtractor> = {
   ".swift": { mode: "content", extract: extractSwiftReferencedSymbols },
   ".scala": { mode: "lines", extract: extractScalaImportedSymbols },
   ".dart": { mode: "lines", extract: extractDartImportedSymbols },
+  ".ex": { mode: "content", extract: extractElixirReferencedSymbols },
+  ".exs": { mode: "content", extract: extractElixirReferencedSymbols },
 };
 
 interface FileExport {

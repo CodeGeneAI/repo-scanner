@@ -29,36 +29,6 @@ const CONTAINER_CHECKS: readonly ContainerCheck[] = [
     name: "Helm",
     evidence: "Chart.yaml",
   },
-  {
-    detect: (idx) => idx.hasFile("fly.toml"),
-    name: "Fly.io",
-    evidence: "fly.toml",
-  },
-  {
-    detect: (idx) => idx.hasFile("vercel.json"),
-    name: "Vercel",
-    evidence: "vercel.json",
-  },
-  {
-    detect: (idx) => idx.hasFile("netlify.toml"),
-    name: "Netlify",
-    evidence: "netlify.toml",
-  },
-  {
-    detect: (idx) => idx.hasFilePrimary("Procfile"),
-    name: "Heroku",
-    evidence: "Procfile",
-  },
-  {
-    detect: (idx) => idx.hasFile("render.yaml"),
-    name: "Render",
-    evidence: "render.yaml",
-  },
-  {
-    detect: (idx) => idx.hasFile("railway.toml"),
-    name: "Railway",
-    evidence: "railway.toml",
-  },
 ];
 
 registerDetector({

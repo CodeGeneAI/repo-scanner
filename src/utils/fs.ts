@@ -42,6 +42,10 @@ const INCLUDE_DOT_DIRS = new Set([
   ".buildkite",
   ".vscode",
   ".azure",
+  ".semgrep",
+  ".checkmarx",
+  ".do",
+  ".ebextensions",
 ]);
 
 export interface WalkOptions {

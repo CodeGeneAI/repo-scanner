@@ -458,6 +458,146 @@ export const isLaravelRoute = (
   /Route::(get|post|put|delete|patch|any|resource)\(/.test(content) ||
   relativePath.includes("routes/");
 
+// ─── Elixir Phoenix ─────────────────────────────────────────────────
+
+const PHOENIX_ROUTE_PATTERN =
+  /^\s*(get|post|put|patch|delete)\s+["']([^"']+)["']/;
+
+/** Extract REST endpoints from Phoenix router files. */
+export const extractPhoenix = (
+  lines: readonly string[],
+  filePath: string,
+): RawEndpoint[] => {
+  const endpoints: RawEndpoint[] = [];
+  let scopePrefix = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (isCommentLine(line)) continue;
+
+    // scope "/api" do
+    const scopeMatch = /scope\s+["']([^"']+)["']/.exec(line);
+    if (scopeMatch) {
+      scopePrefix = scopeMatch[1]!;
+      continue;
+    }
+
+    const routeMatch = PHOENIX_ROUTE_PATTERN.exec(line);
+    if (routeMatch) {
+      const path = scopePrefix
+        ? `${scopePrefix}${routeMatch[2]}`
+        : routeMatch[2]!;
+      endpoints.push({
+        method: routeMatch[1]!.toUpperCase(),
+        path,
+        file: filePath,
+        line: i + 1,
+        framework: "Phoenix",
+      });
+      continue;
+    }
+
+    // resources "/users", UserController
+    const resourceMatch = /resources?\s+["']([^"']+)["']/.exec(line);
+    if (resourceMatch) {
+      const resource = resourceMatch[1]!;
+      for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"] as const) {
+        endpoints.push({
+          method,
+          path: scopePrefix ? `${scopePrefix}${resource}` : resource,
+          file: filePath,
+          line: i + 1,
+          framework: "Phoenix",
+        });
+      }
+    }
+  }
+
+  return endpoints;
+};
+
+/** Check if content looks like a Phoenix router. */
+export const isPhoenixRouter = (
+  content: string,
+  relativePath: string,
+): boolean =>
+  content.includes("use") &&
+  (content.includes("Phoenix.Router") ||
+    relativePath.endsWith("_web/router.ex") ||
+    relativePath.includes("router.ex"));
+
+// ─── Swift Vapor ────────────────────────────────────────────────────
+
+const VAPOR_ROUTE_PATTERN =
+  /(?:app|routes?)\.(get|post|put|patch|delete)\(\s*["']([^"']+)["']/g;
+
+/** Extract REST endpoints from Swift Vapor route definitions. */
+export const extractVapor = (
+  lines: readonly string[],
+  filePath: string,
+): RawEndpoint[] => {
+  const endpoints: RawEndpoint[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (isCommentLine(line)) continue;
+    VAPOR_ROUTE_PATTERN.lastIndex = 0;
+    let m: RegExpExecArray | null;
+
+    while ((m = VAPOR_ROUTE_PATTERN.exec(line)) !== null) {
+      endpoints.push({
+        method: m[1]!.toUpperCase(),
+        path: m[2]!.startsWith("/") ? m[2]! : `/${m[2]}`,
+        file: filePath,
+        line: i + 1,
+        framework: "Vapor",
+      });
+    }
+  }
+
+  return endpoints;
+};
+
+/** Check if content looks like Vapor routes. */
+export const isVaporRoute = (content: string): boolean =>
+  /(?:app|routes?)\.(get|post|put|patch|delete)\(/.test(content) ||
+  content.includes("import Vapor");
+
+// ─── Scala Play ─────────────────────────────────────────────────────
+
+/** Extract REST endpoints from Scala Play routes file. */
+export const extractPlayRoutes = (
+  lines: readonly string[],
+  filePath: string,
+): RawEndpoint[] => {
+  const endpoints: RawEndpoint[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (isCommentLine(line) || !line.trim()) continue;
+
+    // Play routes format: METHOD  /path  controller.action
+    const routeMatch = /^(GET|POST|PUT|PATCH|DELETE)\s+(\S+)\s+\S+/.exec(
+      line.trim(),
+    );
+    if (routeMatch) {
+      endpoints.push({
+        method: routeMatch[1]!,
+        path: routeMatch[2]!,
+        file: filePath,
+        line: i + 1,
+        framework: "Play",
+      });
+    }
+  }
+
+  return endpoints;
+};
+
+/** Check if content looks like a Play routes file. */
+export const isPlayRoutes = (_content: string, relativePath: string): boolean =>
+  relativePath.endsWith("conf/routes");
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /** Join two URL path segments, handling slashes. */

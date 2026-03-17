@@ -54,6 +54,32 @@ bun packages/repo-scanner/src/bin.ts --path /path/to/repo --large-file-threshold
 | todo | TODO/FIXME/HACK/BUG/XXX annotation scanning |
 | dead-export | Unused export detection (heuristic) |
 
+## Detector × Language Coverage Matrix
+
+Coverage status: ✅ good coverage | 🟡 partial/minimal | 🟥 not covered | — not applicable
+
+| Detector | JS/TS | Python | Go | Rust | Java | Kotlin | Scala | C/C++ | Ruby | PHP | Swift | Dart | Elixir | .NET | Shell |
+|----------|-------|--------|-----|------|------|--------|-------|-------|------|-----|-------|------|--------|------|-------|
+| **language** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **framework** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — | ✅ | ✅ | — |
+| **dependency-manager** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **build** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **testing** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **linting** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **datastore** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **runtime** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **env** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **api-surface** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
+| **naming-convention** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **dead-export** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **ci** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| **monorepo** | ✅ | 🟡 | ✅ | ✅ | 🟡 | 🟡 | ✅ | — | — | — | — | ✅ | ✅ | ✅ | — |
+| **containerization** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| **iac** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| **repo-tools** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+
+> **Note:** `ci`, `containerization`, `iac`, and `repo-tools` are language-agnostic detectors that work by file/config presence rather than language-specific patterns.
+
 ## Language support by detector
 
 ### Language detection & LOC counting

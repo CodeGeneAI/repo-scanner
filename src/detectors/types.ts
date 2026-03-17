@@ -33,6 +33,7 @@ export interface DetectorResult {
     readonly hasTests: boolean;
     readonly hasTypedContracts: boolean;
     readonly hasQualityGates: boolean;
+    readonly hasDeploymentPlatform: boolean;
   }>;
 }
 

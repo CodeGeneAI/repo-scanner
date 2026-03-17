@@ -40,6 +40,7 @@ export const aggregate = (
     hasTypedContracts: false,
     hasQualityGates: false,
     isPolyglot: false,
+    hasDeploymentPlatform: false,
   };
 
   const componentMap = new Map<string, Component>();
@@ -78,6 +79,7 @@ export const aggregate = (
     testing: repoTools,
     build: repoTools,
     "code-quality": repoTools,
+    "deployment-platform": repoTools,
   };
 
   /** Minimum confidence threshold for language findings. */

@@ -156,6 +156,34 @@ const VERSION_CHECKS: readonly VersionCheck[] = [
     },
   },
 
+  // ── Kotlin ───────────────────────────────────────────
+  {
+    language: "Kotlin",
+    source: "build.gradle.kts kotlin",
+    fileName: "build.gradle.kts",
+    extract: (content) => {
+      const m =
+        /kotlin\s*\(\s*["']jvm["']\s*\)\s*version\s+["']([^"']+)["']/.exec(
+          content,
+        ) ??
+        /org\.jetbrains\.kotlin[^"]*["']([0-9]+\.[0-9]+\.[0-9]+)["']/.exec(
+          content,
+        );
+      return m?.[1];
+    },
+  },
+
+  // ── Scala ────────────────────────────────────────────
+  {
+    language: "Scala",
+    source: "build.sbt scalaVersion",
+    fileName: "build.sbt",
+    extract: (content) => {
+      const m = /scalaVersion\s*:=\s*"([^"]+)"/.exec(content);
+      return m?.[1];
+    },
+  },
+
   // ── Swift ──────────────────────────────────────────────
   {
     language: "Swift",
@@ -235,6 +263,8 @@ const TOOL_VERSIONS_MAP: Record<string, string> = {
   dart: "Dart",
   elixir: "Elixir",
   swift: "Swift",
+  kotlin: "Kotlin",
+  scala: "Scala",
 };
 
 // ─── .csproj TargetFramework ────────────────────────────────────────

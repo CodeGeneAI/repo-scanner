@@ -16,18 +16,24 @@ import {
   extractGoHttp,
   extractLaravel,
   extractNestJsRest,
+  extractPhoenix,
+  extractPlayRoutes,
   extractRails,
   extractRustWeb,
   extractSpring,
+  extractVapor,
   isAspNetController,
   isExpressLike,
   isFlaskLike,
   isGoHttp,
   isLaravelRoute,
   isNestJsController,
+  isPhoenixRouter,
+  isPlayRoutes,
   isRailsRoutes,
   isRustWebFramework,
   isSpringController,
+  isVaporRoute,
 } from "./rest-extractors";
 import type { RawEndpoint } from "./types";
 import {
@@ -81,6 +87,18 @@ const PHP_EXTRACTORS: readonly ExtractorEntry[] = [
   { check: (c, rp) => isLaravelRoute(c, rp), extract: extractLaravel },
 ];
 
+const EX_EXTRACTORS: readonly ExtractorEntry[] = [
+  { check: (c, rp) => isPhoenixRouter(c, rp), extract: extractPhoenix },
+];
+
+const SWIFT_EXTRACTORS: readonly ExtractorEntry[] = [
+  { check: isVaporRoute, extract: extractVapor },
+];
+
+const SCALA_EXTRACTORS: readonly ExtractorEntry[] = [
+  { check: (_c, rp) => isPlayRoutes(_c, rp), extract: extractPlayRoutes },
+];
+
 // Map of extension → extractors
 const EXTENSION_MAP: Record<string, readonly ExtractorEntry[]> = {
   ".ts": TS_EXTRACTORS,
@@ -94,6 +112,9 @@ const EXTENSION_MAP: Record<string, readonly ExtractorEntry[]> = {
   ".cs": CS_EXTRACTORS,
   ".rs": RS_EXTRACTORS,
   ".php": PHP_EXTRACTORS,
+  ".ex": EX_EXTRACTORS,
+  ".swift": SWIFT_EXTRACTORS,
+  ".scala": SCALA_EXTRACTORS,
 };
 
 // Extensions to scan

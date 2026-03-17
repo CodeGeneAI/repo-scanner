@@ -531,6 +531,39 @@ export const extractDartExports = (lines: readonly string[]): RawExport[] => {
   return results;
 };
 
+// ─── Elixir ─────────────────────────────────────────────────────────
+
+export const extractElixirExports = (lines: readonly string[]): RawExport[] => {
+  const results: RawExport[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const moduleMatch = /^defmodule\s+([\w.]+)/.exec(line);
+    if (moduleMatch) {
+      results.push({
+        symbol: moduleMatch[1]!,
+        line: i + 1,
+        exportType: "class",
+      });
+      continue;
+    }
+    const defMatch = /^\s{0,4}def\s+(\w+)/.exec(line);
+    if (
+      defMatch &&
+      !/defp\s/.test(line) &&
+      !/defmodule/.test(line) &&
+      !/defstruct/.test(line) &&
+      !/defimpl/.test(line)
+    ) {
+      results.push({
+        symbol: defMatch[1]!,
+        line: i + 1,
+        exportType: "function",
+      });
+    }
+  }
+  return results;
+};
+
 // ─── Ruby ────────────────────────────────────────────────────────────
 
 export const extractRubyExports = (lines: readonly string[]): RawExport[] => {

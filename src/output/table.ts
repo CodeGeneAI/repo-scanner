@@ -428,8 +428,8 @@ export const renderTable = (
   w(`${check(result.signals.hasIaC)} IaC  `);
   w(`${check(result.signals.hasTests)} Tests  `);
   w(`${check(result.signals.hasTypedContracts)} Typed Contracts  `);
-  w(`${check(result.signals.hasQualityGates)} Quality Gates\n`);
+  w(`${check(result.signals.isPolyglot)} Polyglot  `);
   w(`${check(result.signals.hasQualityGates)} Quality Gates  `);
-  w(`${check(result.signals.isPolyglot)} Polyglot\n`);
+  w(`${check(result.signals.hasDeploymentPlatform)} Deployment\n`);
   w("\n");
 };

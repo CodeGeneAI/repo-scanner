@@ -230,6 +230,36 @@ export const extractDartImportedSymbols = (
   return symbols;
 };
 
+// ─── Elixir ─────────────────────────────────────────────────────────
+
+/** Elixir: alias, import, use directives + module name references. */
+export const extractElixirReferencedSymbols = (
+  content: string,
+): Set<string> => {
+  const symbols = new Set<string>();
+  // alias Module.Name or alias Module.Name, as: Alias
+  const aliasRegex = /alias\s+([\w.]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = aliasRegex.exec(content)) !== null) {
+    const fullName = m[1]!;
+    symbols.add(fullName);
+    // Also add the last segment (MyApp.Repo → Repo)
+    const parts = fullName.split(".");
+    symbols.add(parts[parts.length - 1]!);
+  }
+  // import Module / use Module
+  const importRegex = /(?:import|use)\s+([\w.]+)/g;
+  while ((m = importRegex.exec(content)) !== null) {
+    symbols.add(m[1]!);
+  }
+  // Function calls: Module.function_name
+  const callRegex = /\b([A-Z][\w.]*)\.\w+/g;
+  while ((m = callRegex.exec(content)) !== null) {
+    symbols.add(m[1]!);
+  }
+  return symbols;
+};
+
 // ─── Ruby ────────────────────────────────────────────────────────────
 
 /** For Ruby, like Go, we do whole-content symbol scanning. */
