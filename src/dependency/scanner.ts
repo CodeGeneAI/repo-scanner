@@ -6,6 +6,7 @@ import {
   queryVulnerabilities,
 } from "./security/osv";
 import type {
+  DeadDependencySummaryItem,
   DependencyComponentGroupingMode,
   DependencyComponentSummary,
   DependencyReport,
@@ -19,6 +20,7 @@ import type {
   VulnerabilitySeverity,
   VulnerableDependencySummaryItem,
 } from "./types";
+import { classifyExclusion } from "./usage/exclusions";
 import { scanUsages } from "./usage/scanner";
 import { extractBaseVersion, getUpdateType } from "./utils/semver";
 
@@ -139,6 +141,8 @@ const normalizeScanResult = (
 const buildSummary = (
   scans: readonly ScanResult[],
   componentGrouping: DependencyComponentGroupingMode,
+  includeDevDeadDeps: boolean,
+  skipUsage: boolean,
 ) => {
   const flattened = scans.flatMap((scan) =>
     scan.reports.map((report) => ({
@@ -206,35 +210,63 @@ const buildSummary = (
       );
     });
 
+  // Dead dependency detection: deps with zero import usages that aren't excluded.
+  // Only compute when usage scanning was not skipped (otherwise all deps would look dead).
+  // Cache exclusion results to avoid duplicate classification in the byComponent loop.
+  type FlatEntry = (typeof flattened)[number];
+  const deadSet = new Set<FlatEntry>();
+  const dead: FlatEntry[] = [];
+
+  if (!skipUsage) {
+    for (const entry of flattened) {
+      if (entry.report.usages.length > 0) continue;
+      const exclusion = classifyExclusion(
+        entry.report.dependency,
+        entry.ecosystem,
+        includeDevDeadDeps,
+      );
+      if (!exclusion.excluded) {
+        dead.push(entry);
+        deadSet.add(entry);
+      }
+    }
+  }
+
   const byComponentMap = new Map<
     string,
     {
       totalDependencies: number;
       outdatedDependencies: number;
       vulnerabilityCount: number;
+      deadDependencies: number;
     }
   >();
 
-  for (const { report } of flattened) {
+  for (const entry of flattened) {
     const component = classifyComponent(
-      report.dependency.manifestPath,
+      entry.report.dependency.manifestPath,
       componentGrouping,
     );
     const existing = byComponentMap.get(component) ?? {
       totalDependencies: 0,
       outdatedDependencies: 0,
       vulnerabilityCount: 0,
+      deadDependencies: 0,
     };
 
     existing.totalDependencies += 1;
     if (
-      report.version &&
-      report.version.updateType !== "unknown" &&
-      report.version.updateType !== "up-to-date"
+      entry.report.version &&
+      entry.report.version.updateType !== "unknown" &&
+      entry.report.version.updateType !== "up-to-date"
     ) {
       existing.outdatedDependencies += 1;
     }
-    existing.vulnerabilityCount += report.vulnerabilities.length;
+    existing.vulnerabilityCount += entry.report.vulnerabilities.length;
+
+    if (deadSet.has(entry)) {
+      existing.deadDependencies += 1;
+    }
 
     byComponentMap.set(component, existing);
   }
@@ -279,11 +311,30 @@ const buildSummary = (
     (a, b) => a.localeCompare(b),
   );
 
+  const topDead: DeadDependencySummaryItem[] = dead
+    .sort((left, right) => {
+      if (left.ecosystem !== right.ecosystem) {
+        return left.ecosystem.localeCompare(right.ecosystem);
+      }
+      return left.report.dependency.name.localeCompare(
+        right.report.dependency.name,
+      );
+    })
+    .slice(0, TOP_LIST_LIMIT)
+    .map(({ ecosystem, report }) => ({
+      name: report.dependency.name,
+      ecosystem,
+      isDev: report.dependency.isDev,
+      manifestPath: report.dependency.manifestPath,
+    }));
+
   return {
     ecosystems,
     outdatedDependencies: outdated.length,
+    deadDependencies: dead.length,
     topOutdated,
     topVulnerable,
+    topDead,
     byComponent,
   };
 };
@@ -397,7 +448,12 @@ export const scanDependencySubsystem = async (
     scans: sortedScans,
     totalDependencies,
     totalVulnerabilities,
-    summary: buildSummary(sortedScans, options.componentGrouping ?? "default"),
+    summary: buildSummary(
+      sortedScans,
+      options.componentGrouping ?? "default",
+      options.includeDevDeadDeps ?? false,
+      options.skipUsage,
+    ),
     debug: options.debugVulnerabilityKeys
       ? {
           vulnerabilityKeyStats: {

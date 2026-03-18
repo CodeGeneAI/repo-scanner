@@ -11,6 +11,8 @@ export interface DependencyPolicyOptions {
   readonly failOnOutdated: boolean;
   readonly failOnOutdatedCount?: number;
   readonly outdatedThreshold: OutdatedThreshold;
+  readonly failOnDeadDeps?: boolean;
+  readonly failOnDeadDepsCount?: number;
 }
 
 interface DependencyPolicyDimensionEvaluation {
@@ -28,10 +30,23 @@ interface DependencyPolicyDimensionEvaluation {
     | "both";
 }
 
+export interface DeadDepsPolicyDimensionEvaluation {
+  readonly count: number;
+  readonly failOnAnyEnabled: boolean;
+  readonly failOnCount?: number;
+  readonly failed: boolean;
+  readonly triggeredBy:
+    | "none"
+    | "fail-on-dead-deps"
+    | "fail-on-dead-deps-count"
+    | "both";
+}
+
 export interface DependencyPolicyEvaluation {
   readonly failed: boolean;
   readonly vulnerabilities: DependencyPolicyDimensionEvaluation;
   readonly outdated: DependencyPolicyDimensionEvaluation;
+  readonly deadDeps: DeadDepsPolicyDimensionEvaluation;
 }
 
 const severityRank: Record<VulnerabilitySeverity, number> = {
@@ -107,6 +122,8 @@ export const evaluateDependencyPolicy = (
     options.outdatedThreshold,
   );
 
+  const deadDepsCount = result.summary.deadDependencies;
+
   const vulnThresholdTriggered =
     options.failOnVulns && vulnerabilityMatches > 0;
   const vulnCountTriggered =
@@ -119,12 +136,20 @@ export const evaluateDependencyPolicy = (
     options.failOnOutdatedCount !== undefined &&
     outdatedMatches >= options.failOnOutdatedCount;
 
+  const deadDepsThresholdTriggered =
+    (options.failOnDeadDeps ?? false) && deadDepsCount > 0;
+  const deadDepsCountTriggered =
+    options.failOnDeadDepsCount !== undefined &&
+    deadDepsCount >= options.failOnDeadDepsCount;
+
   return {
     failed:
       vulnThresholdTriggered ||
       vulnCountTriggered ||
       outdatedThresholdTriggered ||
-      outdatedCountTriggered,
+      outdatedCountTriggered ||
+      deadDepsThresholdTriggered ||
+      deadDepsCountTriggered,
     vulnerabilities: {
       threshold: options.severityThreshold,
       thresholdMatches: vulnerabilityMatches,
@@ -153,6 +178,20 @@ export const evaluateDependencyPolicy = (
             ? "fail-on-outdated"
             : outdatedCountTriggered
               ? "fail-on-outdated-count"
+              : "none",
+    },
+    deadDeps: {
+      count: deadDepsCount,
+      failOnAnyEnabled: options.failOnDeadDeps ?? false,
+      failOnCount: options.failOnDeadDepsCount,
+      failed: deadDepsThresholdTriggered || deadDepsCountTriggered,
+      triggeredBy:
+        deadDepsThresholdTriggered && deadDepsCountTriggered
+          ? "both"
+          : deadDepsThresholdTriggered
+            ? "fail-on-dead-deps"
+            : deadDepsCountTriggered
+              ? "fail-on-dead-deps-count"
               : "none",
     },
   };

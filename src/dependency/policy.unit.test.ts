@@ -67,8 +67,23 @@ const fixtureResult: DepScannerResult = {
   summary: {
     ecosystems: ["npm"],
     outdatedDependencies: 2,
+    deadDependencies: 2,
     topOutdated: [],
     topVulnerable: [],
+    topDead: [
+      {
+        name: "alpha",
+        ecosystem: "npm",
+        isDev: false,
+        manifestPath: "package.json",
+      },
+      {
+        name: "beta",
+        ecosystem: "npm",
+        isDev: false,
+        manifestPath: "package.json",
+      },
+    ],
     byComponent: [],
   },
   scanPath: ".",
@@ -103,6 +118,7 @@ describe("dependency policy counters", () => {
       failOnOutdated: false,
       failOnOutdatedCount: 2,
       outdatedThreshold: "minor",
+      failOnDeadDeps: false,
     });
 
     expect(evaluation.failed).toBeTrue();
@@ -110,5 +126,116 @@ describe("dependency policy counters", () => {
     expect(evaluation.vulnerabilities.triggeredBy).toBe("both");
     expect(evaluation.outdated.failed).toBeTrue();
     expect(evaluation.outdated.triggeredBy).toBe("fail-on-outdated-count");
+  });
+
+  it("evaluates dead deps policy with failOnDeadDeps", () => {
+    const evaluation = evaluateDependencyPolicy(fixtureResult, {
+      failOnVulns: false,
+      severityThreshold: "LOW",
+      failOnOutdated: false,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: true,
+    });
+
+    expect(evaluation.failed).toBeTrue();
+    expect(evaluation.deadDeps.failed).toBeTrue();
+    expect(evaluation.deadDeps.count).toBe(2);
+    expect(evaluation.deadDeps.triggeredBy).toBe("fail-on-dead-deps");
+  });
+
+  it("evaluates dead deps policy with failOnDeadDepsCount", () => {
+    const evaluation = evaluateDependencyPolicy(fixtureResult, {
+      failOnVulns: false,
+      severityThreshold: "LOW",
+      failOnOutdated: false,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: false,
+      failOnDeadDepsCount: 3,
+    });
+
+    // 2 dead deps, threshold is 3, should not fail
+    expect(evaluation.deadDeps.failed).toBeFalse();
+    expect(evaluation.deadDeps.triggeredBy).toBe("none");
+  });
+
+  it("evaluates dead deps with both triggers", () => {
+    const evaluation = evaluateDependencyPolicy(fixtureResult, {
+      failOnVulns: false,
+      severityThreshold: "LOW",
+      failOnOutdated: false,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: true,
+      failOnDeadDepsCount: 2,
+    });
+
+    expect(evaluation.deadDeps.failed).toBeTrue();
+    expect(evaluation.deadDeps.triggeredBy).toBe("both");
+  });
+
+  it("does not fail when no dead deps exist", () => {
+    const noDeadResult: DepScannerResult = {
+      ...fixtureResult,
+      summary: {
+        ...fixtureResult.summary,
+        deadDependencies: 0,
+        topDead: [],
+      },
+    };
+    const evaluation = evaluateDependencyPolicy(noDeadResult, {
+      failOnVulns: false,
+      severityThreshold: "LOW",
+      failOnOutdated: false,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: true,
+    });
+
+    expect(evaluation.deadDeps.failed).toBeFalse();
+    expect(evaluation.deadDeps.triggeredBy).toBe("none");
+  });
+
+  it("correctly populates deadDeps dimension metadata", () => {
+    const evaluation = evaluateDependencyPolicy(fixtureResult, {
+      failOnVulns: false,
+      severityThreshold: "LOW",
+      failOnOutdated: false,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: true,
+      failOnDeadDepsCount: 5,
+    });
+
+    expect(evaluation.deadDeps.count).toBe(2);
+    expect(evaluation.deadDeps.failOnAnyEnabled).toBeTrue();
+    expect(evaluation.deadDeps.failOnCount).toBe(5);
+    // failOnDeadDeps triggers (2 > 0), but failOnDeadDepsCount doesn't (2 < 5)
+    expect(evaluation.deadDeps.triggeredBy).toBe("fail-on-dead-deps");
+  });
+
+  it("fails overall when vulns, outdated, AND dead deps all trigger", () => {
+    const evaluation = evaluateDependencyPolicy(fixtureResult, {
+      failOnVulns: true,
+      severityThreshold: "LOW",
+      failOnOutdated: true,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: true,
+    });
+
+    expect(evaluation.failed).toBeTrue();
+    expect(evaluation.vulnerabilities.failed).toBeTrue();
+    expect(evaluation.outdated.failed).toBeTrue();
+    expect(evaluation.deadDeps.failed).toBeTrue();
+  });
+
+  it("does not fail dead deps dimension when only failOnDeadDepsCount exceeds", () => {
+    const evaluation = evaluateDependencyPolicy(fixtureResult, {
+      failOnVulns: false,
+      severityThreshold: "LOW",
+      failOnOutdated: false,
+      outdatedThreshold: "patch",
+      failOnDeadDeps: false,
+      failOnDeadDepsCount: 100,
+    });
+
+    expect(evaluation.deadDeps.failed).toBeFalse();
+    expect(evaluation.deadDeps.count).toBe(2);
   });
 });

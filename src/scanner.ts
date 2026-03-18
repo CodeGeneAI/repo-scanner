@@ -100,6 +100,7 @@ export const scanRepo = async (
     concurrency: options.dependencies.concurrency,
     componentGrouping: options.dependencies.componentGrouping,
     debugVulnerabilityKeys: options.dependencies.debugVulnerabilityKeys,
+    includeDevDeadDeps: options.dependencies.includeDevDeadDeps,
     indexedUsageFiles,
     indexedFileContent,
   });

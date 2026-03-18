@@ -1,9 +1,11 @@
 export type { DependencyOrchestratorOptions } from "./orchestrator";
 export { scanDependencies } from "./orchestrator";
 export type {
+  DeadDependencySummaryItem,
   Dependency,
   DependencyReport,
   DependencyScanOptions,
+  DependencySummary,
   DepScannerResult,
   Ecosystem,
   ScanResult,
@@ -12,3 +14,4 @@ export type {
   VersionInfo,
   Vulnerability,
 } from "./types";
+export type { DeadDepExclusionResult } from "./usage/exclusions";

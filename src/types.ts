@@ -324,6 +324,9 @@ export interface CliOptions {
   readonly solid: boolean;
   readonly solidThreshold: number;
   readonly envIncludeTests: boolean;
+  readonly failOnDeadDeps: boolean;
+  readonly failOnDeadDepsCount?: number;
+  readonly includeDevDeadDeps: boolean;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;
@@ -334,6 +337,7 @@ export interface DependencyScanConfig {
   readonly concurrency?: number;
   readonly componentGrouping?: DependencyComponentGroupingMode;
   readonly debugVulnerabilityKeys?: boolean;
+  readonly includeDevDeadDeps?: boolean;
 }
 
 export interface ScanRepoOptions {

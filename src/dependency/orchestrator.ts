@@ -19,6 +19,7 @@ export interface DependencyOrchestratorOptions {
   readonly concurrency?: number;
   readonly componentGrouping?: DependencyComponentGroupingMode;
   readonly debugVulnerabilityKeys?: boolean;
+  readonly includeDevDeadDeps?: boolean;
   readonly indexedUsageFiles?: readonly IndexedUsageFile[];
   readonly indexedFileContent?: ReadonlyMap<string, string>;
 }
@@ -38,6 +39,7 @@ export const scanDependencies = async (
     concurrency: options.concurrency ?? os.cpus().length,
     componentGrouping: options.componentGrouping ?? "default",
     debugVulnerabilityKeys: options.debugVulnerabilityKeys ?? false,
+    includeDevDeadDeps: options.includeDevDeadDeps ?? false,
     indexedUsageFiles: options.indexedUsageFiles,
     indexedFileContent: options.indexedFileContent,
   };

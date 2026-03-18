@@ -138,6 +138,276 @@ describe("scanDependencySubsystem", () => {
     }
   });
 
+  it("computes dead dependencies from usage scan results", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-"),
+    );
+
+    try {
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture",
+            version: "1.0.0",
+            dependencies: {
+              axios: "^1.0.0",
+              "unused-pkg": "^1.0.0",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      // Create a source file that imports axios but NOT unused-pkg
+      await writeFile(
+        path.join(repoPath, "index.ts"),
+        'import axios from "axios";\nconsole.log(axios);\n',
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      expect(result.summary.deadDependencies).toBe(1);
+      expect(result.summary.topDead).toHaveLength(1);
+      expect(result.summary.topDead[0]?.name).toBe("unused-pkg");
+      expect(result.summary.topDead[0]?.ecosystem).toBe("npm");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("excludes dev tooling from dead deps by default", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-dev-"),
+    );
+
+    try {
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture",
+            version: "1.0.0",
+            dependencies: {
+              "unused-pkg": "^1.0.0",
+            },
+            devDependencies: {
+              typescript: "^5.0.0",
+              vitest: "^1.0.0",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      // Only unused-pkg should be dead; typescript and vitest are excluded
+      expect(result.summary.deadDependencies).toBe(1);
+      expect(result.summary.topDead[0]?.name).toBe("unused-pkg");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("includes dev tooling in dead deps when includeDevDeadDeps is true", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-include-dev-"),
+    );
+
+    try {
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture",
+            version: "1.0.0",
+            devDependencies: {
+              typescript: "^5.0.0",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+        includeDevDeadDeps: true,
+      });
+
+      // With includeDevDeadDeps, typescript should be reported as dead
+      expect(result.summary.deadDependencies).toBe(1);
+      expect(result.summary.topDead[0]?.name).toBe("typescript");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("does not count deps as dead when usage scanning is skipped", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-skip-usage-"),
+    );
+
+    try {
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture",
+            version: "1.0.0",
+            dependencies: {
+              axios: "^1.0.0",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: true,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      // When usage scanning is skipped, nothing should be counted as dead
+      expect(result.summary.deadDependencies).toBe(0);
+      expect(result.summary.topDead).toHaveLength(0);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("limits topDead to 5 entries and sorts by ecosystem then name", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-limit-"),
+    );
+
+    try {
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture",
+            version: "1.0.0",
+            dependencies: {
+              "alpha-unused": "^1.0.0",
+              "bravo-unused": "^1.0.0",
+              "charlie-unused": "^1.0.0",
+              "delta-unused": "^1.0.0",
+              "echo-unused": "^1.0.0",
+              "foxtrot-unused": "^1.0.0",
+              "golf-unused": "^1.0.0",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      expect(result.summary.deadDependencies).toBe(7);
+      expect(result.summary.topDead).toHaveLength(5);
+      // Sorted alphabetically by name (same ecosystem)
+      expect(result.summary.topDead[0]?.name).toBe("alpha-unused");
+      expect(result.summary.topDead[4]?.name).toBe("echo-unused");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("tracks dead dependencies per component in byComponent", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-components-"),
+    );
+
+    try {
+      const appDir = path.join(repoPath, "apps", "web");
+      const svcDir = path.join(repoPath, "services", "api");
+      await mkdir(appDir, { recursive: true });
+      await mkdir(svcDir, { recursive: true });
+
+      // apps/web has one dead dep
+      await writeFile(
+        path.join(appDir, "package.json"),
+        JSON.stringify({
+          name: "@fixture/web",
+          version: "1.0.0",
+          dependencies: { "dead-in-web": "^1.0.0" },
+        }),
+      );
+
+      // services/api has two dead deps
+      await writeFile(
+        path.join(svcDir, "package.json"),
+        JSON.stringify({
+          name: "@fixture/api",
+          version: "1.0.0",
+          dependencies: {
+            "dead-in-api-1": "^1.0.0",
+            "dead-in-api-2": "^1.0.0",
+          },
+        }),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      expect(result.summary.deadDependencies).toBe(3);
+
+      const webComponent = result.summary.byComponent.find(
+        (c) => c.component === "apps/web",
+      );
+      const apiComponent = result.summary.byComponent.find(
+        (c) => c.component === "services/api",
+      );
+
+      expect(webComponent?.deadDependencies).toBe(1);
+      expect(apiComponent?.deadDependencies).toBe(2);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
   it("exposes vulnerability key debug stats when enabled", async () => {
     const repoPath = await mkdtemp(
       path.join(os.tmpdir(), "repo-scanner-deps-debug-"),

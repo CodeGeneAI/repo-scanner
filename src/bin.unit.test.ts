@@ -218,4 +218,107 @@ describe("repo-scanner bin", () => {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
+
+  it("enables dependency scan when --fail-on-dead-deps is used without --deps", async () => {
+    const repoPath = await createCliFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--no-security",
+        "--no-version-lookup",
+        "--fail-on-dead-deps",
+        "--format",
+        "json",
+      ]);
+
+      // lodash IS used in fixture, so may or may not have dead deps
+      expect([0, 1]).toContain(result.exitCode);
+
+      const payload = JSON.parse(new TextDecoder().decode(result.stdout));
+      expect(payload.dependencies).toBeDefined();
+      expect(payload.policyEvaluation).toBeDefined();
+      expect(payload.policyEvaluation.deadDeps).toBeDefined();
+      expect(typeof payload.policyEvaluation.deadDeps.count).toBe("number");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("forces usage scanning when --fail-on-dead-deps overrides --no-usage", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-dead-override-"),
+    );
+
+    try {
+      await writeFile(path.join(repoPath, "README.md"), "# fixture\n");
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify({
+          name: "fixture",
+          version: "1.0.0",
+          dependencies: { "unused-pkg": "^1.0.0" },
+        }),
+      );
+
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--no-security",
+        "--no-version-lookup",
+        "--no-usage",
+        "--fail-on-dead-deps",
+        "--format",
+        "json",
+      ]);
+
+      // --fail-on-dead-deps overrides --no-usage, so unused-pkg detected as dead → exit 1
+      expect(result.exitCode).toBe(1);
+
+      const payload = JSON.parse(new TextDecoder().decode(result.stdout));
+      expect(payload.dependencies.summary.deadDependencies).toBe(1);
+      expect(payload.policyEvaluation.deadDeps.failed).toBeTrue();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("includes topDead and deadDependencies in JSON output", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-dead-json-"),
+    );
+
+    try {
+      await writeFile(path.join(repoPath, "README.md"), "# fixture\n");
+      await writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify({
+          name: "fixture",
+          version: "1.0.0",
+          dependencies: { "dead-a": "^1.0.0", "dead-b": "^1.0.0" },
+        }),
+      );
+
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--deps",
+        "--no-security",
+        "--no-version-lookup",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const payload = JSON.parse(new TextDecoder().decode(result.stdout));
+      expect(payload.dependencies.summary.deadDependencies).toBe(2);
+      expect(payload.dependencies.summary.topDead).toHaveLength(2);
+      expect(payload.dependencies.summary.topDead[0].name).toBe("dead-a");
+      expect(payload.dependencies.summary.topDead[0].ecosystem).toBe("npm");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
 });

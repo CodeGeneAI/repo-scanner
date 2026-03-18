@@ -26,7 +26,9 @@ const shouldEnableDependencyScan = (options: ReturnType<typeof parseArgs>) =>
   options.failOnVulns ||
   options.failOnOutdated ||
   options.failOnVulnsCount !== undefined ||
-  options.failOnOutdatedCount !== undefined;
+  options.failOnOutdatedCount !== undefined ||
+  options.failOnDeadDeps ||
+  options.failOnDeadDepsCount !== undefined;
 
 const resolveValidDirectory = (rawPath: string): string => {
   const resolvedPath = path.resolve(rawPath);
@@ -97,17 +99,21 @@ const main = async () => {
   }
 
   const dependenciesEnabled = shouldEnableDependencyScan(options);
+  const deadDepsActive =
+    options.failOnDeadDeps || options.failOnDeadDepsCount !== undefined;
 
   const result = await scanRepo(options.path, {
     dependencies: {
       enabled: dependenciesEnabled,
       ecosystems: options.ecosystems,
-      skipUsage: options.skipUsage,
+      // Dead dep detection requires usage scanning — override skipUsage when active
+      skipUsage: deadDepsActive ? false : options.skipUsage,
       skipSecurity: options.skipSecurity,
       skipVersionLookup: options.skipVersionLookup,
       concurrency: options.concurrency,
       componentGrouping: options.componentGrouping,
       debugVulnerabilityKeys: options.depsDebug,
+      includeDevDeadDeps: options.includeDevDeadDeps,
     },
   });
 
@@ -119,6 +125,8 @@ const main = async () => {
         failOnOutdated: options.failOnOutdated,
         failOnOutdatedCount: options.failOnOutdatedCount,
         outdatedThreshold: options.outdatedThreshold,
+        failOnDeadDeps: options.failOnDeadDeps,
+        failOnDeadDepsCount: options.failOnDeadDepsCount,
       })
     : undefined;
 

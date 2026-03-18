@@ -545,6 +545,7 @@ export const renderTable = (
       `  Outdated:         ${result.dependencies.summary.outdatedDependencies}\n`,
     );
     w(`  Vulnerabilities:  ${result.dependencies.totalVulnerabilities}\n`);
+    w(`  Dead (unused):    ${result.dependencies.summary.deadDependencies}\n`);
 
     if (result.dependencies.summary.topOutdated.length > 0) {
       w("  Top outdated:\n");
@@ -564,6 +565,16 @@ export const renderTable = (
       }
     }
 
+    if (result.dependencies.summary.topDead.length > 0) {
+      w("  Top dead (unused):\n");
+      for (const item of result.dependencies.summary.topDead) {
+        const dev = item.isDev ? ` ${DIM}(dev)${RESET}` : "";
+        w(
+          `    ${YELLOW}${item.name}${RESET} ${DIM}(${item.ecosystem})${RESET}${dev}\n`,
+        );
+      }
+    }
+
     if (result.dependencies.summary.byComponent.length > 0) {
       w("  By component:\n");
       for (const component of result.dependencies.summary.byComponent.slice(
@@ -571,7 +582,7 @@ export const renderTable = (
         10,
       )) {
         w(
-          `    ${YELLOW}${component.component}${RESET} ${DIM}deps:${component.totalDependencies} outdated:${component.outdatedDependencies} vulns:${component.vulnerabilityCount}${RESET}\n`,
+          `    ${YELLOW}${component.component}${RESET} ${DIM}deps:${component.totalDependencies} outdated:${component.outdatedDependencies} vulns:${component.vulnerabilityCount} dead:${component.deadDependencies}${RESET}\n`,
         );
       }
       if (result.dependencies.summary.byComponent.length > 10) {

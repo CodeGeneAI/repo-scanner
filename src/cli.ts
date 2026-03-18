@@ -75,6 +75,9 @@ Options:
   --fail-on-outdated-count <n> Exit with code 1 when outdated matches >= n
   --outdated-threshold <lvl>  Update threshold for --fail-on-outdated
                               Valid: patch,minor,major (default: patch)
+  --fail-on-dead-deps         Exit with code 1 when dead (unused) dependencies are found
+  --fail-on-dead-deps-count <n> Exit with code 1 when dead dependency count >= n
+  --include-dev-dead-deps     Include dev dependencies in dead dependency detection
   --large-file-threshold <n>  Line count threshold for large file detection (default: 500)
   --min-tokens <n>            Minimum token window for duplication detection (default: 50)
   --min-lines <n>             Minimum duplicate lines to report (default: 6)
@@ -193,6 +196,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let solid = false;
   let solidThreshold = 80;
   let envIncludeTests = false;
+  let failOnDeadDeps = false;
+  let failOnDeadDepsCount: number | undefined;
+  let includeDevDeadDeps = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -379,6 +385,18 @@ export const parseArgs = (argv: string[]): CliOptions => {
           "--solid-threshold",
         );
         break;
+      case "--fail-on-dead-deps":
+        failOnDeadDeps = true;
+        break;
+      case "--fail-on-dead-deps-count":
+        failOnDeadDepsCount = parseRequiredPositiveIntegerOption(
+          args[++i],
+          "--fail-on-dead-deps-count",
+        );
+        break;
+      case "--include-dev-dead-deps":
+        includeDevDeadDeps = true;
+        break;
     }
   }
 
@@ -412,6 +430,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
     solid,
     solidThreshold,
     envIncludeTests,
+    failOnDeadDeps,
+    failOnDeadDepsCount,
+    includeDevDeadDeps,
   };
 };
 

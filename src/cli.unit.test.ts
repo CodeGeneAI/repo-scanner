@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { parseArgs } from "./cli";
+import { CliParseError, parseArgs } from "./cli";
 
 describe("parseArgs", () => {
   it("parses default values", () => {
@@ -22,6 +22,9 @@ describe("parseArgs", () => {
     expect(result.minUniqueRatio).toBe(0.1);
     expect(result.maxLiteralRatio).toBe(0.5);
     expect(result.ignoreBarrelExports).toBeTrue();
+    expect(result.failOnDeadDeps).toBeFalse();
+    expect(result.failOnDeadDepsCount).toBeUndefined();
+    expect(result.includeDevDeadDeps).toBeFalse();
   });
 
   it("parses dependency options", () => {
@@ -75,6 +78,72 @@ describe("parseArgs", () => {
     ]);
 
     expect(result.ecosystems).toEqual(["npm", "pypi", "go"]);
+  });
+
+  it("parses dead dependency flags", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--fail-on-dead-deps",
+      "--fail-on-dead-deps-count",
+      "5",
+      "--include-dev-dead-deps",
+    ]);
+
+    expect(result.failOnDeadDeps).toBeTrue();
+    expect(result.failOnDeadDepsCount).toBe(5);
+    expect(result.includeDevDeadDeps).toBeTrue();
+  });
+
+  it("throws CliParseError for --fail-on-dead-deps-count without value", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--fail-on-dead-deps-count"]),
+    ).toThrow(CliParseError);
+  });
+
+  it("throws CliParseError for --fail-on-dead-deps-count with invalid value", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--fail-on-dead-deps-count", "abc"]),
+    ).toThrow(CliParseError);
+  });
+
+  it("throws CliParseError for --fail-on-dead-deps-count with negative value", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--fail-on-dead-deps-count", "-1"]),
+    ).toThrow(CliParseError);
+  });
+
+  it("parses --fail-on-dead-deps-count with decimal value as truncated integer", () => {
+    // parseInt("1.5") returns 1, which is a valid positive integer
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--fail-on-dead-deps-count",
+      "1.5",
+    ]);
+    expect(result.failOnDeadDepsCount).toBe(1);
+  });
+
+  it("parses --fail-on-dead-deps-count independently without --fail-on-dead-deps", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--fail-on-dead-deps-count",
+      "10",
+    ]);
+    expect(result.failOnDeadDeps).toBeFalse();
+    expect(result.failOnDeadDepsCount).toBe(10);
+  });
+
+  it("parses --include-dev-dead-deps independently without other dead deps flags", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--include-dev-dead-deps",
+    ]);
+    expect(result.includeDevDeadDeps).toBeTrue();
+    expect(result.failOnDeadDeps).toBeFalse();
+    expect(result.failOnDeadDepsCount).toBeUndefined();
   });
 
   it("parses dry-check compatibility flags", () => {

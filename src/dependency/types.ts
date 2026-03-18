@@ -106,6 +106,7 @@ export interface DependencyComponentSummary {
   readonly totalDependencies: number;
   readonly outdatedDependencies: number;
   readonly vulnerabilityCount: number;
+  readonly deadDependencies: number;
 }
 
 export type DependencyComponentGroupingMode =
@@ -114,11 +115,20 @@ export type DependencyComponentGroupingMode =
   | "services-only"
   | "workspace-package";
 
+export interface DeadDependencySummaryItem {
+  readonly name: string;
+  readonly ecosystem: Ecosystem;
+  readonly isDev: boolean;
+  readonly manifestPath: string;
+}
+
 export interface DependencySummary {
   readonly ecosystems: readonly Ecosystem[];
   readonly outdatedDependencies: number;
+  readonly deadDependencies: number;
   readonly topOutdated: readonly OutdatedDependencySummaryItem[];
   readonly topVulnerable: readonly VulnerableDependencySummaryItem[];
+  readonly topDead: readonly DeadDependencySummaryItem[];
   readonly byComponent: readonly DependencyComponentSummary[];
 }
 
@@ -138,4 +148,5 @@ export interface DependencyScanOptions {
   readonly indexedFileContent?: ReadonlyMap<string, string>;
   readonly componentGrouping?: DependencyComponentGroupingMode;
   readonly debugVulnerabilityKeys?: boolean;
+  readonly includeDevDeadDeps?: boolean;
 }
