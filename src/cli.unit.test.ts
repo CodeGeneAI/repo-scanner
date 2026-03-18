@@ -80,6 +80,46 @@ describe("parseArgs", () => {
     expect(result.ecosystems).toEqual(["npm", "pypi", "go"]);
   });
 
+  it("parses topology defaults", () => {
+    const result = parseArgs(["bun", "repo-scanner"]);
+    expect(result.topology).toBeFalse();
+    expect(result.topologyDiagrams).toBeUndefined();
+    expect(result.topologyOutput).toBeUndefined();
+  });
+
+  it("parses --topology flag", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--topology"]);
+    expect(result.topology).toBeTrue();
+  });
+
+  it("parses --topology-diagrams", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--topology-diagrams",
+      "architecture,dataflow",
+    ]);
+    expect(result.topology).toBeTrue();
+    expect(result.topologyDiagrams).toEqual(["architecture", "dataflow"]);
+  });
+
+  it("rejects invalid --topology-diagrams", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--topology-diagrams", "invalid-type"]),
+    ).toThrow(/invalid diagram types/);
+  });
+
+  it("parses --topology-output", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--topology-output",
+      "./out.md",
+    ]);
+    expect(result.topology).toBeTrue();
+    expect(result.topologyOutput).toBe("./out.md");
+  });
+
   it("parses dead dependency flags", () => {
     const result = parseArgs([
       "bun",

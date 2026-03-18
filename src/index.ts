@@ -1,5 +1,11 @@
 export { scanDependencies } from "./dependency";
 export type { DetectorResult, Finding } from "./detectors/types";
+export type {
+  DiagramKind,
+  DiagramOutput,
+  TopologyResult,
+} from "./output/topology";
+export { generateTopology } from "./output/topology";
 export { scanRepo } from "./scanner";
 export type {
   ApiEndpoint,

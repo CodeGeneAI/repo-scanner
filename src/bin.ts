@@ -13,6 +13,8 @@ import { setSolidOptions } from "./detectors/solid-health";
 import { renderDryCheckJson, renderDryCheckTable } from "./output/dry-check";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
+import { generateTopology } from "./output/topology";
+import { renderTopologyToString } from "./output/topology/render";
 import { scanRepo } from "./scanner";
 import { FileIndex } from "./utils/file-index";
 
@@ -132,13 +134,29 @@ const main = async () => {
       })
     : undefined;
 
+  const topology = options.topology
+    ? generateTopology(result, options.topologyDiagrams)
+    : undefined;
+
   if (options.format === "json") {
-    renderJson(
-      policyEvaluation ? { ...result, policyEvaluation } : result,
-      process.stdout,
-    );
+    const jsonPayload = {
+      ...result,
+      ...(policyEvaluation ? { policyEvaluation } : {}),
+      ...(topology ? { topology } : {}),
+    };
+    renderJson(jsonPayload, process.stdout);
   } else {
     renderTable(result, process.stdout);
+  }
+
+  if (topology) {
+    if (options.topologyOutput) {
+      const content = renderTopologyToString(topology, "markdown");
+      fs.writeFileSync(options.topologyOutput, content);
+    } else if (options.format !== "json") {
+      const content = renderTopologyToString(topology, "markdown");
+      process.stdout.write(`\n${content}`);
+    }
   }
 
   if (policyEvaluation?.failed) {

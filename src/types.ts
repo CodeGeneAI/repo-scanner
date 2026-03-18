@@ -297,6 +297,14 @@ export interface ExternalService {
   readonly evidence: readonly string[];
 }
 
+export type {
+  DiagramKind,
+  DiagramOutput,
+  TopologyResult,
+} from "./output/topology/types";
+
+import type { DiagramKind } from "./output/topology/types";
+
 export interface CliOptions {
   readonly path: string;
   readonly format: "table" | "json";
@@ -327,6 +335,9 @@ export interface CliOptions {
   readonly solid: boolean;
   readonly solidThreshold: number;
   readonly envIncludeTests: boolean;
+  readonly topology: boolean;
+  readonly topologyDiagrams?: readonly DiagramKind[];
+  readonly topologyOutput?: string;
   readonly failOnDeadDeps: boolean;
   readonly failOnDeadDepsCount?: number;
   readonly includeDevDeadDeps: boolean;

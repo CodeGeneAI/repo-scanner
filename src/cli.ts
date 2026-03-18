@@ -5,7 +5,10 @@ import type {
   OutdatedThreshold,
   VulnerabilitySeverity,
 } from "./dependency/types";
-import type { CliOptions } from "./types";
+import { ALL_DIAGRAM_KINDS } from "./output/topology/types";
+import type { CliOptions, DiagramKind } from "./types";
+
+const VALID_DIAGRAM_KINDS = new Set<DiagramKind>(ALL_DIAGRAM_KINDS);
 
 export class CliParseError extends Error {
   readonly exitCode: number;
@@ -88,6 +91,10 @@ Options:
   --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
   --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
   --env-include-tests         Include test files in env var detection
+  --topology                  Generate mermaid architecture diagrams from scan results
+  --topology-diagrams <list>  Comma-separated diagram types to generate (default: all)
+                              Valid: architecture,dependency,dataflow,api-topology
+  --topology-output <path>    Write topology diagrams to file instead of stdout
   --db-schema                 Enable database schema detection (tables, columns, relationships)
   --version, -v               Show version number
   --help, -h                  Show this help text
@@ -197,6 +204,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let solid = false;
   let solidThreshold = 80;
   let envIncludeTests = false;
+  let topology = false;
+  let topologyDiagrams: DiagramKind[] | undefined;
+  let topologyOutput: string | undefined;
   let failOnDeadDeps = false;
   let failOnDeadDepsCount: number | undefined;
   let includeDevDeadDeps = false;
@@ -390,6 +400,51 @@ export const parseArgs = (argv: string[]): CliOptions => {
           "--solid-threshold",
         );
         break;
+      case "--topology":
+        topology = true;
+        break;
+      case "--topology-diagrams": {
+        const raw = args[++i];
+        if (!raw || isFlagToken(raw)) {
+          failCliParse(
+            "Error: --topology-diagrams requires a comma-separated value.",
+          );
+        }
+
+        const tokens = raw
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0);
+
+        if (tokens.length === 0) {
+          failCliParse(
+            "Error: --topology-diagrams must include at least one diagram type.",
+          );
+        }
+
+        const invalid = tokens.filter(
+          (value) => !VALID_DIAGRAM_KINDS.has(value as DiagramKind),
+        );
+
+        if (invalid.length > 0) {
+          failCliParse(
+            `Error: invalid diagram types "${invalid.join(",")}". Use one of architecture,dependency,dataflow,api-topology.`,
+          );
+        }
+
+        topologyDiagrams = [...new Set(tokens)] as DiagramKind[];
+        topology = true;
+        break;
+      }
+      case "--topology-output":
+        topologyOutput =
+          args[++i] ??
+          failCliParse("Error: --topology-output requires a file path.");
+        if (isFlagToken(topologyOutput)) {
+          failCliParse("Error: --topology-output requires a file path.");
+        }
+        topology = true;
+        break;
       case "--fail-on-dead-deps":
         failOnDeadDeps = true;
         break;
@@ -435,6 +490,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
     solid,
     solidThreshold,
     envIncludeTests,
+    topology,
+    topologyDiagrams,
+    topologyOutput,
     failOnDeadDeps,
     failOnDeadDepsCount,
     includeDevDeadDeps,
