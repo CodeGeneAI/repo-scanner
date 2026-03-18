@@ -7,6 +7,7 @@ import type {
 } from "./dependency/types";
 import { ALL_DIAGRAM_KINDS } from "./output/topology/types";
 import type { CliOptions, DiagramKind } from "./types";
+import { BUILD_SHA } from "./update/build-version";
 
 const VALID_DIAGRAM_KINDS = new Set<DiagramKind>(ALL_DIAGRAM_KINDS);
 
@@ -54,7 +55,10 @@ const VALID_COMPONENT_GROUPING_MODES = new Set<DependencyComponentGroupingMode>(
 
 const HELP_TEXT = `repo-scanner - Universal repository structure scanner
 
-Usage: repo-scanner [options]
+Usage: repo-scanner [command] [options]
+
+Commands:
+  update                      Check for updates and install the latest version
 
 Options:
   --path <dir>                Directory to scan (default: cwd)
@@ -96,6 +100,7 @@ Options:
                               Valid: architecture,dependency,dataflow,api-topology
   --topology-output <path>    Write topology diagrams to file instead of stdout
   --db-schema                 Enable database schema detection (tables, columns, relationships)
+  --no-update-check           Suppress background update check for this run
   --version, -v               Show version number
   --help, -h                  Show this help text
 `;
@@ -179,6 +184,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let format: "table" | "json" = "table";
   let showHelp = false;
   let showVersion = false;
+  let showUpdate = false;
+  let noUpdateCheck = false;
   let dryCheck = false;
   let deps = false;
   let depsDebug = false;
@@ -212,6 +219,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let includeDevDeadDeps = false;
   let dbSchema = false;
 
+  // Detect positional subcommand as the first non-flag argument.
+  if (args[0] === "update") {
+    showUpdate = true;
+    args.splice(0, 1);
+  }
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
 
@@ -223,6 +236,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--help":
       case "-h":
         showHelp = true;
+        break;
+      case "--no-update-check":
+        noUpdateCheck = true;
         break;
       case "--path":
         pathArg = args[++i] ?? pathArg;
@@ -465,6 +481,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
     format,
     showHelp,
     showVersion,
+    showUpdate,
+    noUpdateCheck,
     dryCheck,
     deps,
     depsDebug,
@@ -502,7 +520,4 @@ export const parseArgs = (argv: string[]): CliOptions => {
 
 export const getHelpText = () => HELP_TEXT;
 
-export const getVersion = async (): Promise<string> => {
-  const { default: pkg } = await import("../package.json");
-  return pkg.version;
-};
+export const getVersion = (): string => BUILD_SHA;

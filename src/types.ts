@@ -310,6 +310,8 @@ export interface CliOptions {
   readonly format: "table" | "json";
   readonly showHelp: boolean;
   readonly showVersion: boolean;
+  readonly showUpdate: boolean;
+  readonly noUpdateCheck: boolean;
   readonly dryCheck: boolean;
   readonly deps: boolean;
   readonly depsDebug: boolean;

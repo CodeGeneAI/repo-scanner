@@ -11,7 +11,8 @@
   },
   "scripts": {
     "start": "bun src/bin.ts",
-    "build:single": "mkdir -p dist && bun build ./src/bin.ts --compile --bytecode --target=bun-linux-x64-baseline --outfile ./dist/repo-scanner",
+    "build:version": "bun scripts/gen-build-version.ts",
+    "build:single": "bun run build:version && mkdir -p dist && bun build ./src/bin.ts --compile --bytecode --target=bun-linux-x64-baseline --outfile ./dist/repo-scanner",
     "typecheck": "bun x tsgo --noEmit",
     "test:unit": "files=$(find . -type f \\( -name '*.unit.spec.ts' -o -name '*.unit.spec.tsx' -o -name '*.unit.test.ts' -o -name '*.unit.test.tsx' \\)); if [ -n \"$files\" ]; then bun test $files; else echo 'No unit tests found'; fi",
     "lint": "biome check --write --diagnostic-level=error",

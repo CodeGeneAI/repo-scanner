@@ -16,6 +16,9 @@ import { renderTable } from "./output/table";
 import { generateTopology } from "./output/topology";
 import { renderTopologyToString } from "./output/topology/render";
 import { scanRepo } from "./scanner";
+import { BUILD_SHA, BUILD_UPDATE_URL } from "./update/build-version";
+import { formatUpdateNotice, startBackgroundUpdateCheck } from "./update/check";
+import { runUpdateCommand } from "./update/command";
 import { FileIndex } from "./utils/file-index";
 
 const flushWritable = async (stream: NodeJS.WritableStream): Promise<void> => {
@@ -47,6 +50,17 @@ const resolveValidDirectory = (rawPath: string): string => {
   return resolvedPath;
 };
 
+/**
+ * Races a promise against a timeout, resolving to null if the timeout wins.
+ * Used to give the background update check a short final wait window after
+ * the main scan completes (it has already been running concurrently).
+ */
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
+  Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+
 const main = async () => {
   const options = parseArgs(process.argv);
   setLargeFileThreshold(options.largeFileThreshold);
@@ -69,8 +83,7 @@ const main = async () => {
   setDbSchemaOptions({ enabled: options.dbSchema });
 
   if (options.showVersion) {
-    const version = await getVersion();
-    process.stdout.write(`${version}\n`);
+    process.stdout.write(`${getVersion()}\n`);
     process.exit(0);
   }
 
@@ -78,6 +91,22 @@ const main = async () => {
     process.stdout.write(getHelpText());
     process.exit(0);
   }
+
+  if (options.showUpdate) {
+    await runUpdateCommand({
+      currentSha: BUILD_SHA,
+      updateUrl: BUILD_UPDATE_URL,
+      stderr: process.stderr,
+    });
+    process.exit(0);
+  }
+
+  // Start background update check concurrently — does not block scan work.
+  const updateCheckPromise = startBackgroundUpdateCheck({
+    currentSha: BUILD_SHA,
+    updateUrl: BUILD_UPDATE_URL,
+    noUpdateCheck: options.noUpdateCheck,
+  });
 
   if (options.dryCheck) {
     const validScanPath = resolveValidDirectory(options.path);
@@ -98,6 +127,12 @@ const main = async () => {
       renderDryCheckJson(result, process.stdout);
     } else {
       renderDryCheckTable(result, process.stdout);
+    }
+
+    // Show update notice after output if applicable.
+    const updateInfo = await withTimeout(updateCheckPromise, 500);
+    if (updateInfo && process.stderr.isTTY) {
+      process.stderr.write(formatUpdateNotice(BUILD_SHA, updateInfo));
     }
     return;
   }
@@ -169,6 +204,12 @@ const main = async () => {
     process.stderr.write(
       `[deps-debug] vulnerability keys: total=${stats.totalDependencies} unique=${stats.uniqueKeys} duplicate=${stats.duplicateKeys}\n`,
     );
+  }
+
+  // Show update notice after all scan output and debug info.
+  const updateInfo = await withTimeout(updateCheckPromise, 500);
+  if (updateInfo && process.stderr.isTTY) {
+    process.stderr.write(formatUpdateNotice(BUILD_SHA, updateInfo));
   }
 };
 
