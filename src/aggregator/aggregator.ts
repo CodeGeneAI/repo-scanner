@@ -1,4 +1,5 @@
 import type { SolidHealthResult } from "../ast/solid/types";
+import type { DatabaseSchema } from "../detectors/db-schema/types";
 import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
@@ -77,6 +78,7 @@ export const aggregate = async (
   let solidHealth: SolidHealthResult | undefined;
   let complexityHotspots: readonly ComplexityHotspot[] | undefined;
   let externalServices: readonly ExternalService[] | undefined;
+  let databaseSchema: DatabaseSchema | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -295,6 +297,23 @@ export const aggregate = async (
       }
     }
 
+    // Extract database schema (validates outer envelope: tables[], relationships[])
+    if (result.detectorId === "db-schema" && result.metadata?.databaseSchema) {
+      const candidate = result.metadata.databaseSchema;
+      if (
+        typeof candidate === "object" &&
+        candidate !== null &&
+        "tables" in candidate &&
+        "relationships" in candidate &&
+        Array.isArray((candidate as DatabaseSchema).tables)
+      ) {
+        const schema = candidate as DatabaseSchema;
+        if (schema.tables.length > 0) {
+          databaseSchema = schema;
+        }
+      }
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -371,6 +390,7 @@ export const aggregate = async (
       solidHealth,
       complexityHotspots,
       externalServices,
+      databaseSchema,
     },
     architecture: {
       monorepo: isMonorepo,

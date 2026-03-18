@@ -88,6 +88,7 @@ Options:
   --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
   --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
   --env-include-tests         Include test files in env var detection
+  --db-schema                 Enable database schema detection (tables, columns, relationships)
   --version, -v               Show version number
   --help, -h                  Show this help text
 `;
@@ -199,6 +200,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let failOnDeadDeps = false;
   let failOnDeadDepsCount: number | undefined;
   let includeDevDeadDeps = false;
+  let dbSchema = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -376,6 +378,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--env-include-tests":
         envIncludeTests = true;
         break;
+      case "--db-schema":
+        dbSchema = true;
+        break;
       case "--solid":
         solid = true;
         break;
@@ -433,6 +438,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     failOnDeadDeps,
     failOnDeadDepsCount,
     includeDevDeadDeps,
+    dbSchema,
   };
 };
 

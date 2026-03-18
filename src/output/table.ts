@@ -536,6 +536,55 @@ export const renderTable = (
     }
   }
 
+  // Database Schema
+  if (result.inventory.databaseSchema) {
+    const schema = result.inventory.databaseSchema;
+    w(section("Database Schema"));
+    w(
+      `  Tables: ${schema.summary.totalTables}  Columns: ${schema.summary.totalColumns}  Relationships: ${schema.summary.totalRelationships}\n`,
+    );
+
+    const MAX_TABLES = 20;
+    const shownTables = schema.tables.slice(0, MAX_TABLES);
+    for (const t of shownTables) {
+      const pk = t.primaryKey
+        ? ` ${DIM}PK: ${t.primaryKey.join(", ")}${RESET}`
+        : "";
+      const fkCount = t.columns.filter((c) => c.isForeignKey).length;
+      const fk = fkCount > 0 ? ` ${DIM}FK: ${fkCount}${RESET}` : "";
+      w(
+        `    ${YELLOW}${t.name.padEnd(30)}${RESET} ${t.columns.length} col${t.columns.length !== 1 ? "s" : ""}${pk}${fk}  ${DIM}(${t.source.parser})${RESET}\n`,
+      );
+    }
+    if (schema.tables.length > MAX_TABLES) {
+      w(
+        `    ${DIM}... +${schema.tables.length - MAX_TABLES} more tables${RESET}\n`,
+      );
+    }
+
+    if (schema.relationships.length > 0) {
+      w("\n  Relationships:\n");
+      const MAX_RELS = 15;
+      const shownRels = schema.relationships.slice(0, MAX_RELS);
+      for (const r of shownRels) {
+        const typeLabel =
+          r.type === "one-to-many"
+            ? "1:N"
+            : r.type === "one-to-one"
+              ? "1:1"
+              : "M:N";
+        w(
+          `    ${r.from.table}.${r.from.column} ${DIM}→${RESET} ${r.to.table}.${r.to.column}  ${DIM}(${typeLabel})${RESET}\n`,
+        );
+      }
+      if (schema.relationships.length > MAX_RELS) {
+        w(
+          `    ${DIM}... +${schema.relationships.length - MAX_RELS} more${RESET}\n`,
+        );
+      }
+    }
+  }
+
   if (result.dependencies) {
     w(section("Dependencies"));
 

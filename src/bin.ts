@@ -4,6 +4,7 @@ import path from "path";
 import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import { scanForDuplicates } from "./code-duplication/scanner";
 import { evaluateDependencyPolicy } from "./dependency/policy";
+import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
 import "./detectors/init";
 import { setDuplicationOptions } from "./detectors/code-duplication";
@@ -63,6 +64,7 @@ const main = async () => {
     threshold: options.solidThreshold,
   });
   setEnvIncludeTestFiles(options.envIncludeTests);
+  setDbSchemaOptions({ enabled: options.dbSchema });
 
   if (options.showVersion) {
     const version = await getVersion();

@@ -6,8 +6,10 @@ import type {
   OutdatedThreshold,
   VulnerabilitySeverity,
 } from "./dependency/types";
+import type { DatabaseSchema } from "./detectors/db-schema/types";
 
 export type { SolidHealthResult } from "./ast/solid/types";
+export type { DatabaseSchema } from "./detectors/db-schema/types";
 
 export type ComponentKind =
   | "app"
@@ -114,6 +116,7 @@ export interface RepoScanResult {
     readonly solidHealth?: SolidHealthResult;
     readonly complexityHotspots?: readonly ComplexityHotspot[];
     readonly externalServices?: readonly ExternalService[];
+    readonly databaseSchema?: DatabaseSchema;
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -327,6 +330,7 @@ export interface CliOptions {
   readonly failOnDeadDeps: boolean;
   readonly failOnDeadDepsCount?: number;
   readonly includeDevDeadDeps: boolean;
+  readonly dbSchema: boolean;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;
