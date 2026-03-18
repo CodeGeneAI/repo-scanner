@@ -3,11 +3,14 @@ import type { UpdateCommandDeps } from "./command";
 import { runUpdateCommand } from "./command";
 import {
   UpdateChecksumError,
+  UpdateConfigError,
   UpdateDownloadError,
   UpdateExtractionError,
   UpdateFetchError,
+  UpdatePlatformError,
 } from "./errors";
-import type { VersionInfo } from "./types";
+import type { BunPlatform, VersionInfo } from "./types";
+import { BUN_PLATFORMS } from "./types";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -16,10 +19,32 @@ import type { VersionInfo } from "./types";
 const CURRENT_SHA = "oldshaoldshaoldshaoldshaoldshaoldshaoldsha";
 const LATEST: VersionInfo = {
   sha: "newshanewshanewshanewshanewshanewshanewsha",
-  bundleUrl: "https://cdn.example.com/bundles/scanner.tar.gz",
-  bundleChecksum:
-    "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
   publishedAt: "2026-03-18T00:00:00.000Z",
+  platforms: {
+    "bun-linux-x64-baseline": {
+      bundleUrl:
+        "https://cdn.example.com/bundles/scanner-bun-linux-x64-baseline.tar.gz",
+      bundleChecksum:
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+    },
+  },
+};
+
+/** All-platform version fixture for parameterized platform selection tests. */
+const LATEST_ALL_PLATFORMS: VersionInfo = {
+  sha: "newshanewshanewshanewshanewshanewshanewsha",
+  publishedAt: "2026-03-18T00:00:00.000Z",
+  platforms: Object.fromEntries(
+    BUN_PLATFORMS.map((p, i) => [
+      p,
+      {
+        bundleUrl: `https://cdn.example.com/bundles/scanner-${p}.tar.gz`,
+        bundleChecksum: String(i + 1)
+          .repeat(64)
+          .slice(0, 64),
+      },
+    ]),
+  ) as VersionInfo["platforms"],
 };
 const FAKE_BINARY = new TextEncoder().encode("fake-binary-bytes");
 
@@ -41,6 +66,7 @@ const makeDeps = (
   overrides: Partial<UpdateCommandDeps> = {},
 ): UpdateCommandDeps => ({
   fetchLatestVersion: async () => LATEST,
+  detectPlatform: () => "bun-linux-x64-baseline" as BunPlatform,
   downloadBundle: async () => FAKE_BINARY,
   extractBinaryFromBundle: () => FAKE_BINARY,
   atomicReplace: async () => {},
@@ -113,14 +139,14 @@ describe("runUpdateCommand", () => {
     expect(installIdx).toBeGreaterThan(extractIdx);
   });
 
-  it("throws when updateUrl is empty", async () => {
+  it("throws UpdateConfigError when updateUrl is empty", async () => {
     const { stream } = makeWritable();
     await expect(
       runUpdateCommand(
         { currentSha: CURRENT_SHA, updateUrl: "", stderr: stream },
         makeDeps(),
       ),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(UpdateConfigError);
   });
 
   it("propagates UpdateFetchError from fetchLatestVersion", async () => {
@@ -135,6 +161,19 @@ describe("runUpdateCommand", () => {
         }),
       ),
     ).rejects.toBeInstanceOf(UpdateFetchError);
+  });
+
+  it("throws UpdatePlatformError when no bundle exists for detected platform", async () => {
+    const { stream } = makeWritable();
+    await expect(
+      runUpdateCommand(
+        { currentSha: CURRENT_SHA, updateUrl: "https://x", stderr: stream },
+        makeDeps({
+          detectPlatform: () => "bun-darwin-arm64" as BunPlatform,
+          // LATEST has no entry for bun-darwin-arm64
+        }),
+      ),
+    ).rejects.toBeInstanceOf(UpdatePlatformError);
   });
 
   it("propagates UpdateDownloadError from downloadBundle", async () => {
@@ -211,4 +250,52 @@ describe("runUpdateCommand", () => {
 
     expect(replaceArgs[0]![0]).toEqual(extractedBinary);
   });
+
+  it("downloads using the platform-specific bundleUrl and bundleChecksum", async () => {
+    const { stream } = makeWritable();
+    const downloadArgs: Array<[string, string]> = [];
+
+    await runUpdateCommand(
+      { currentSha: CURRENT_SHA, updateUrl: "https://x", stderr: stream },
+      makeDeps({
+        detectPlatform: () => "bun-linux-x64-baseline" as BunPlatform,
+        downloadBundle: async (url, checksum) => {
+          downloadArgs.push([url, checksum]);
+          return FAKE_BINARY;
+        },
+      }),
+    );
+
+    expect(downloadArgs).toHaveLength(1);
+    expect(downloadArgs[0]![0]).toBe(
+      LATEST.platforms["bun-linux-x64-baseline"]!.bundleUrl,
+    );
+    expect(downloadArgs[0]![1]).toBe(
+      LATEST.platforms["bun-linux-x64-baseline"]!.bundleChecksum,
+    );
+  });
+
+  // Parameterized: each platform resolves to the correct bundle URL/checksum.
+  for (const platform of BUN_PLATFORMS) {
+    it(`selects correct bundle for platform ${platform}`, async () => {
+      const { stream } = makeWritable();
+      const downloadArgs: Array<[string, string]> = [];
+
+      await runUpdateCommand(
+        { currentSha: CURRENT_SHA, updateUrl: "https://x", stderr: stream },
+        makeDeps({
+          fetchLatestVersion: async () => LATEST_ALL_PLATFORMS,
+          detectPlatform: () => platform,
+          downloadBundle: async (url, checksum) => {
+            downloadArgs.push([url, checksum]);
+            return FAKE_BINARY;
+          },
+        }),
+      );
+
+      const expected = LATEST_ALL_PLATFORMS.platforms[platform]!;
+      expect(downloadArgs[0]![0]).toBe(expected.bundleUrl);
+      expect(downloadArgs[0]![1]).toBe(expected.bundleChecksum);
+    });
+  }
 });

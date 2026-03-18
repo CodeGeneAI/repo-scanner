@@ -3,11 +3,15 @@ set -eu
 
 print_usage() {
   cat <<'USAGE' >&2
-Usage: install-repo-scanner.sh --bundle-url <url> --bundle-sha256 <sha256> [--bundle-version <version>]
+Usage: install-repo-scanner.sh --version-url <url> [--bundle-version <version>]
+   or: install-repo-scanner.sh --bundle-url <url> --bundle-sha256 <sha256> [--bundle-version <version>]
 
-Required:
-  --bundle-url       HTTPS URL to scanner-tools-bundle.tar.gz
-  --bundle-sha256    Expected SHA-256 digest of the bundle archive
+Modes:
+  --version-url      HTTPS URL to version.json; platform is auto-detected.
+                     Requires python3 to parse version.json.
+
+  --bundle-url       HTTPS URL to scanner-tools-bundle-{platform}.tar.gz (explicit)
+  --bundle-sha256    Expected SHA-256 digest of the bundle archive (explicit)
 
 Optional:
   --bundle-version   Cache/install key; defaults to sha-<first16>
@@ -22,6 +26,7 @@ fail() {
 bundle_url=""
 bundle_sha256=""
 bundle_version=""
+version_url=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -40,6 +45,11 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -gt 0 ] || fail "Missing value for --bundle-version"
       bundle_version="$1"
       ;;
+    --version-url)
+      shift
+      [ "$#" -gt 0 ] || fail "Missing value for --version-url"
+      version_url="$1"
+      ;;
     --help|-h)
       print_usage
       exit 0
@@ -51,8 +61,108 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-[ -n "$bundle_url" ] || fail "--bundle-url is required"
-[ -n "$bundle_sha256" ] || fail "--bundle-sha256 is required"
+[ -n "$bundle_url" ] || [ -n "$version_url" ] || fail "--version-url or (--bundle-url and --bundle-sha256) is required"
+
+# ---------------------------------------------------------------------------
+# Platform detection (used when --version-url is provided)
+# ---------------------------------------------------------------------------
+
+detect_platform() {
+  _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  _arch="$(uname -m)"
+  case "$_os" in
+    linux)
+      case "$_arch" in
+        x86_64)
+          if grep -qw 'avx2' /proc/cpuinfo 2>/dev/null; then
+            printf 'bun-linux-x64'
+          else
+            printf 'bun-linux-x64-baseline'
+          fi
+          ;;
+        aarch64|arm64)
+          printf 'bun-linux-arm64'
+          ;;
+        *)
+          fail "Unsupported architecture: $_arch"
+          ;;
+      esac
+      ;;
+    darwin)
+      case "$_arch" in
+        x86_64)
+          if [ "$(sysctl -n hw.optional.avx2_0 2>/dev/null)" = "1" ]; then
+            printf 'bun-darwin-x64'
+          else
+            printf 'bun-darwin-x64-baseline'
+          fi
+          ;;
+        arm64)
+          printf 'bun-darwin-arm64'
+          ;;
+        *)
+          fail "Unsupported architecture: $_arch"
+          ;;
+      esac
+      ;;
+    *)
+      fail "Unsupported OS: $_os"
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Resolve bundle URL + checksum from version.json (--version-url mode)
+# ---------------------------------------------------------------------------
+
+if [ -n "$version_url" ] && [ -z "$bundle_url" ]; then
+  case "$version_url" in
+    https://*) ;;
+    *) fail "--version-url must use HTTPS" ;;
+  esac
+
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required when using --version-url"
+  command -v curl >/dev/null 2>&1 || fail "curl is required"
+
+  platform="$(detect_platform)"
+
+  # Whitelist-validate the platform string before interpolating into any
+  # downstream context (defence-in-depth against unexpected detect_platform output).
+  case "$platform" in
+    bun-linux-x64|bun-linux-x64-baseline|bun-linux-arm64|\
+    bun-darwin-x64|bun-darwin-x64-baseline|bun-darwin-arm64)
+      ;;
+    *)
+      fail "Unexpected platform value from detect_platform: $platform"
+      ;;
+  esac
+
+  version_json="$(curl -fsSL --max-time 30 "$version_url")" || fail "Failed to fetch version.json from $version_url"
+
+  # Pass the platform string as a positional argument to the Python interpreter
+  # rather than interpolating it into the script body, eliminating injection risk.
+  # Single invocation extracts both bundleUrl and bundleChecksum (space-separated).
+  resolved="$(printf '%s' "$version_json" | python3 - "$platform" <<'PYEOF'
+import json, sys
+platform = sys.argv[1]
+data = json.load(sys.stdin)
+entry = data.get('platforms', {}).get(platform)
+if not entry:
+    raise SystemExit('No bundle available for platform: ' + platform)
+print(entry['bundleUrl'] + ' ' + entry['bundleChecksum'])
+PYEOF
+)" || fail "Failed to extract bundle info for platform '$platform' from version.json"
+
+  bundle_url="${resolved%% *}"
+  bundle_sha256="${resolved#* }"
+fi
+
+# ---------------------------------------------------------------------------
+# Validate resolved bundle URL + checksum
+# ---------------------------------------------------------------------------
+
+[ -n "$bundle_url" ] || fail "--bundle-url is required (or provide --version-url)"
+[ -n "$bundle_sha256" ] || fail "--bundle-sha256 is required (or provide --version-url)"
 
 case "$bundle_url" in
   https://*) ;;
@@ -101,7 +211,7 @@ fi
 
 if [ ! -s "$archive_path" ]; then
   rm -f "$tmp_archive_path"
-  curl -fsSL "$bundle_url" -o "$tmp_archive_path"
+  curl -fsSL --max-time 300 "$bundle_url" -o "$tmp_archive_path"
   mv "$tmp_archive_path" "$archive_path"
 fi
 
@@ -110,6 +220,9 @@ if [ "$actual_sha" != "$normalized_sha" ]; then
   fail "scanner tools bundle checksum mismatch"
 fi
 
+# This POSIX shell installer only supports Linux and macOS; detect_platform()
+# above rejects any other OS.  The bundle therefore always contains a POSIX
+# binary at bin/repo-scanner (no .exe suffix needed).
 if [ ! -x "$target_dir/bin/repo-scanner" ]; then
   rm -rf "$target_dir"
   mkdir -p "$target_dir"

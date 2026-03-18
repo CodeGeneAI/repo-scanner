@@ -1,8 +1,15 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { UpdateFetchError } from "./errors";
-import type { FetchFn, UpdateCheckCache, VersionInfo } from "./types";
+import { UpdateFetchError, UpdatePlatformError } from "./errors";
+import type {
+  BunPlatform,
+  FetchFn,
+  PlatformBundle,
+  UpdateCheckCache,
+  VersionInfo,
+} from "./types";
+import { isBunPlatform, parseHttpsUrl } from "./utils";
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -18,26 +25,54 @@ const validateVersionInfo = (raw: unknown): VersionInfo => {
   if (!isString(obj.sha) || obj.sha.length === 0) {
     throw new UpdateFetchError("version.json: missing or empty field 'sha'");
   }
-  if (!isString(obj.bundleUrl) || obj.bundleUrl.length === 0) {
-    throw new UpdateFetchError(
-      "version.json: missing or empty field 'bundleUrl'",
-    );
-  }
-  if (!isString(obj.bundleChecksum) || obj.bundleChecksum.length === 0) {
-    throw new UpdateFetchError(
-      "version.json: missing or empty field 'bundleChecksum'",
-    );
-  }
   if (!isString(obj.publishedAt) || obj.publishedAt.length === 0) {
     throw new UpdateFetchError(
       "version.json: missing or empty field 'publishedAt'",
     );
   }
+  if (
+    obj.platforms === null ||
+    typeof obj.platforms !== "object" ||
+    Array.isArray(obj.platforms)
+  ) {
+    throw new UpdateFetchError(
+      "version.json: missing or invalid field 'platforms' (expected object)",
+    );
+  }
+  const platforms = obj.platforms as Record<string, unknown>;
+  const entries = Object.entries(platforms);
+  if (entries.length === 0) {
+    throw new UpdateFetchError(
+      "version.json: 'platforms' must contain at least one entry",
+    );
+  }
+  for (const [key, val] of entries) {
+    if (!isBunPlatform(key)) {
+      throw new UpdateFetchError(
+        `version.json: platforms["${key}"] is not a recognised platform`,
+      );
+    }
+    if (val === null || typeof val !== "object") {
+      throw new UpdateFetchError(
+        `version.json: platforms["${key}"] must be an object`,
+      );
+    }
+    const entry = val as Record<string, unknown>;
+    if (!isString(entry.bundleUrl) || entry.bundleUrl.length === 0) {
+      throw new UpdateFetchError(
+        `version.json: platforms["${key}"].bundleUrl is missing or empty`,
+      );
+    }
+    if (!isString(entry.bundleChecksum) || entry.bundleChecksum.length === 0) {
+      throw new UpdateFetchError(
+        `version.json: platforms["${key}"].bundleChecksum is missing or empty`,
+      );
+    }
+  }
   return {
     sha: obj.sha,
-    bundleUrl: obj.bundleUrl,
-    bundleChecksum: obj.bundleChecksum,
     publishedAt: obj.publishedAt,
+    platforms: platforms as Partial<Record<BunPlatform, PlatformBundle>>,
   };
 };
 
@@ -45,26 +80,12 @@ const validateVersionInfo = (raw: unknown): VersionInfo => {
 // Fetch
 // ---------------------------------------------------------------------------
 
-const requireHttpsUrl = (url: string, label: string): void => {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new UpdateFetchError(`${label}: invalid URL "${url}"`);
-  }
-  if (parsed.protocol !== "https:") {
-    throw new UpdateFetchError(
-      `${label}: URL must use HTTPS (got "${parsed.protocol}")`,
-    );
-  }
-};
-
 export const fetchLatestVersion = async (
   url: string,
   timeoutMs = 3000,
   fetchFn: FetchFn = globalThis.fetch,
 ): Promise<VersionInfo> => {
-  requireHttpsUrl(url, "fetchLatestVersion");
+  parseHttpsUrl(url, (msg) => new UpdateFetchError(msg));
 
   let response: Response;
   try {
@@ -90,6 +111,69 @@ export const fetchLatestVersion = async (
   }
 
   return validateVersionInfo(raw);
+};
+
+// ---------------------------------------------------------------------------
+// Platform detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns `true` when the current CPU supports AVX2.
+ *
+ * Windows is intentionally not detected here: reliable cross-process CPU
+ * feature detection on Windows requires native Win32 API calls that are not
+ * available in a pure Bun process. Bun's own `bun-windows-x64-baseline` target
+ * is compiled for the SSE4.2 baseline and runs on all x64 Windows hardware, so
+ * using baseline on Windows is always correct and avoids the detection risk.
+ * Windows therefore always uses the `-baseline` variant — see `detectPlatform`.
+ */
+export const detectAvx2 = (): boolean => {
+  try {
+    if (process.platform === "linux") {
+      return /\bavx2\b/.test(fs.readFileSync("/proc/cpuinfo", "utf8"));
+    }
+    if (process.platform === "darwin") {
+      const r = Bun.spawnSync(["sysctl", "-n", "hw.optional.avx2_0"]);
+      return r.success && r.stdout.toString().trim() === "1";
+    }
+  } catch {
+    // Fall through to baseline on any error.
+  }
+  return false;
+};
+
+export const detectPlatform = (): BunPlatform => {
+  const plat = process.platform; // "linux" | "darwin" | "win32"
+  const arch = process.arch; // "x64" | "arm64"
+
+  if (arch === "arm64") {
+    if (plat === "linux") return "bun-linux-arm64";
+    if (plat === "darwin") return "bun-darwin-arm64";
+  }
+  if (arch === "x64") {
+    // Windows: reliable AVX2 detection requires Win32 native APIs unavailable
+    // in Bun; baseline is safe on all x64 Windows hardware (see detectAvx2).
+    if (plat === "win32") return "bun-windows-x64-baseline";
+    const avx2 = detectAvx2();
+    if (plat === "linux")
+      return avx2 ? "bun-linux-x64" : "bun-linux-x64-baseline";
+    if (plat === "darwin")
+      return avx2 ? "bun-darwin-x64" : "bun-darwin-x64-baseline";
+  }
+  throw new UpdatePlatformError(`Unsupported platform: ${plat}/${arch}`);
+};
+
+export const getBundleForPlatform = (
+  info: VersionInfo,
+  platform: BunPlatform,
+): PlatformBundle => {
+  const bundle = info.platforms[platform];
+  if (!bundle) {
+    throw new UpdatePlatformError(
+      `No bundle available for platform "${platform}" in version.json`,
+    );
+  }
+  return bundle;
 };
 
 // ---------------------------------------------------------------------------

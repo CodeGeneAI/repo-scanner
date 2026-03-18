@@ -1,16 +1,19 @@
 import {
+  detectPlatform,
   fetchLatestVersion,
   formatUpdateNotice,
+  getBundleForPlatform,
   isUpdateAvailable,
   shortSha,
 } from "./check";
+import { UpdateConfigError } from "./errors";
 import {
   atomicReplace,
   downloadBundle,
   extractBinaryFromBundle,
   resolveRealExecPath,
 } from "./install";
-import type { VersionInfo } from "./types";
+import type { BunPlatform, VersionInfo } from "./types";
 
 // ---------------------------------------------------------------------------
 // Dependency injection interface — all side-effectful operations are injectable
@@ -19,6 +22,7 @@ import type { VersionInfo } from "./types";
 
 export interface UpdateCommandDeps {
   readonly fetchLatestVersion: (url: string) => Promise<VersionInfo>;
+  readonly detectPlatform: () => BunPlatform;
   readonly downloadBundle: (
     url: string,
     checksum: string,
@@ -32,7 +36,11 @@ export interface UpdateCommandDeps {
 }
 
 export const defaultUpdateDeps: UpdateCommandDeps = {
-  fetchLatestVersion: (url) => fetchLatestVersion(url),
+  // TypeScript function-type compatibility allows assigning the real function
+  // (which has additional optional parameters) directly to the interface slot
+  // typed as `(url: string) => Promise<VersionInfo>`.
+  fetchLatestVersion,
+  detectPlatform,
   downloadBundle,
   extractBinaryFromBundle,
   atomicReplace,
@@ -51,54 +59,49 @@ export interface UpdateCommandOpts {
 
 export type UpdateCommandResult = "up-to-date" | "updated";
 
-const write = (stream: NodeJS.WritableStream, message: string): void => {
-  stream.write(message);
-};
-
 export const runUpdateCommand = async (
   opts: UpdateCommandOpts,
   deps: UpdateCommandDeps = defaultUpdateDeps,
 ): Promise<UpdateCommandResult> => {
   if (!opts.updateUrl) {
-    throw new Error(
+    throw new UpdateConfigError(
       "No update URL configured. This binary was built without an update URL.",
     );
   }
 
-  write(opts.stderr, "Checking for updates...\n");
+  opts.stderr.write("Checking for updates...\n");
 
   const latest = await deps.fetchLatestVersion(opts.updateUrl);
 
   if (!isUpdateAvailable(opts.currentSha, latest.sha)) {
-    write(
-      opts.stderr,
+    opts.stderr.write(
       `Already up to date (sha: ${shortSha(opts.currentSha)}).\n`,
     );
     return "up-to-date";
   }
 
-  write(
-    opts.stderr,
+  opts.stderr.write(
     `Update available: ${shortSha(opts.currentSha)} → ${shortSha(latest.sha)}\n`,
   );
-  write(opts.stderr, "Downloading...\n");
+
+  const platform = deps.detectPlatform();
+  const bundle = getBundleForPlatform(latest, platform);
+
+  opts.stderr.write("Downloading...\n");
 
   const bundleBytes = await deps.downloadBundle(
-    latest.bundleUrl,
-    latest.bundleChecksum,
+    bundle.bundleUrl,
+    bundle.bundleChecksum,
   );
 
-  write(opts.stderr, "Extracting binary...\n");
+  opts.stderr.write("Extracting binary...\n");
   const binaryBytes = deps.extractBinaryFromBundle(bundleBytes);
 
-  write(opts.stderr, "Installing...\n");
+  opts.stderr.write("Installing...\n");
   const execPath = deps.resolveRealExecPath();
   await deps.atomicReplace(binaryBytes, execPath);
 
-  write(
-    opts.stderr,
-    `Done. repo-scanner updated to ${shortSha(latest.sha)}.\n`,
-  );
+  opts.stderr.write(`Done. repo-scanner updated to ${shortSha(latest.sha)}.\n`);
 
   return "updated";
 };

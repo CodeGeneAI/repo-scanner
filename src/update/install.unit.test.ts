@@ -196,6 +196,42 @@ describe("extractBinaryFromBundle", () => {
     const tarGz = buildMinimalTarGz("dist/something-else", binaryContent);
     expect(() => extractBinaryFromBundle(tarGz)).toThrow(UpdateExtractionError);
   });
+
+  it("extracts bin/repo-scanner.exe when process.platform is win32", () => {
+    const origDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "win32",
+      configurable: true,
+    });
+    try {
+      const tarGz = buildMinimalTarGz("bin/repo-scanner.exe", binaryContent);
+      const result = extractBinaryFromBundle(tarGz);
+      expect(result).toEqual(binaryContent);
+    } finally {
+      if (origDescriptor) {
+        Object.defineProperty(process, "platform", origDescriptor);
+      }
+    }
+  });
+
+  it("throws UpdateExtractionError when bin/repo-scanner.exe is missing on win32", () => {
+    const origDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "win32",
+      configurable: true,
+    });
+    try {
+      // Archive has unix binary, not .exe
+      const tarGz = buildMinimalTarGz("bin/repo-scanner", binaryContent);
+      expect(() => extractBinaryFromBundle(tarGz)).toThrow(
+        UpdateExtractionError,
+      );
+    } finally {
+      if (origDescriptor) {
+        Object.defineProperty(process, "platform", origDescriptor);
+      }
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

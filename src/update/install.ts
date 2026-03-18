@@ -6,6 +6,7 @@ import {
   UpdateExtractionError,
 } from "./errors";
 import type { FetchFn } from "./types";
+import { parseHttpsUrl } from "./utils";
 
 // ---------------------------------------------------------------------------
 // Checksum verification
@@ -35,7 +36,9 @@ export const verifyChecksum = (data: Uint8Array, expected: string): void => {
 // Bundle download
 // ---------------------------------------------------------------------------
 
-const DOWNLOAD_TIMEOUT_MS = 30_000;
+// 5 minutes — matches the --max-time 300 used in install-repo-scanner.sh for
+// large binary bundles on slow connections.
+const DOWNLOAD_TIMEOUT_MS = 300_000;
 
 export const downloadBundle = async (
   url: string,
@@ -44,17 +47,7 @@ export const downloadBundle = async (
   timeoutMs: number = DOWNLOAD_TIMEOUT_MS,
 ): Promise<Uint8Array> => {
   // Reject non-HTTPS URLs to prevent SSRF from version.json-controlled URLs.
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(url);
-  } catch {
-    throw new UpdateDownloadError(`Bundle download URL is invalid: "${url}"`);
-  }
-  if (parsedUrl.protocol !== "https:") {
-    throw new UpdateDownloadError(
-      `Bundle download URL must use HTTPS (got "${parsedUrl.protocol}")`,
-    );
-  }
+  parseHttpsUrl(url, (msg) => new UpdateDownloadError(msg));
 
   let response: Response;
   try {
@@ -82,7 +75,10 @@ export const downloadBundle = async (
 // Tar extraction
 // ---------------------------------------------------------------------------
 
-const TARGET_ENTRY = "bin/repo-scanner";
+const getBinaryEntryName = (): string =>
+  process.platform === "win32" ? "bin/repo-scanner.exe" : "bin/repo-scanner";
+
+const tarDecoder = new TextDecoder();
 
 const readOctal = (buf: Uint8Array, start: number, len: number): number => {
   let str = "";
@@ -97,7 +93,7 @@ const readOctal = (buf: Uint8Array, start: number, len: number): number => {
 const readString = (buf: Uint8Array, start: number, len: number): string => {
   let end = start;
   while (end < start + len && buf[end] !== 0) end++;
-  return new TextDecoder().decode(buf.slice(start, end));
+  return tarDecoder.decode(buf.slice(start, end));
 };
 
 export const extractBinaryFromBundle = (tarGzBytes: Uint8Array): Uint8Array => {
@@ -124,7 +120,7 @@ export const extractBinaryFromBundle = (tarGzBytes: Uint8Array): Uint8Array => {
     const entryName = rawName.replace(/^\.\//, "");
     const isRegularFile = typeflag === 0x30 || typeflag === 0x00;
 
-    if (isRegularFile && entryName === TARGET_ENTRY) {
+    if (isRegularFile && entryName === getBinaryEntryName()) {
       return tar.slice(offset, offset + size);
     }
 
@@ -133,7 +129,7 @@ export const extractBinaryFromBundle = (tarGzBytes: Uint8Array): Uint8Array => {
   }
 
   throw new UpdateExtractionError(
-    `"${TARGET_ENTRY}" not found in bundle archive`,
+    `"${getBinaryEntryName()}" not found in bundle archive`,
   );
 };
 

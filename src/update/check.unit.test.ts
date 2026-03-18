@@ -1,14 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import fs from "fs";
 import {
+  detectAvx2,
+  detectPlatform,
   fetchLatestVersion,
   formatUpdateNotice,
+  getBundleForPlatform,
   isCacheStale,
   isUpdateAvailable,
   shouldRunUpdateCheck,
   startBackgroundUpdateCheck,
 } from "./check";
-import { UpdateFetchError } from "./errors";
-import type { UpdateCheckCache, VersionInfo } from "./types";
+import { UpdateFetchError, UpdatePlatformError } from "./errors";
+import type { BunPlatform, UpdateCheckCache, VersionInfo } from "./types";
+import { BUN_PLATFORMS } from "./types";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -16,11 +21,77 @@ import type { UpdateCheckCache, VersionInfo } from "./types";
 
 const LATEST: VersionInfo = {
   sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  bundleUrl:
-    "https://cdn.example.com/binaries/releases/aaa/scanner-tools-bundle.tar.gz",
-  bundleChecksum:
-    "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
   publishedAt: "2026-03-18T00:00:00.000Z",
+  platforms: {
+    "bun-linux-x64-baseline": {
+      bundleUrl:
+        "https://cdn.example.com/binaries/releases/aaa/scanner-tools-bundle-bun-linux-x64-baseline.tar.gz",
+      bundleChecksum:
+        "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+    },
+    "bun-darwin-arm64": {
+      bundleUrl:
+        "https://cdn.example.com/binaries/releases/aaa/scanner-tools-bundle-bun-darwin-arm64.tar.gz",
+      bundleChecksum:
+        "def456abc123def456abc123def456abc123def456abc123def456abc123def4",
+    },
+  },
+};
+
+/** All-platform fixture exercised in getBundleForPlatform parameterized tests. */
+const ALL_PLATFORMS_LATEST: VersionInfo = {
+  sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  publishedAt: "2026-03-18T00:00:00.000Z",
+  platforms: {
+    "bun-linux-x64": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-linux-x64.tar.gz",
+      bundleChecksum:
+        "1111111111111111111111111111111111111111111111111111111111111111",
+    },
+    "bun-linux-x64-baseline": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-linux-x64-baseline.tar.gz",
+      bundleChecksum:
+        "2222222222222222222222222222222222222222222222222222222222222222",
+    },
+    "bun-linux-arm64": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-linux-arm64.tar.gz",
+      bundleChecksum:
+        "3333333333333333333333333333333333333333333333333333333333333333",
+    },
+    "bun-darwin-x64": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-darwin-x64.tar.gz",
+      bundleChecksum:
+        "4444444444444444444444444444444444444444444444444444444444444444",
+    },
+    "bun-darwin-x64-baseline": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-darwin-x64-baseline.tar.gz",
+      bundleChecksum:
+        "5555555555555555555555555555555555555555555555555555555555555555",
+    },
+    "bun-darwin-arm64": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-darwin-arm64.tar.gz",
+      bundleChecksum:
+        "6666666666666666666666666666666666666666666666666666666666666666",
+    },
+    "bun-windows-x64": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-windows-x64.tar.gz",
+      bundleChecksum:
+        "7777777777777777777777777777777777777777777777777777777777777777",
+    },
+    "bun-windows-x64-baseline": {
+      bundleUrl:
+        "https://cdn.example.com/releases/bbb/scanner-tools-bundle-bun-windows-x64-baseline.tar.gz",
+      bundleChecksum:
+        "8888888888888888888888888888888888888888888888888888888888888888",
+    },
+  },
 };
 
 const makeFetch =
@@ -75,15 +146,48 @@ describe("fetchLatestVersion", () => {
     ).rejects.toBeInstanceOf(UpdateFetchError);
   });
 
-  it("throws UpdateFetchError when bundleUrl is missing", async () => {
-    const bad = { ...LATEST, bundleUrl: "" };
+  it("throws UpdateFetchError when platforms is missing", async () => {
+    const { platforms: _platforms, ...bad } = LATEST;
     await expect(
       fetchLatestVersion("https://x", 100, makeFetch(bad)),
     ).rejects.toBeInstanceOf(UpdateFetchError);
   });
 
-  it("throws UpdateFetchError when bundleChecksum is missing", async () => {
-    const bad = { ...LATEST, bundleChecksum: "" };
+  it("throws UpdateFetchError when platforms is not an object", async () => {
+    const bad = { ...LATEST, platforms: "not-an-object" };
+    await expect(
+      fetchLatestVersion("https://x", 100, makeFetch(bad)),
+    ).rejects.toBeInstanceOf(UpdateFetchError);
+  });
+
+  it("throws UpdateFetchError when platforms is an empty object", async () => {
+    const bad = { ...LATEST, platforms: {} };
+    await expect(
+      fetchLatestVersion("https://x", 100, makeFetch(bad)),
+    ).rejects.toBeInstanceOf(UpdateFetchError);
+  });
+
+  it("throws UpdateFetchError when a platform entry has missing bundleUrl", async () => {
+    const bad = {
+      ...LATEST,
+      platforms: {
+        "bun-linux-x64-baseline": { bundleChecksum: "a".repeat(64) },
+      },
+    };
+    await expect(
+      fetchLatestVersion("https://x", 100, makeFetch(bad)),
+    ).rejects.toBeInstanceOf(UpdateFetchError);
+  });
+
+  it("throws UpdateFetchError when a platform entry has missing bundleChecksum", async () => {
+    const bad = {
+      ...LATEST,
+      platforms: {
+        "bun-linux-x64-baseline": {
+          bundleUrl: "https://cdn.example.com/bundle.tar.gz",
+        },
+      },
+    };
     await expect(
       fetchLatestVersion("https://x", 100, makeFetch(bad)),
     ).rejects.toBeInstanceOf(UpdateFetchError);
@@ -116,6 +220,321 @@ describe("fetchLatestVersion", () => {
     await expect(
       fetchLatestVersion("not-a-url", 100, makeFetch(LATEST)),
     ).rejects.toBeInstanceOf(UpdateFetchError);
+  });
+
+  it("throws UpdateFetchError when platforms contains an unknown platform key", async () => {
+    const bad = {
+      ...LATEST,
+      platforms: {
+        "bun-unknown-platform": {
+          bundleUrl: "https://cdn.example.com/bundle.tar.gz",
+          bundleChecksum: "a".repeat(64),
+        },
+      },
+    };
+    await expect(
+      fetchLatestVersion("https://x", 100, makeFetch(bad)),
+    ).rejects.toBeInstanceOf(UpdateFetchError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getBundleForPlatform
+// ---------------------------------------------------------------------------
+
+describe("getBundleForPlatform", () => {
+  it("returns the bundle for a present platform key", () => {
+    const bundle = getBundleForPlatform(
+      LATEST,
+      "bun-linux-x64-baseline" as BunPlatform,
+    );
+    expect(bundle.bundleUrl).toContain("bun-linux-x64-baseline");
+    expect(bundle.bundleChecksum).toBe(
+      "abc123def456abc123def456abc123def456abc123def456abc123def456abc1",
+    );
+  });
+
+  it("throws UpdatePlatformError when platform is absent", () => {
+    expect(() =>
+      getBundleForPlatform(LATEST, "bun-linux-arm64" as BunPlatform),
+    ).toThrow(UpdatePlatformError);
+  });
+
+  it("includes the platform name in the error message", () => {
+    expect(() =>
+      getBundleForPlatform(LATEST, "bun-darwin-x64" as BunPlatform),
+    ).toThrow(/bun-darwin-x64/);
+  });
+
+  // Parameterized: every BUN_PLATFORM must be retrievable from the all-platform fixture.
+  for (const platform of BUN_PLATFORMS) {
+    it(`returns bundle for ${platform}`, () => {
+      const bundle = getBundleForPlatform(ALL_PLATFORMS_LATEST, platform);
+      expect(bundle.bundleUrl).toContain(platform);
+      expect(bundle.bundleChecksum).toMatch(/^[0-9a-f]{64}$/);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// detectAvx2
+// ---------------------------------------------------------------------------
+
+describe("detectAvx2", () => {
+  it("returns a boolean on the current system", () => {
+    expect(typeof detectAvx2()).toBe("boolean");
+  });
+
+  it("returns false on unsupported platforms (win32)", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "win32",
+      configurable: true,
+    });
+    try {
+      expect(detectAvx2()).toBe(false);
+    } finally {
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+
+  it("returns true on linux when /proc/cpuinfo contains avx2 flag", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "linux",
+      configurable: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spy = spyOn(fs, "readFileSync").mockImplementation(
+      (() => "flags : fpu avx2 sse4_2\n") as any,
+    );
+    try {
+      expect(detectAvx2()).toBe(true);
+    } finally {
+      spy.mockRestore();
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+
+  it("returns false on linux when /proc/cpuinfo lacks avx2 flag", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "linux",
+      configurable: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spy = spyOn(fs, "readFileSync").mockImplementation(
+      (() => "flags : fpu sse4_2\n") as any,
+    );
+    try {
+      expect(detectAvx2()).toBe(false);
+    } finally {
+      spy.mockRestore();
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+
+  it("returns false on linux when readFileSync throws", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "linux",
+      configurable: true,
+    });
+    const spy = spyOn(fs, "readFileSync").mockImplementation(() => {
+      throw new Error("EACCES: permission denied");
+    });
+    try {
+      expect(detectAvx2()).toBe(false);
+    } finally {
+      spy.mockRestore();
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+
+  it("returns true on darwin when sysctl reports avx2", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spy = spyOn(Bun, "spawnSync").mockReturnValue({
+      success: true,
+      stdout: Buffer.from("1\n"),
+      stderr: Buffer.from(""),
+      exitCode: 0,
+      signalCode: null,
+    } as unknown as ReturnType<typeof Bun.spawnSync>);
+    try {
+      expect(detectAvx2()).toBe(true);
+    } finally {
+      spy.mockRestore();
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+
+  it("returns false on darwin when sysctl reports no avx2", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+    const spy = spyOn(Bun, "spawnSync").mockReturnValue({
+      success: true,
+      stdout: Buffer.from("0\n"),
+      stderr: Buffer.from(""),
+      exitCode: 0,
+      signalCode: null,
+    } as unknown as ReturnType<typeof Bun.spawnSync>);
+    try {
+      expect(detectAvx2()).toBe(false);
+    } finally {
+      spy.mockRestore();
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+
+  it("returns false on darwin when sysctl command fails", () => {
+    const orig = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+    const spy = spyOn(Bun, "spawnSync").mockReturnValue({
+      success: false,
+      stdout: Buffer.from(""),
+      stderr: Buffer.from("sysctl: unknown oid"),
+      exitCode: 1,
+      signalCode: null,
+    } as unknown as ReturnType<typeof Bun.spawnSync>);
+    try {
+      expect(detectAvx2()).toBe(false);
+    } finally {
+      spy.mockRestore();
+      if (orig) Object.defineProperty(process, "platform", orig);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectPlatform
+// ---------------------------------------------------------------------------
+
+describe("detectPlatform", () => {
+  const mockPlatformArch = (platform: string, arch: string, fn: () => void) => {
+    const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    const origArch = Object.getOwnPropertyDescriptor(process, "arch");
+    Object.defineProperty(process, "platform", {
+      value: platform,
+      configurable: true,
+    });
+    Object.defineProperty(process, "arch", {
+      value: arch,
+      configurable: true,
+    });
+    try {
+      fn();
+    } finally {
+      if (origPlatform)
+        Object.defineProperty(process, "platform", origPlatform);
+      if (origArch) Object.defineProperty(process, "arch", origArch);
+    }
+  };
+
+  it("returns a valid BunPlatform on the current system", () => {
+    const result = detectPlatform();
+    expect(BUN_PLATFORMS).toContain(result);
+  });
+
+  it("returns bun-linux-arm64 on linux/arm64", () => {
+    mockPlatformArch("linux", "arm64", () => {
+      expect(detectPlatform()).toBe("bun-linux-arm64");
+    });
+  });
+
+  it("returns bun-darwin-arm64 on darwin/arm64", () => {
+    mockPlatformArch("darwin", "arm64", () => {
+      expect(detectPlatform()).toBe("bun-darwin-arm64");
+    });
+  });
+
+  it("returns bun-linux-x64 on linux/x64 with avx2 present", () => {
+    mockPlatformArch("linux", "x64", () => {
+      const spy = spyOn(fs, "readFileSync").mockImplementation(
+        (() => "flags : fpu avx2 sse4_2\n") as any,
+      );
+      try {
+        expect(detectPlatform()).toBe("bun-linux-x64");
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  it("returns bun-linux-x64-baseline on linux/x64 without avx2", () => {
+    mockPlatformArch("linux", "x64", () => {
+      const spy = spyOn(fs, "readFileSync").mockImplementation(
+        (() => "flags : fpu sse4_2\n") as any,
+      );
+      try {
+        expect(detectPlatform()).toBe("bun-linux-x64-baseline");
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  it("returns bun-darwin-x64 on darwin/x64 with avx2 present", () => {
+    mockPlatformArch("darwin", "x64", () => {
+      const spy = spyOn(Bun, "spawnSync").mockReturnValue({
+        success: true,
+        stdout: Buffer.from("1\n"),
+        stderr: Buffer.from(""),
+        exitCode: 0,
+        signalCode: null,
+      } as unknown as ReturnType<typeof Bun.spawnSync>);
+      try {
+        expect(detectPlatform()).toBe("bun-darwin-x64");
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  it("returns bun-darwin-x64-baseline on darwin/x64 without avx2", () => {
+    mockPlatformArch("darwin", "x64", () => {
+      const spy = spyOn(Bun, "spawnSync").mockReturnValue({
+        success: true,
+        stdout: Buffer.from("0\n"),
+        stderr: Buffer.from(""),
+        exitCode: 0,
+        signalCode: null,
+      } as unknown as ReturnType<typeof Bun.spawnSync>);
+      try {
+        expect(detectPlatform()).toBe("bun-darwin-x64-baseline");
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  it("returns bun-windows-x64-baseline on win32/x64 (always baseline)", () => {
+    mockPlatformArch("win32", "x64", () => {
+      // Windows always uses baseline — no AVX2 detection attempted.
+      expect(detectPlatform()).toBe("bun-windows-x64-baseline");
+    });
+  });
+
+  it("throws UpdatePlatformError for unsupported OS on arm64", () => {
+    mockPlatformArch("freebsd", "arm64", () => {
+      expect(() => detectPlatform()).toThrow(UpdatePlatformError);
+    });
+  });
+
+  it("throws UpdatePlatformError for unsupported arch", () => {
+    mockPlatformArch("linux", "ia32", () => {
+      expect(() => detectPlatform()).toThrow(UpdatePlatformError);
+    });
   });
 });
 
