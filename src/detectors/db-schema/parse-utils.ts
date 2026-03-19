@@ -1,5 +1,14 @@
 import { readText } from "../../utils/fs";
-import type { RelationshipInfo, SchemaParserResult, TableInfo } from "./types";
+import type {
+  DroppedItem,
+  RelationshipInfo,
+  SchemaParserResult,
+  TableInfo,
+} from "./types";
+
+/** Pattern matching test/spec file naming conventions. */
+const TEST_FILE_PATTERN =
+  /\.(?:test|spec|unit\.test|unit\.spec|integration\.test|e2e\.test)\.[^.]+$/;
 
 /** Confidence values for each parser source. */
 export const CONFIDENCE = {
@@ -26,9 +35,13 @@ export const collectParserResults = async (
 ): Promise<SchemaParserResult> => {
   const allTables: TableInfo[] = [];
   const allRelationships: RelationshipInfo[] = [];
+  const allDropped: DroppedItem[] = [];
 
   for (const file of files) {
     try {
+      // Skip test/spec files that may contain inline schema fixtures
+      if (TEST_FILE_PATTERN.test(file.relativePath)) continue;
+
       const content = await readText(file.path);
       if (!content) continue;
       if (bailCheck && !bailCheck(content)) continue;
@@ -36,10 +49,17 @@ export const collectParserResults = async (
       const result = parser(content, file.relativePath);
       allTables.push(...result.tables);
       allRelationships.push(...result.relationships);
+      if (result.dropped) {
+        allDropped.push(...result.dropped);
+      }
     } catch {}
   }
 
-  return { tables: allTables, relationships: allRelationships };
+  return {
+    tables: allTables,
+    relationships: allRelationships,
+    dropped: allDropped.length > 0 ? allDropped : undefined,
+  };
 };
 
 /**

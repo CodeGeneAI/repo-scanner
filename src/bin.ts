@@ -109,7 +109,11 @@ const main = async () => {
     threshold: options.solidThreshold,
   });
   setEnvIncludeTestFiles(options.envIncludeTests);
-  setDbSchemaOptions({ enabled: options.dbSchema });
+  // Auto-enable db-schema when ERD topology diagram is requested.
+  const erdRequested = options.topologyDiagrams
+    ? options.topologyDiagrams.includes("erd")
+    : options.topology;
+  setDbSchemaOptions({ enabled: options.dbSchema || erdRequested });
 
   if (options.showVersion) {
     process.stdout.write(`${getVersion()}\n`);

@@ -118,6 +118,60 @@ describe("generateTopology", () => {
     }
   });
 
+  it("generates erd diagram when databaseSchema is present", () => {
+    const full = makeFullResult();
+    const withSchema = {
+      ...full,
+      inventory: {
+        databaseSchema: {
+          tables: [
+            {
+              name: "users",
+              columns: [{ name: "id", type: "int", isPrimaryKey: true }],
+              source: { file: "schema.sql", parser: "sql", confidence: 0.95 },
+            },
+          ],
+          relationships: [],
+          summary: { totalTables: 1, totalColumns: 1, totalRelationships: 0 },
+        },
+      },
+    } as unknown as RepoScanResult;
+
+    const result = generateTopology(withSchema, ["erd"]);
+    expect(result.diagrams).toHaveLength(1);
+    expect(result.diagrams[0]!.kind).toBe("erd");
+    expect(result.diagrams[0]!.mermaid).toContain("erDiagram");
+  });
+
+  it("skips erd when no databaseSchema", () => {
+    const result = generateTopology(makeFullResult(), ["erd"]);
+    expect(result.diagrams).toHaveLength(0);
+  });
+
+  it("includes erd in default generation when schema is present", () => {
+    const full = makeFullResult();
+    const withSchema = {
+      ...full,
+      inventory: {
+        databaseSchema: {
+          tables: [
+            {
+              name: "users",
+              columns: [{ name: "id", type: "int" }],
+              source: { file: "schema.sql", parser: "sql", confidence: 0.95 },
+            },
+          ],
+          relationships: [],
+          summary: { totalTables: 1, totalColumns: 1, totalRelationships: 0 },
+        },
+      },
+    } as unknown as RepoScanResult;
+
+    const result = generateTopology(withSchema);
+    const kinds = result.diagrams.map((d) => d.kind);
+    expect(kinds).toContain("erd");
+  });
+
   it("handles empty result gracefully", () => {
     const empty = {
       architecture: { monorepo: false, components: [] },

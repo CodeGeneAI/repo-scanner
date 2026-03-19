@@ -138,10 +138,10 @@ describe("parseArgs", () => {
     expect(result.topologyDiagrams).toEqual(["architecture", "dataflow"]);
   });
 
-  it("rejects invalid --topology-diagrams", () => {
+  it("rejects invalid --topology-diagrams with erd in valid list", () => {
     expect(() =>
       parseArgs(["bun", "repo-scanner", "--topology-diagrams", "invalid-type"]),
-    ).toThrow(/invalid diagram types/);
+    ).toThrow(/Use one of architecture,dependency,dataflow,api-topology,erd/);
   });
 
   it("parses --topology-output", () => {
@@ -153,6 +153,28 @@ describe("parseArgs", () => {
     ]);
     expect(result.topology).toBeTrue();
     expect(result.topologyOutput).toBe("./out.md");
+  });
+
+  it("parses --topology-diagrams erd", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--topology-diagrams",
+      "erd",
+    ]);
+    expect(result.topology).toBeTrue();
+    expect(result.topologyDiagrams).toEqual(["erd"]);
+  });
+
+  it("parses --topology-diagrams with erd and other kinds", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--topology-diagrams",
+      "architecture,erd",
+    ]);
+    expect(result.topology).toBeTrue();
+    expect(result.topologyDiagrams).toEqual(["architecture", "erd"]);
   });
 
   it("parses dead dependency flags", () => {

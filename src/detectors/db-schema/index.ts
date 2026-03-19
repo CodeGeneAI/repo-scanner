@@ -8,7 +8,12 @@ import { parsePrismaFiles } from "./parsers/prisma";
 import { parseSqlFiles } from "./parsers/sql";
 import { parseSqlalchemyFiles } from "./parsers/sqlalchemy";
 import { parseTypeormFiles } from "./parsers/typeorm";
-import type { DatabaseSchema, RelationshipInfo, TableInfo } from "./types";
+import type {
+  DatabaseSchema,
+  DroppedItem,
+  RelationshipInfo,
+  TableInfo,
+} from "./types";
 
 /** Module-level opt-in flag. Safe for single-process CLI context only. */
 let enabled = false;
@@ -111,17 +116,54 @@ registerDetector({
     // Collect successful results
     const allTables: TableInfo[] = [];
     const allRelationships: RelationshipInfo[] = [];
+    const allDropped: DroppedItem[] = [];
 
     for (const result of parserResults) {
       if (result.status === "fulfilled") {
         allTables.push(...result.value.tables);
         allRelationships.push(...result.value.relationships);
+        if (result.value.dropped) {
+          allDropped.push(...result.value.dropped);
+        }
       }
     }
 
-    // Merge and deduplicate
-    const mergedTables = mergeTables(allTables);
-    const mergedRelationships = dedupeRelationships(allRelationships);
+    // Merge, deduplicate, and apply drops
+    let mergedTables = mergeTables(allTables);
+    let mergedRelationships = dedupeRelationships(allRelationships);
+
+    if (allDropped.length > 0) {
+      const droppedTableNames = new Set(
+        allDropped
+          .filter((d) => !d.column)
+          .map((d) => normalizeTableName(d.table)),
+      );
+      const droppedColumns = allDropped.filter((d) => d.column);
+
+      // Remove dropped tables
+      mergedTables = mergedTables.filter((t) => !droppedTableNames.has(t.name));
+
+      // Remove dropped columns from remaining tables
+      if (droppedColumns.length > 0) {
+        mergedTables = mergedTables.map((table) => {
+          const drops = droppedColumns
+            .filter((d) => normalizeTableName(d.table) === table.name)
+            .map((d) => d.column!);
+          if (drops.length === 0) return table;
+          return {
+            ...table,
+            columns: table.columns.filter((c) => !drops.includes(c.name)),
+          };
+        });
+      }
+
+      // Remove relationships referencing dropped tables
+      mergedRelationships = mergedRelationships.filter(
+        (r) =>
+          !droppedTableNames.has(normalizeTableName(r.from.table)) &&
+          !droppedTableNames.has(normalizeTableName(r.to.table)),
+      );
+    }
 
     const totalColumns = mergedTables.reduce(
       (sum, t) => sum + t.columns.length,

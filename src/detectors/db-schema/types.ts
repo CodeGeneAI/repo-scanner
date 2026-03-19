@@ -53,8 +53,15 @@ export interface DatabaseSchema {
   };
 }
 
+/** A table or column that was dropped by a migration. */
+export interface DroppedItem {
+  readonly table: string;
+  readonly column?: string;
+}
+
 /** Result returned by each individual parser. */
 export interface SchemaParserResult {
   readonly tables: TableInfo[];
   readonly relationships: RelationshipInfo[];
+  readonly dropped?: DroppedItem[];
 }

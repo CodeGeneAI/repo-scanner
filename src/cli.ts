@@ -103,7 +103,7 @@ Options:
   --env-include-tests         Include test files in env var detection
   --topology                  Generate mermaid architecture diagrams from scan results
   --topology-diagrams <list>  Comma-separated diagram types to generate (default: all)
-                              Valid: architecture,dependency,dataflow,api-topology
+                              Valid: architecture,dependency,dataflow,api-topology,erd
   --topology-output <path>    Write topology diagrams to file instead of stdout
   --db-schema                 Enable database schema detection (tables, columns, relationships)
   --no-update-check           Suppress background update check for this run
@@ -471,7 +471,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
 
         if (invalid.length > 0) {
           failCliParse(
-            `Error: invalid diagram types "${invalid.join(",")}". Use one of architecture,dependency,dataflow,api-topology.`,
+            `Error: invalid diagram types "${invalid.join(",")}". Use one of architecture,dependency,dataflow,api-topology,erd.`,
           );
         }
 

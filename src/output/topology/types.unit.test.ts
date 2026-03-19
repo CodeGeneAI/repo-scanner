@@ -8,14 +8,15 @@ import type {
 import { ALL_DIAGRAM_KINDS } from "./types";
 
 describe("topology types", () => {
-  it("DiagramKind accepts all four valid values", () => {
+  it("DiagramKind accepts all five valid values", () => {
     const kinds: DiagramKind[] = [
       "architecture",
       "dependency",
       "dataflow",
       "api-topology",
+      "erd",
     ];
-    expect(kinds).toHaveLength(4);
+    expect(kinds).toHaveLength(5);
   });
 
   it("ALL_DIAGRAM_KINDS is the single source of truth for valid kinds", () => {
@@ -24,6 +25,7 @@ describe("topology types", () => {
       "dependency",
       "dataflow",
       "api-topology",
+      "erd",
     ]);
   });
 

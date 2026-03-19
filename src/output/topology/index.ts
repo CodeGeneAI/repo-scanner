@@ -3,6 +3,7 @@ import { generateApiTopologyDiagram } from "./api-topology-diagram";
 import { generateArchitectureDiagram } from "./architecture-diagram";
 import { generateDataflowDiagram } from "./dataflow-diagram";
 import { generateDependencyDiagram } from "./dependency-diagram";
+import { generateErdDiagram } from "./erd-diagram";
 import {
   ALL_DIAGRAM_KINDS,
   type DiagramKind,
@@ -17,6 +18,7 @@ const GENERATORS: Record<DiagramKind, DiagramGenerator> = {
   dependency: generateDependencyDiagram,
   dataflow: generateDataflowDiagram,
   "api-topology": generateApiTopologyDiagram,
+  erd: generateErdDiagram,
 };
 
 /**

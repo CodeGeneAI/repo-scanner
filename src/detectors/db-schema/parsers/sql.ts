@@ -6,6 +6,7 @@ import {
 } from "../parse-utils";
 import type {
   ColumnInfo,
+  DroppedItem,
   RelationshipInfo,
   SchemaParserResult,
   TableInfo,
@@ -30,10 +31,15 @@ const stripSchemaPrefix = (name: string): string => {
   return dot >= 0 ? name.slice(dot + 1) : name;
 };
 
-/** Parse a SQL column type, handling parenthesized precision like VARCHAR(255). */
+/** Parse a SQL column type, preserving array suffix and precision. */
 const parseColumnType = (raw: string): string => {
-  // Normalize whitespace and return uppercase
-  return raw.trim().toUpperCase();
+  const trimmed = raw.trim();
+  // Preserve array suffix [] while uppercasing the base type
+  const arrayMatch = trimmed.match(/^(.+?)(\[\])$/);
+  if (arrayMatch) {
+    return `${arrayMatch[1]!.toUpperCase()}[]`;
+  }
+  return trimmed.toUpperCase();
 };
 
 /**
@@ -245,7 +251,37 @@ export const parseSql = (
     }
   }
 
-  return { tables, relationships };
+  // Parse DROP TABLE statements
+  const dropped: DroppedItem[] = [];
+  const dropTableRegex =
+    /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^\s;,]+?)(?:\s+CASCADE)?(?:\s*;)/gi;
+  while ((match = dropTableRegex.exec(content)) !== null) {
+    const tableName = unquote(stripSchemaPrefix(match[1]!.trim()));
+    dropped.push({ table: tableName });
+  }
+
+  // Parse ALTER TABLE DROP COLUMN statements (handles ONLY keyword and multi-column drops)
+  const alterDropColRegex =
+    /ALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?([^\s]+)\s+((?:DROP\s+(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?[^\s;,]+[\s,]*)+)/gi;
+  while ((match = alterDropColRegex.exec(content)) !== null) {
+    const tableName = unquote(stripSchemaPrefix(match[1]!.trim()));
+    const body = match[2]!;
+    // Extract each DROP COLUMN clause from the body
+    const colDropRegex = /DROP\s+(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?([^\s;,]+)/gi;
+    let colMatch: RegExpExecArray | null;
+    while ((colMatch = colDropRegex.exec(body)) !== null) {
+      // Skip DROP CONSTRAINT (not a column drop)
+      if (/^CONSTRAINT$/i.test(colMatch[1]!.trim())) continue;
+      const colName = unquote(colMatch[1]!.trim());
+      dropped.push({ table: tableName, column: colName });
+    }
+  }
+
+  return {
+    tables,
+    relationships,
+    dropped: dropped.length > 0 ? dropped : undefined,
+  };
 };
 
 /** Split column definitions by top-level commas, respecting parentheses. */
@@ -259,13 +295,18 @@ const parseColumnDef = (
   filePath: string,
 ): { column: ColumnInfo; relationship?: RelationshipInfo } | null => {
   // Match: column_name TYPE [constraints...]
+  // Type can be dotted (public.owner_type), have parens (VARCHAR(255)), or array suffix ([])
   const colMatch = line.match(
-    /^(["`]?[a-zA-Z_]\w*["`]?)\s+(\w+(?:\([^)]*\))?)(.*)/i,
+    /^(["`]?[a-zA-Z_]\w*["`]?)\s+([\w.]+(?:\([^)]*\))?(?:\[\])?)(.*)/i,
   );
   if (!colMatch) return null;
 
   const name = unquote(colMatch[1]!.trim());
-  const type = parseColumnType(colMatch[2]!);
+  const rawType = colMatch[2]!;
+  // Strip schema prefix from type (public.owner_type → owner_type) but keep it
+  const type = parseColumnType(
+    rawType.includes(".") ? stripSchemaPrefix(rawType) : rawType,
+  );
   const rest = colMatch[3]!;
 
   return parseColumnDefFromParts(name, `${type} ${rest}`, tableName, filePath);
@@ -278,11 +319,14 @@ const parseColumnDefFromParts = (
   tableName: string,
   filePath: string,
 ): { column: ColumnInfo; relationship?: RelationshipInfo } | null => {
-  // Extract type (first word, possibly with parens)
-  const typeMatch = rest.match(/^(\w+(?:\([^)]*\))?)/i);
+  // Extract type (possibly dotted like public.enum_name, with parens, or array suffix)
+  const typeMatch = rest.match(/^([\w.]+(?:\([^)]*\))?(?:\[\])?)/i);
   if (!typeMatch) return null;
 
-  const type = parseColumnType(typeMatch[1]!);
+  const rawType = typeMatch[1]!;
+  const type = parseColumnType(
+    rawType.includes(".") ? stripSchemaPrefix(rawType) : rawType,
+  );
   const constraints = rest.slice(typeMatch[0]!.length);
 
   const isPrimaryKey =

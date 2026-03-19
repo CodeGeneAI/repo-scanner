@@ -464,6 +464,114 @@ describe("repo-scanner bin", () => {
     }
   });
 
+  it("generates erd diagram via --topology-diagrams erd with sql fixture", async () => {
+    const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-erd-"));
+
+    try {
+      await writeFile(path.join(repoPath, "README.md"), "# fixture\n");
+      await mkdir(path.join(repoPath, "db"), { recursive: true });
+      await writeFile(
+        path.join(repoPath, "db", "schema.sql"),
+        `CREATE TABLE users (
+  id INT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE orders (
+  id INT PRIMARY KEY,
+  user_id INT NOT NULL,
+  total DECIMAL(10,2),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);`,
+      );
+
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--topology-diagrams",
+        "erd",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const payload = JSON.parse(decode(result.stdout));
+      expect(payload.topology).toBeDefined();
+      expect(payload.topology.diagrams).toBeArrayOfSize(1);
+      expect(payload.topology.diagrams[0].kind).toBe("erd");
+      expect(payload.topology.diagrams[0].mermaid).toContain("erDiagram");
+      expect(payload.topology.diagrams[0].mermaid).toContain("users");
+      expect(payload.topology.diagrams[0].mermaid).toContain("orders");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("writes erd diagram to file via --topology-output", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-erd-file-"),
+    );
+    const outputPath = path.join(repoPath, "erd-output.md");
+
+    try {
+      await writeFile(path.join(repoPath, "README.md"), "# fixture\n");
+      await mkdir(path.join(repoPath, "db"), { recursive: true });
+      await writeFile(
+        path.join(repoPath, "db", "schema.sql"),
+        "CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100));",
+      );
+
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--topology-diagrams",
+        "erd",
+        "--topology-output",
+        outputPath,
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const fileContent = await Bun.file(outputPath).text();
+      expect(fileContent).toContain("erDiagram");
+      expect(fileContent).toContain("users");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("gracefully skips erd when no schema files exist", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-erd-empty-"),
+    );
+
+    try {
+      await writeFile(path.join(repoPath, "README.md"), "# fixture\n");
+      await writeFile(
+        path.join(repoPath, "index.ts"),
+        "export const ok = true;\n",
+      );
+
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--topology-diagrams",
+        "erd",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const payload = JSON.parse(decode(result.stdout));
+      expect(payload.topology).toBeDefined();
+      expect(payload.topology.diagrams).toBeArrayOfSize(0);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
   it("emits section-only json payload for section mode", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
