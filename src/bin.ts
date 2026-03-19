@@ -6,6 +6,9 @@ import { scanForDuplicates } from "./code-duplication/scanner";
 import { evaluateDependencyPolicy } from "./dependency/policy";
 import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
+import { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
+import { getChangedFiles } from "./diff/git";
+import { buildDiffScanResult } from "./diff/scan-diff";
 import "./detectors/init";
 import { setDuplicationOptions } from "./detectors/code-duplication";
 import { setLargeFileThreshold } from "./detectors/large-file";
@@ -229,6 +232,32 @@ const main = async () => {
   const topology = options.topology
     ? generateTopology(result, options.topologyDiagrams)
     : undefined;
+  const diffScan =
+    options.diff && options.diff.length > 0
+      ? await (async () => {
+          const diffRange = options.diff!;
+          const changedFiles = await getChangedFiles(options.path, diffRange);
+          const affectedComponents = result.architecture.components.filter(
+            (component) =>
+              changedFiles.some(
+                (file) =>
+                  file === component.path ||
+                  file.startsWith(`${component.path}/`),
+              ),
+          );
+          const historyBaselines =
+            affectedComponents.length > 0
+              ? await learnComponentConventionBaselinesFromGit(
+                  options.path,
+                  affectedComponents,
+                )
+              : undefined;
+
+          return buildDiffScanResult(result, changedFiles, {
+            historyBaselines,
+          });
+        })()
+      : undefined;
 
   const sectionOutputExplicitlyRequested =
     hasExplicitSectionOutputFlags(options) || options.allDetectors;
@@ -273,6 +302,7 @@ const main = async () => {
             : {}),
           ...(includePolicyOutput ? { policyEvaluation } : {}),
           ...(topology ? { topology } : {}),
+          ...(diffScan ? { diffScan } : {}),
         };
     renderJson(jsonPayload, process.stdout);
   } else if (includeReportOutput) {

@@ -1,6 +1,7 @@
 import type { RepoScanResult } from "../../types";
 import { generateApiTopologyDiagram } from "./api-topology-diagram";
 import { generateArchitectureDiagram } from "./architecture-diagram";
+import { generateCallGraphDiagram } from "./call-graph-diagram";
 import { generateDataflowDiagram } from "./dataflow-diagram";
 import { generateDependencyDiagram } from "./dependency-diagram";
 import { generateErdDiagram } from "./erd-diagram";
@@ -19,6 +20,7 @@ const GENERATORS: Record<DiagramKind, DiagramGenerator> = {
   dataflow: generateDataflowDiagram,
   "api-topology": generateApiTopologyDiagram,
   erd: generateErdDiagram,
+  "call-graph": generateCallGraphDiagram,
 };
 
 /**

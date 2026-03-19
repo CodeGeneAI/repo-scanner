@@ -58,6 +58,18 @@ export interface ComponentMetadata {
   readonly hasDockerfile?: boolean;
   readonly hasTests?: boolean;
   readonly hasMigrations?: boolean;
+  readonly namingConventions?: {
+    readonly file?: {
+      readonly dominantStyle: string;
+      readonly percentage: number;
+      readonly sampleSize: number;
+    };
+    readonly directory?: {
+      readonly dominantStyle: string;
+      readonly percentage: number;
+      readonly sampleSize: number;
+    };
+  };
   // Reasonable heuristics tier
   readonly observability?: readonly string[];
   readonly deployTarget?: string;
@@ -117,6 +129,7 @@ export interface RepoScanResult {
     readonly complexityHotspots?: readonly ComplexityHotspot[];
     readonly externalServices?: readonly ExternalService[];
     readonly databaseSchema?: DatabaseSchema;
+    readonly callGraph?: CallGraph;
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -291,6 +304,57 @@ export interface ComplexityHotspot {
   readonly language: string;
 }
 
+export interface CallGraphNode {
+  readonly id: string;
+  readonly name: string;
+  readonly file: string;
+  readonly line: number;
+}
+
+export interface CallGraphEdge {
+  readonly callerId: string;
+  readonly calleeId: string;
+  readonly line: number;
+  readonly caller: {
+    readonly name: string;
+    readonly file: string;
+  };
+  readonly callee: {
+    readonly name: string;
+    readonly file: string;
+  };
+}
+
+export interface CallGraph {
+  readonly nodes: readonly CallGraphNode[];
+  readonly edges: readonly CallGraphEdge[];
+  readonly truncated?: boolean;
+  readonly warnings?: readonly string[];
+}
+
+export interface DiffBlastRadius {
+  readonly component: string;
+  readonly score: number;
+  readonly dependents: readonly string[];
+}
+
+export interface DiffConventionViolation {
+  readonly file: string;
+  readonly violation: string;
+}
+
+export interface DiffScanResult {
+  readonly changedFiles: readonly string[];
+  readonly affectedComponents: readonly string[];
+  readonly blastRadius: readonly DiffBlastRadius[];
+  readonly testFilesToUpdate: readonly string[];
+  readonly conventionViolations: readonly DiffConventionViolation[];
+  readonly newTodos: readonly TodoAnnotation[];
+  readonly newDeadExports: readonly DeadExport[];
+  readonly suggestedReviewFocus: readonly string[];
+  readonly warnings?: readonly string[];
+}
+
 export interface ExternalService {
   readonly name: string;
   readonly category: string;
@@ -345,6 +409,8 @@ export interface CliOptions {
   readonly topology: boolean;
   readonly topologyDiagrams?: readonly DiagramKind[];
   readonly topologyOutput?: string;
+  readonly diff?: string;
+  readonly callGraph: boolean;
   readonly failOnDeadDeps: boolean;
   readonly failOnDeadDepsCount?: number;
   readonly includeDevDeadDeps: boolean;

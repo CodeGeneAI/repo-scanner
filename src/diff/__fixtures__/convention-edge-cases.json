@@ -1,0 +1,25 @@
+{
+  "mixedStyles": {
+    "changedFiles": [
+      "packages/a/src/BadDir/feature_service.ts",
+      "packages/a/src/kebab-dir/snake_case_file.ts",
+      "packages/a/src/okayDir/camelCaseFile.ts"
+    ],
+    "expectedViolationContains": [
+      "directory segment \"BadDir\"",
+      "file naming style snake_case differs from dominant camelCase"
+    ]
+  },
+  "componentBaselines": {
+    "changedFiles": [
+      "packages/web-ui/src/components/button_primary.tsx",
+      "packages/api-service/src/BadDir/handler_snake.ts"
+    ],
+    "expected": [
+      {
+        "file": "packages/api-service/src/BadDir/handler_snake.ts",
+        "violationContains": "directory segment \"BadDir\" uses PascalCase"
+      }
+    ]
+  }
+}

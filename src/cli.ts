@@ -99,12 +99,14 @@ Options:
   --max-literal-ratio <f>     Max literal token ratio for duplication filtering (default: 0.50)
   --no-barrel-filter          Disable barrel re-export duplication filtering
   --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
+  --call-graph                Enable call graph detector output in scan JSON
   --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
   --env-include-tests         Include test files in env var detection
   --topology                  Generate mermaid architecture diagrams from scan results
   --topology-diagrams <list>  Comma-separated diagram types to generate (default: all)
-                              Valid: architecture,dependency,dataflow,api-topology,erd
+                              Valid: architecture,dependency,dataflow,api-topology,erd,call-graph
   --topology-output <path>    Write topology diagrams to file instead of stdout
+  --diff <range>              Diff-focused scan for changed files (e.g. HEAD~1, main...feature)
   --db-schema                 Enable database schema detection (tables, columns, relationships)
   --no-update-check           Suppress background update check for this run
   --version, -v               Show version number
@@ -220,11 +222,13 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let maxLiteralRatio = 0.5;
   let ignoreBarrelExports = true;
   let solid = false;
+  let callGraph = false;
   let solidThreshold = 80;
   let envIncludeTests = false;
   let topology = false;
   let topologyDiagrams: DiagramKind[] | undefined;
   let topologyOutput: string | undefined;
+  let diff: string | undefined;
   let failOnDeadDeps = false;
   let failOnDeadDepsCount: number | undefined;
   let includeDevDeadDeps = false;
@@ -437,6 +441,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--solid":
         solid = true;
         break;
+      case "--call-graph":
+        callGraph = true;
+        break;
       case "--solid-threshold":
         solidThreshold = parseRequiredPositiveIntegerOption(
           args[++i],
@@ -471,7 +478,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
 
         if (invalid.length > 0) {
           failCliParse(
-            `Error: invalid diagram types "${invalid.join(",")}". Use one of architecture,dependency,dataflow,api-topology,erd.`,
+            `Error: invalid diagram types "${invalid.join(",")}". Use one of ${ALL_DIAGRAM_KINDS.join(",")}.`,
           );
         }
 
@@ -488,6 +495,16 @@ export const parseArgs = (argv: string[]): CliOptions => {
         }
         topology = true;
         break;
+      case "--diff": {
+        const value =
+          args[++i] ??
+          failCliParse("Error: --diff requires a git range value.");
+        if (isFlagToken(value)) {
+          failCliParse("Error: --diff requires a git range value.");
+        }
+        diff = value;
+        break;
+      }
       case "--fail-on-dead-deps":
         failOnDeadDeps = true;
         break;
@@ -538,11 +555,13 @@ export const parseArgs = (argv: string[]): CliOptions => {
     maxLiteralRatio,
     ignoreBarrelExports,
     solid,
+    callGraph,
     solidThreshold,
     envIncludeTests,
     topology,
     topologyDiagrams,
     topologyOutput,
+    diff,
     failOnDeadDeps,
     failOnDeadDepsCount,
     includeDevDeadDeps,

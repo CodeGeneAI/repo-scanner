@@ -92,4 +92,13 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("api-surface");
     expect(profile.enabledDetectorIds).toContain("db-schema");
   });
+
+  it("adds call-graph detector when call-graph topology is requested", () => {
+    const profile = resolveScanProfile(
+      parseArgs(["bun", "repo-scanner", "--topology-diagrams", "call-graph"]),
+    );
+
+    expect(profile.allDetectors).toBeFalse();
+    expect(profile.enabledDetectorIds).toContain("call-graph");
+  });
 });

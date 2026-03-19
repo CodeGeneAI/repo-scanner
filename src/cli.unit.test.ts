@@ -141,7 +141,9 @@ describe("parseArgs", () => {
   it("rejects invalid --topology-diagrams with erd in valid list", () => {
     expect(() =>
       parseArgs(["bun", "repo-scanner", "--topology-diagrams", "invalid-type"]),
-    ).toThrow(/Use one of architecture,dependency,dataflow,api-topology,erd/);
+    ).toThrow(
+      /Use one of architecture,dependency,dataflow,api-topology,erd,call-graph/,
+    );
   });
 
   it("parses --topology-output", () => {
@@ -175,6 +177,11 @@ describe("parseArgs", () => {
     ]);
     expect(result.topology).toBeTrue();
     expect(result.topologyDiagrams).toEqual(["architecture", "erd"]);
+  });
+
+  it("parses --diff range", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--diff", "HEAD~1"]);
+    expect(result.diff).toBe("HEAD~1");
   });
 
   it("parses dead dependency flags", () => {

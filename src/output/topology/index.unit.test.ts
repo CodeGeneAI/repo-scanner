@@ -188,4 +188,32 @@ describe("generateTopology", () => {
     expect(result.diagrams.length).toBeGreaterThanOrEqual(1);
     expect(result.diagrams[0]!.kind).toBe("architecture");
   });
+
+  it("generates call-graph diagram when callGraph is present", () => {
+    const full = makeFullResult();
+    const withCallGraph = {
+      ...full,
+      inventory: {
+        callGraph: {
+          nodes: [
+            { id: "n1", name: "handler", file: "src/a.ts", line: 1 },
+            { id: "n2", name: "service", file: "src/b.ts", line: 2 },
+          ],
+          edges: [
+            {
+              callerId: "n1",
+              calleeId: "n2",
+              line: 1,
+              caller: { name: "handler", file: "src/a.ts" },
+              callee: { name: "service", file: "src/b.ts" },
+            },
+          ],
+        },
+      },
+    } as unknown as RepoScanResult;
+
+    const result = generateTopology(withCallGraph, ["call-graph"]);
+    expect(result.diagrams).toHaveLength(1);
+    expect(result.diagrams[0]!.kind).toBe("call-graph");
+  });
 });

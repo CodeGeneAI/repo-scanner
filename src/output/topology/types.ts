@@ -3,7 +3,8 @@ export type DiagramKind =
   | "dependency"
   | "dataflow"
   | "api-topology"
-  | "erd";
+  | "erd"
+  | "call-graph";
 
 export const ALL_DIAGRAM_KINDS: readonly DiagramKind[] = [
   "architecture",
@@ -11,6 +12,7 @@ export const ALL_DIAGRAM_KINDS: readonly DiagramKind[] = [
   "dataflow",
   "api-topology",
   "erd",
+  "call-graph",
 ];
 
 export interface DiagramOutput {

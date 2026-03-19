@@ -38,6 +38,7 @@ const TOPOLOGY_DETECTOR_IDS: Record<DiagramKind, readonly string[]> = {
   dataflow: ["monorepo", "external-services"],
   "api-topology": ["monorepo", "api-surface"],
   erd: ["db-schema"],
+  "call-graph": ["call-graph"],
 };
 
 export interface ResolvedScanProfile {
@@ -110,10 +111,22 @@ export const resolveScanProfile = (
 
   // Preserve explicit opt-in behavior for these optional detectors.
   if (options.solid) enabledDetectorIds.add("solid-health");
+  if (options.callGraph) enabledDetectorIds.add("call-graph");
 
-  // Preserve explicit opt-in for db-schema even when topology is not requested.
-  if (options.dbSchema) {
+  // Enable db-schema detector when explicitly requested or when ERD diagram is requested.
+  // Note: bin.ts also calls setDbSchemaOptions() for runtime config; this adds the detector ID.
+  const erdRequested =
+    options.topology &&
+    (!options.topologyDiagrams || options.topologyDiagrams.includes("erd"));
+  const callGraphRequested =
+    options.topology &&
+    (!options.topologyDiagrams ||
+      options.topologyDiagrams.includes("call-graph"));
+  if (options.dbSchema || erdRequested) {
     enabledDetectorIds.add("db-schema");
+  }
+  if (callGraphRequested) {
+    enabledDetectorIds.add("call-graph");
   }
 
   // Ensure requested topology diagrams have required detector data even when

@@ -3,6 +3,7 @@ import type { DatabaseSchema } from "../detectors/db-schema/types";
 import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
+  CallGraph,
   CodeDuplicationResult,
   ComplexityHotspot,
   Component,
@@ -79,6 +80,7 @@ export const aggregate = async (
   let complexityHotspots: readonly ComplexityHotspot[] | undefined;
   let externalServices: readonly ExternalService[] | undefined;
   let databaseSchema: DatabaseSchema | undefined;
+  let callGraph: CallGraph | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -314,6 +316,14 @@ export const aggregate = async (
       }
     }
 
+    // Extract call graph
+    if (result.detectorId === "call-graph" && result.metadata?.callGraph) {
+      const graph = result.metadata.callGraph as CallGraph;
+      if (graph.nodes.length > 0) {
+        callGraph = graph;
+      }
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -391,6 +401,7 @@ export const aggregate = async (
       complexityHotspots,
       externalServices,
       databaseSchema,
+      callGraph,
     },
     architecture: {
       monorepo: isMonorepo,
