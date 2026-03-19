@@ -15,7 +15,9 @@ import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { generateTopology } from "./output/topology";
 import { renderTopologyToString } from "./output/topology/render";
+import { resolveScanProfile, type ScanSection } from "./scan-profile";
 import { scanRepo } from "./scanner";
+import type { RepoScanResult } from "./types";
 import { BUILD_SHA, BUILD_UPDATE_URL } from "./update/build-version";
 import { formatUpdateNotice, startBackgroundUpdateCheck } from "./update/check";
 import { runUpdateCommand } from "./update/command";
@@ -60,6 +62,33 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
     promise,
     new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
   ]);
+
+const buildSectionJsonPayload = (
+  result: RepoScanResult,
+  selectedSections: readonly ScanSection[],
+): Record<string, unknown> => {
+  const sectionSet = new Set(selectedSections);
+  const payload: Record<string, unknown> = {
+    scanPath: result.scanPath,
+    timestamp: result.timestamp,
+    durationMs: result.durationMs,
+  };
+
+  if (sectionSet.has("architecture")) {
+    payload.architecture = result.architecture;
+  }
+  if (sectionSet.has("inventory")) {
+    payload.inventory = result.inventory;
+  }
+  if (sectionSet.has("external-services")) {
+    payload.externalServices = result.inventory.externalServices ?? [];
+  }
+  if (sectionSet.has("build-and-test")) {
+    payload.buildAndTest = result.buildAndTest;
+  }
+
+  return payload;
+};
 
 const main = async () => {
   const options = parseArgs(process.argv);
@@ -140,8 +169,10 @@ const main = async () => {
   const dependenciesEnabled = shouldEnableDependencyScan(options);
   const deadDepsActive =
     options.failOnDeadDeps || options.failOnDeadDepsCount !== undefined;
+  const scanProfile = resolveScanProfile(options);
 
   const result = await scanRepo(options.path, {
+    enabledDetectorIds: scanProfile.enabledDetectorIds,
     dependencies: {
       enabled: dependenciesEnabled,
       ecosystems: options.ecosystems,
@@ -174,14 +205,24 @@ const main = async () => {
     : undefined;
 
   if (options.format === "json") {
+    const basePayload = scanProfile.allDetectors
+      ? ({ ...result } as Record<string, unknown>)
+      : buildSectionJsonPayload(result, scanProfile.selectedSections);
     const jsonPayload = {
-      ...result,
+      ...basePayload,
+      ...(result.dependencies ? { dependencies: result.dependencies } : {}),
       ...(policyEvaluation ? { policyEvaluation } : {}),
       ...(topology ? { topology } : {}),
     };
     renderJson(jsonPayload, process.stdout);
   } else {
-    renderTable(result, process.stdout);
+    renderTable(result, process.stdout, {
+      selectedSections: scanProfile.allDetectors
+        ? undefined
+        : scanProfile.selectedSections,
+      includeDependencies: dependenciesEnabled,
+      includeSignals: scanProfile.allDetectors,
+    });
   }
 
   if (topology) {

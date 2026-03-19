@@ -39,10 +39,16 @@ export const scanRepo = async (
 
   const index = await FileIndex.build(absolutePath);
   const detectors = getDetectors();
+  const detectorIdSet = options?.enabledDetectorIds
+    ? new Set(options.enabledDetectorIds)
+    : undefined;
+  const enabledDetectors = detectorIdSet
+    ? detectors.filter((detector) => detectorIdSet.has(detector.id))
+    : detectors;
 
   // Use allSettled so one failing detector doesn't crash the entire scan
   const settled = await Promise.allSettled(
-    detectors.map((detector) => detector.detect(absolutePath, index)),
+    enabledDetectors.map((detector) => detector.detect(absolutePath, index)),
   );
   const results = settled
     .filter(

@@ -285,6 +285,50 @@ describe("api-surface detector (integration)", () => {
     }
   });
 
+  it("honors nested api-scoped .scanignore rules", async () => {
+    const root = await tmpDir();
+    try {
+      await writeAt(
+        root,
+        "packages/repo-scanner/.scanignore",
+        "[api]\n/src/detectors/api/graphql-extractors.ts\n",
+      );
+      await writeAt(
+        root,
+        "packages/repo-scanner/src/detectors/api/graphql-extractors.ts",
+        "@Resolver()\nexport class SelfResolver {\n  @Query(() => String)\n  exec() {}\n  @Query(() => String)\n  getUser() {}\n}\n",
+      );
+
+      const result = await runApi(root);
+      expect(result.findings).toHaveLength(0);
+      expect(result.metadata?.apiSurface).toBeUndefined();
+    } finally {
+      await rm(root, { recursive: true });
+    }
+  });
+
+  it("honors nested api-scoped .scanignore rules for websocket extractors", async () => {
+    const root = await tmpDir();
+    try {
+      await writeAt(
+        root,
+        "packages/repo-scanner/.scanignore",
+        "[api]\n/src/detectors/api/websocket-extractors.ts\n",
+      );
+      await writeAt(
+        root,
+        "packages/repo-scanner/src/detectors/api/websocket-extractors.ts",
+        "@WebSocketGateway()\nexport class SelfGateway {\n  @SubscribeMessage('eventName')\n  handleMessage() {}\n}\n",
+      );
+
+      const result = await runApi(root);
+      expect(result.findings).toHaveLength(0);
+      expect(result.metadata?.apiSurface).toBeUndefined();
+    } finally {
+      await rm(root, { recursive: true });
+    }
+  });
+
   it("detects .proto files", async () => {
     const root = await tmpDir();
     try {

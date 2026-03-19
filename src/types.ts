@@ -312,6 +312,11 @@ export interface CliOptions {
   readonly showVersion: boolean;
   readonly showUpdate: boolean;
   readonly noUpdateCheck: boolean;
+  readonly scanArchitecture: boolean;
+  readonly scanInventory: boolean;
+  readonly scanExternalServices: boolean;
+  readonly scanBuildAndTest: boolean;
+  readonly allDetectors: boolean;
   readonly dryCheck: boolean;
   readonly deps: boolean;
   readonly depsDebug: boolean;
@@ -358,5 +363,6 @@ export interface DependencyScanConfig {
 }
 
 export interface ScanRepoOptions {
+  readonly enabledDetectorIds?: readonly string[];
   readonly dependencies?: DependencyScanConfig;
 }

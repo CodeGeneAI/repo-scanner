@@ -63,6 +63,12 @@ Commands:
 Options:
   --path <dir>                Directory to scan (default: cwd)
   --format <fmt>              Output format: table | json (default: table)
+  --architecture              Scan/render Architecture section only
+  --inventory                 Scan/render Inventory section only
+  --external-services         Scan/render External Services section only
+  --build-and-test            Scan/render Build & Test section only
+  --all-detectors             Run full legacy detector set
+  --full-scan                 Alias for --all-detectors
   --dry-check                 Run duplication-only scan with dry-check output contract
   --deps                      Enable deep dependency analysis
   --deps-debug                Emit dependency debug diagnostics to stderr
@@ -186,6 +192,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let showVersion = false;
   let showUpdate = false;
   let noUpdateCheck = false;
+  let scanArchitecture = false;
+  let scanInventory = false;
+  let scanExternalServices = false;
+  let scanBuildAndTest = false;
+  let allDetectors = false;
   let dryCheck = false;
   let deps = false;
   let depsDebug = false;
@@ -239,6 +250,22 @@ export const parseArgs = (argv: string[]): CliOptions => {
         break;
       case "--no-update-check":
         noUpdateCheck = true;
+        break;
+      case "--architecture":
+        scanArchitecture = true;
+        break;
+      case "--inventory":
+        scanInventory = true;
+        break;
+      case "--external-services":
+        scanExternalServices = true;
+        break;
+      case "--build-and-test":
+        scanBuildAndTest = true;
+        break;
+      case "--all-detectors":
+      case "--full-scan":
+        allDetectors = true;
         break;
       case "--path":
         pathArg = args[++i] ?? pathArg;
@@ -483,6 +510,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
     showVersion,
     showUpdate,
     noUpdateCheck,
+    scanArchitecture,
+    scanInventory,
+    scanExternalServices,
+    scanBuildAndTest,
+    allDetectors,
     dryCheck,
     deps,
     depsDebug,

@@ -1,0 +1,5 @@
+# repo-scanner scans itself inside this monorepo.
+# Exclude API detector implementation file to prevent self-detected endpoints.
+[api]
+/src/detectors/api/graphql-extractors.ts
+/src/detectors/api/websocket-extractors.ts

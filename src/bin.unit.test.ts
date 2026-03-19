@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 
 const repoRootPath = path.resolve(import.meta.dir, "../../..");
+const textDecoder = new TextDecoder();
+const decode = (value: ArrayBufferLike | ArrayBufferView): string =>
+  textDecoder.decode(value);
 
 const createCliFixtureRepo = async (): Promise<string> => {
   const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-cli-"));
@@ -27,6 +30,42 @@ const createCliFixtureRepo = async (): Promise<string> => {
     path.join(repoPath, "index.ts"),
     "import lodash from 'lodash';\n",
   );
+
+  return repoPath;
+};
+
+const createCoreProfileFixtureRepo = async (): Promise<string> => {
+  const repoPath = await mkdtemp(
+    path.join(os.tmpdir(), "repo-scanner-core-profile-"),
+  );
+
+  await mkdir(path.join(repoPath, ".github", "workflows"), { recursive: true });
+  await writeFile(path.join(repoPath, "README.md"), "# core fixture\n");
+  await writeFile(
+    path.join(repoPath, ".github", "workflows", "ci.yml"),
+    "name: ci\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n",
+  );
+  await writeFile(
+    path.join(repoPath, "package.json"),
+    JSON.stringify(
+      {
+        name: "fixture-core",
+        version: "1.0.0",
+        dependencies: {
+          "@openrouter/ai-sdk-provider": "^2.0.0",
+          ai: "^6.0.0",
+        },
+        scripts: {
+          build: "tsc -p tsconfig.json",
+          test: "vitest run",
+          lint: "biome check --diagnostic-level=error",
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(path.join(repoPath, "index.ts"), "export const ok = true;\n");
 
   return repoPath;
 };
@@ -317,6 +356,136 @@ describe("repo-scanner bin", () => {
       expect(payload.dependencies.summary.topDead).toHaveLength(2);
       expect(payload.dependencies.summary.topDead[0].name).toBe("dead-a");
       expect(payload.dependencies.summary.topDead[0].ecosystem).toBe("npm");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("defaults to core profile sections and omits signals in table output", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner(["--path", repoPath]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Architecture");
+      expect(stdout).toContain("Inventory");
+      expect(stdout).toContain("External Services");
+      expect(stdout).toContain("Build & Test");
+      expect(stdout).not.toContain("Signals");
+      expect(stdout).not.toContain("API Surface");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("supports single-section output for --external-services", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--external-services",
+      ]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("External Services");
+      expect(stdout).not.toContain("Architecture");
+      expect(stdout).not.toContain("Inventory");
+      expect(stdout).not.toContain("Build & Test");
+      expect(stdout).not.toContain("Signals");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("supports multi-section output for --architecture --build-and-test", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--architecture",
+        "--build-and-test",
+      ]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Architecture");
+      expect(stdout).toContain("Build & Test");
+      expect(stdout).not.toContain("Inventory");
+      expect(stdout).not.toContain("External Services");
+      expect(stdout).not.toContain("Signals");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("treats --full-scan as an alias for --all-detectors", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const allDetectors = runRepoScanner([
+        "--path",
+        repoPath,
+        "--all-detectors",
+        "--format",
+        "json",
+      ]);
+      const fullScan = runRepoScanner([
+        "--path",
+        repoPath,
+        "--full-scan",
+        "--format",
+        "json",
+      ]);
+
+      expect(allDetectors.exitCode).toBe(0);
+      expect(fullScan.exitCode).toBe(0);
+
+      const allPayload = JSON.parse(decode(allDetectors.stdout));
+      const fullPayload = JSON.parse(decode(fullScan.stdout));
+
+      const normalize = (payload: Record<string, unknown>) => ({
+        ...payload,
+        timestamp: "",
+        durationMs: 0,
+      });
+
+      expect(normalize(fullPayload)).toEqual(normalize(allPayload));
+      expect(decode(allDetectors.stdout)).toContain('"signals"');
+      expect(decode(fullScan.stdout)).toContain('"signals"');
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("emits section-only json payload for section mode", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--external-services",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+
+      expect(payload.externalServices).toBeDefined();
+      expect(payload.architecture).toBeUndefined();
+      expect(payload.inventory).toBeUndefined();
+      expect(payload.buildAndTest).toBeUndefined();
+      expect(payload.scanPath).toBeDefined();
+      expect(payload.timestamp).toBeDefined();
+      expect(payload.durationMs).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

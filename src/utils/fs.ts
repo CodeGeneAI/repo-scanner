@@ -37,7 +37,7 @@ export const IGNORE_DIRS = new Set([
 ]);
 
 /** Dot-prefixed directories that should be included when scanning repo structure. */
-const INCLUDE_DOT_DIRS = new Set([
+export const INCLUDE_DOT_DIRS = new Set([
   ".github",
   ".circleci",
   ".husky",
@@ -60,6 +60,8 @@ export interface WalkOptions {
   ignoreMatcher?: IgnoreMatcher;
   /** Root path for computing relative paths (used internally for ignore matching). */
   rootForRelative?: string;
+  /** Whether to load nested .scanignore files while traversing (default: true). */
+  loadNestedScanignore?: boolean;
 }
 
 /**
@@ -77,7 +79,7 @@ export async function* walkFiles(
   let matcher = options?.ignoreMatcher;
 
   // Check for a .scanignore file in this directory (nested/additive)
-  if (depth > 0) {
+  if (depth > 0 && options?.loadNestedScanignore !== false) {
     const childRules = await readScanignore(rootPath);
     if (childRules.length > 0) {
       const dirRel = path.relative(relativeRoot, rootPath);

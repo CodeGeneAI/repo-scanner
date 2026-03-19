@@ -1,6 +1,7 @@
+import { readdir } from "fs/promises";
 import path from "path";
-import { walkFiles } from "./fs";
-import type { IgnoreMatcher } from "./scanignore";
+import { IGNORE_DIRS, INCLUDE_DOT_DIRS, walkFiles } from "./fs";
+import type { IgnoreMatcher, IgnoreRule } from "./scanignore";
 import { buildIgnoreMatcher, readScanignore } from "./scanignore";
 
 /** Directory names that indicate secondary content (examples, test fixtures, playgrounds, etc.) */
@@ -67,7 +68,7 @@ export class FileIndex {
 
   /** Build the index by walking the filesystem once. */
   static async build(rootPath: string): Promise<FileIndex> {
-    const rootRules = await readScanignore(rootPath);
+    const rootRules = await collectScanignoreRules(rootPath);
     const ignoreMatcher =
       rootRules.length > 0 ? buildIgnoreMatcher(rootRules) : undefined;
 
@@ -76,6 +77,7 @@ export class FileIndex {
       includeDotDirs: true,
       ignoreMatcher,
       rootForRelative: rootPath,
+      loadNestedScanignore: false,
     })) {
       const name = path.basename(filePath);
       const ext = path.extname(name).toLowerCase();
@@ -167,3 +169,49 @@ export class FileIndex {
     });
   }
 }
+
+/**
+ * Collect .scanignore rules from root and nested directories, preserving
+ * directory-local scope by prefixing nested patterns.
+ */
+const collectScanignoreRules = async (
+  rootPath: string,
+): Promise<IgnoreRule[]> => {
+  const rules: IgnoreRule[] = [];
+  const stack: string[] = [rootPath];
+
+  while (stack.length > 0) {
+    const dirPath = stack.pop()!;
+    const dirRel = path.relative(rootPath, dirPath);
+
+    const localRules = await readScanignore(dirPath);
+    for (const rule of localRules) {
+      // Root rules are already relative to scan root.
+      if (dirRel === "") {
+        rules.push(rule);
+        continue;
+      }
+
+      // Nested rules must remain constrained to their directory subtree.
+      const scopedPattern = rule.anchored
+        ? `${dirRel}/${rule.pattern}`
+        : `${dirRel}/**/${rule.pattern}`;
+      rules.push({ ...rule, anchored: true, pattern: scopedPattern });
+    }
+
+    const entries = await readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      if (!entry.isDirectory()) continue;
+
+      if (IGNORE_DIRS.has(entry.name)) continue;
+      if (entry.name.startsWith(".") && !INCLUDE_DOT_DIRS.has(entry.name)) {
+        continue;
+      }
+
+      stack.push(path.join(dirPath, entry.name));
+    }
+  }
+
+  return rules;
+};

@@ -25,6 +25,41 @@ describe("parseArgs", () => {
     expect(result.failOnDeadDeps).toBeFalse();
     expect(result.failOnDeadDepsCount).toBeUndefined();
     expect(result.includeDevDeadDeps).toBeFalse();
+    expect(result.scanArchitecture).toBeFalse();
+    expect(result.scanInventory).toBeFalse();
+    expect(result.scanExternalServices).toBeFalse();
+    expect(result.scanBuildAndTest).toBeFalse();
+    expect(result.allDetectors).toBeFalse();
+  });
+
+  it("parses section profile flags", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--architecture",
+      "--inventory",
+      "--external-services",
+      "--build-and-test",
+    ]);
+
+    expect(result.scanArchitecture).toBeTrue();
+    expect(result.scanInventory).toBeTrue();
+    expect(result.scanExternalServices).toBeTrue();
+    expect(result.scanBuildAndTest).toBeTrue();
+    expect(result.allDetectors).toBeFalse();
+  });
+
+  it("parses --all-detectors", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--all-detectors"]);
+    expect(result.allDetectors).toBeTrue();
+  });
+
+  it("parses --full-scan as an alias for --all-detectors", () => {
+    const allDetectors = parseArgs(["bun", "repo-scanner", "--all-detectors"]);
+    const fullScan = parseArgs(["bun", "repo-scanner", "--full-scan"]);
+
+    expect(fullScan.allDetectors).toBeTrue();
+    expect(fullScan.allDetectors).toBe(allDetectors.allDetectors);
   });
 
   it("parses dependency options", () => {
