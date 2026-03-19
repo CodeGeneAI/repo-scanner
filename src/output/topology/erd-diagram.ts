@@ -20,15 +20,16 @@ const sanitizeName = (name: string): string => {
 
 /**
  * Sanitize a column type for Mermaid (no spaces or parentheses allowed in type position).
- * Strips parenthesized precision (e.g. VARCHAR(255) → VARCHAR) and replaces spaces.
+ * Preserves key fidelity (precision/timezone tokens) by converting separators
+ * to underscores (e.g. VARCHAR(255) -> VARCHAR_255).
  */
 const sanitizeType = (type: string): string => {
-  const cleaned = type
-    .trim()
-    .replace(/\([^)]*\)/g, "")
-    .trim()
-    .replace(/\s+/g, "_");
-  return cleaned.length === 0 ? "unknown" : cleaned;
+  const cleaned = type.trim().replace(/[(),]/g, "_").replace(/\s+/g, "_");
+  const normalized = cleaned
+    .replace(/[^a-zA-Z0-9_[\]]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized.length === 0 ? "unknown" : normalized;
 };
 
 /** Build the PK/FK marker suffix for a column. */

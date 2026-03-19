@@ -9,6 +9,7 @@ import { parseSqlFiles } from "./parsers/sql";
 import { parseSqlalchemyFiles } from "./parsers/sqlalchemy";
 import { parseTypeormFiles } from "./parsers/typeorm";
 import type {
+  ColumnInfo,
   DatabaseSchema,
   DroppedItem,
   RelationshipInfo,
@@ -30,6 +31,55 @@ export const normalizeTableName = (name: string): string =>
     .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
     .toLowerCase();
 
+const mergeColumn = (base: ColumnInfo, incoming: ColumnInfo): ColumnInfo => ({
+  ...base,
+  ...incoming,
+  // Preserve stronger known invariants while allowing incoming type updates.
+  nullable:
+    base.nullable === false || incoming.nullable === false
+      ? false
+      : base.nullable === true || incoming.nullable === true
+        ? true
+        : undefined,
+  isPrimaryKey: base.isPrimaryKey || incoming.isPrimaryKey || undefined,
+  isForeignKey: base.isForeignKey || incoming.isForeignKey || undefined,
+  references: incoming.references ?? base.references,
+  defaultValue: incoming.defaultValue ?? base.defaultValue,
+});
+
+const PARSER_TIE_PRIORITY: Record<TableInfo["source"]["parser"], number> = {
+  sql: 6,
+  prisma: 5,
+  drizzle: 4,
+  typeorm: 3,
+  django: 2,
+  sqlalchemy: 1,
+};
+
+const chooseWinner = (existing: TableInfo, incoming: TableInfo): TableInfo => {
+  if (incoming.source.confidence > existing.source.confidence) {
+    return incoming;
+  }
+  if (incoming.source.confidence < existing.source.confidence) {
+    return existing;
+  }
+
+  if (incoming.source.parser === existing.source.parser) {
+    // Same parser family at equal confidence: later observation wins.
+    return incoming;
+  }
+
+  const incomingPriority = PARSER_TIE_PRIORITY[incoming.source.parser];
+  const existingPriority = PARSER_TIE_PRIORITY[existing.source.parser];
+  if (incomingPriority > existingPriority) {
+    return incoming;
+  }
+  if (incomingPriority < existingPriority) {
+    return existing;
+  }
+  return existing;
+};
+
 /**
  * Merge tables from multiple parsers.
  * Tables with the same normalized name are merged:
@@ -49,14 +99,16 @@ export const mergeTables = (allTables: readonly TableInfo[]): TableInfo[] => {
     }
 
     // Merge: prefer higher confidence source, union columns
-    const winner =
-      table.source.confidence > existing.source.confidence ? table : existing;
+    const winner = chooseWinner(existing, table);
     const loser = winner === table ? existing : table;
 
     // Union columns by name
     const columnMap = new Map<string, (typeof existing.columns)[number]>();
     for (const col of loser.columns) columnMap.set(col.name, col);
-    for (const col of winner.columns) columnMap.set(col.name, col); // winner overwrites
+    for (const col of winner.columns) {
+      const prior = columnMap.get(col.name);
+      columnMap.set(col.name, prior ? mergeColumn(prior, col) : col);
+    }
 
     const mergedPk = winner.primaryKey ?? loser.primaryKey;
 

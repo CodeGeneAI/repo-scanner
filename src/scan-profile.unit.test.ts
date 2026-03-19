@@ -74,4 +74,22 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("solid-health");
     expect(profile.enabledDetectorIds).toContain("db-schema");
   });
+
+  it("adds topology-required detectors when section flags narrow report output", () => {
+    const profile = resolveScanProfile(
+      parseArgs([
+        "bun",
+        "repo-scanner",
+        "--inventory",
+        "--topology-diagrams",
+        "api-topology,erd",
+      ]),
+    );
+
+    expect(profile.allDetectors).toBeFalse();
+    expect(profile.selectedSections).toEqual(["inventory"]);
+    expect(profile.enabledDetectorIds).toContain("monorepo");
+    expect(profile.enabledDetectorIds).toContain("api-surface");
+    expect(profile.enabledDetectorIds).toContain("db-schema");
+  });
 });

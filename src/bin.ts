@@ -90,6 +90,28 @@ const buildSectionJsonPayload = (
   return payload;
 };
 
+const hasExplicitSectionOutputFlags = (
+  options: ReturnType<typeof parseArgs>,
+): boolean =>
+  options.scanArchitecture ||
+  options.scanInventory ||
+  options.scanExternalServices ||
+  options.scanBuildAndTest;
+
+const hasExplicitDependencyOutputFlags = (
+  options: ReturnType<typeof parseArgs>,
+): boolean => options.deps;
+
+const hasExplicitPolicyOutputFlags = (
+  options: ReturnType<typeof parseArgs>,
+): boolean =>
+  options.failOnVulns ||
+  options.failOnVulnsCount !== undefined ||
+  options.failOnOutdated ||
+  options.failOnOutdatedCount !== undefined ||
+  options.failOnDeadDeps ||
+  options.failOnDeadDepsCount !== undefined;
+
 const main = async () => {
   const options = parseArgs(process.argv);
   setLargeFileThreshold(options.largeFileThreshold);
@@ -208,23 +230,59 @@ const main = async () => {
     ? generateTopology(result, options.topologyDiagrams)
     : undefined;
 
+  const sectionOutputExplicitlyRequested =
+    hasExplicitSectionOutputFlags(options) || options.allDetectors;
+  const dependencyOutputExplicitlyRequested =
+    hasExplicitDependencyOutputFlags(options);
+  const policyOutputExplicitlyRequested = hasExplicitPolicyOutputFlags(options);
+  const nonTopologyOutputExplicitlyRequested =
+    sectionOutputExplicitlyRequested ||
+    dependencyOutputExplicitlyRequested ||
+    policyOutputExplicitlyRequested;
+  const topologyOnlyOutput =
+    options.topology && !nonTopologyOutputExplicitlyRequested;
+  const includeReportOutput = !topologyOnlyOutput;
+  const includeSectionOutput =
+    scanProfile.allDetectors ||
+    !options.topology ||
+    sectionOutputExplicitlyRequested;
+  const includeDependencyOutput =
+    !!result.dependencies &&
+    (!options.topology ||
+      dependencyOutputExplicitlyRequested ||
+      policyOutputExplicitlyRequested);
+  const includePolicyOutput =
+    !!policyEvaluation &&
+    (!options.topology ||
+      dependencyOutputExplicitlyRequested ||
+      policyOutputExplicitlyRequested);
+
   if (options.format === "json") {
-    const basePayload = scanProfile.allDetectors
-      ? ({ ...result } as Record<string, unknown>)
-      : buildSectionJsonPayload(result, scanProfile.selectedSections);
-    const jsonPayload = {
-      ...basePayload,
-      ...(result.dependencies ? { dependencies: result.dependencies } : {}),
-      ...(policyEvaluation ? { policyEvaluation } : {}),
-      ...(topology ? { topology } : {}),
-    };
+    const jsonPayload = topologyOnlyOutput
+      ? topology
+        ? { topology }
+        : {}
+      : {
+          ...(scanProfile.allDetectors
+            ? ({ ...result } as Record<string, unknown>)
+            : includeSectionOutput
+              ? buildSectionJsonPayload(result, scanProfile.selectedSections)
+              : {}),
+          ...(includeDependencyOutput
+            ? { dependencies: result.dependencies }
+            : {}),
+          ...(includePolicyOutput ? { policyEvaluation } : {}),
+          ...(topology ? { topology } : {}),
+        };
     renderJson(jsonPayload, process.stdout);
-  } else {
+  } else if (includeReportOutput) {
     renderTable(result, process.stdout, {
       selectedSections: scanProfile.allDetectors
         ? undefined
-        : scanProfile.selectedSections,
-      includeDependencies: dependenciesEnabled,
+        : includeSectionOutput
+          ? scanProfile.selectedSections
+          : [],
+      includeDependencies: includeDependencyOutput,
       includeSignals: scanProfile.allDetectors,
     });
   }
@@ -235,7 +293,7 @@ const main = async () => {
       fs.writeFileSync(options.topologyOutput, content);
     } else if (options.format !== "json") {
       const content = renderTopologyToString(topology, "markdown");
-      process.stdout.write(`\n${content}`);
+      process.stdout.write(includeReportOutput ? `\n${content}` : content);
     }
   }
 

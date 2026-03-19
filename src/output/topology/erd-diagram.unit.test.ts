@@ -156,20 +156,21 @@ describe("generateErdDiagram", () => {
     expect(diagram.mermaid).toContain("_2fa_tokens {");
   });
 
-  it("strips parenthesized precision from column types", () => {
+  it("preserves precision and timezone details in sanitized column types", () => {
     const schema = makeSchema([
       makeTable("users", [
         makeColumn("name", "VARCHAR(255)"),
         makeColumn("balance", "NUMERIC(10,2)"),
         makeColumn("flag", "VARCHAR (50)"),
+        makeColumn("created_at", "TIMESTAMP WITH TIME ZONE"),
       ]),
     ]);
     const diagram = generateErdDiagram(makeResult(schema))!;
-    expect(diagram.mermaid).toContain("VARCHAR name");
-    expect(diagram.mermaid).toContain("NUMERIC balance");
-    expect(diagram.mermaid).toContain("VARCHAR flag");
+    expect(diagram.mermaid).toContain("VARCHAR_255 name");
+    expect(diagram.mermaid).toContain("NUMERIC_10_2 balance");
+    expect(diagram.mermaid).toContain("VARCHAR_50 flag");
+    expect(diagram.mermaid).toContain("TIMESTAMP_WITH_TIME_ZONE created_at");
     expect(diagram.mermaid).not.toContain("(");
-    expect(diagram.mermaid).not.toContain("VARCHAR_");
   });
 
   it("defaults to unknown for empty column type", () => {

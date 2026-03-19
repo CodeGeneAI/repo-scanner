@@ -1,3 +1,4 @@
+import { ALL_DIAGRAM_KINDS, type DiagramKind } from "./output/topology/types";
 import type { CliOptions } from "./types";
 
 export const SCAN_SECTIONS = [
@@ -31,11 +32,28 @@ const SECTION_DETECTOR_IDS: Record<ScanSection, readonly string[]> = {
   "build-and-test": ["build", "ci"],
 };
 
+const TOPOLOGY_DETECTOR_IDS: Record<DiagramKind, readonly string[]> = {
+  architecture: ["monorepo", "cross-package-deps"],
+  dependency: ["monorepo", "cross-package-deps"],
+  dataflow: ["monorepo", "external-services"],
+  "api-topology": ["monorepo", "api-surface"],
+  erd: ["db-schema"],
+};
+
 export interface ResolvedScanProfile {
   readonly allDetectors: boolean;
   readonly selectedSections: readonly ScanSection[];
   readonly enabledDetectorIds?: readonly string[];
 }
+
+const resolveRequestedTopologyKinds = (
+  options: Pick<CliOptions, "topology" | "topologyDiagrams">,
+): readonly DiagramKind[] => {
+  if (!options.topology) {
+    return [];
+  }
+  return options.topologyDiagrams ?? ALL_DIAGRAM_KINDS;
+};
 
 const hasExplicitSectionFlags = (
   options: Pick<
@@ -93,13 +111,18 @@ export const resolveScanProfile = (
   // Preserve explicit opt-in behavior for these optional detectors.
   if (options.solid) enabledDetectorIds.add("solid-health");
 
-  // Enable db-schema detector when explicitly requested or when ERD diagram is requested.
-  // Note: bin.ts also calls setDbSchemaOptions() for runtime config; this adds the detector ID.
-  const erdRequested =
-    options.topology &&
-    (!options.topologyDiagrams || options.topologyDiagrams.includes("erd"));
-  if (options.dbSchema || erdRequested) {
+  // Preserve explicit opt-in for db-schema even when topology is not requested.
+  if (options.dbSchema) {
     enabledDetectorIds.add("db-schema");
+  }
+
+  // Ensure requested topology diagrams have required detector data even when
+  // section flags narrow report output.
+  for (const kind of resolveRequestedTopologyKinds(options)) {
+    const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
+    for (const detectorId of required) {
+      enabledDetectorIds.add(detectorId);
+    }
   }
 
   return {

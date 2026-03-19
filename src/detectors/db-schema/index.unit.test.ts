@@ -106,6 +106,66 @@ describe("db-schema detector", () => {
       expect(colNames).toContain("email");
     });
 
+    it("applies later equal-confidence column updates without dropping invariants", () => {
+      const tables: TableInfo[] = [
+        {
+          name: "users",
+          columns: [
+            {
+              name: "id",
+              type: "UUID",
+              nullable: false,
+              isPrimaryKey: true,
+              isForeignKey: false,
+            },
+          ],
+          primaryKey: ["id"],
+          source: { file: "001.sql", parser: "sql", confidence: 0.95 },
+        },
+        {
+          name: "users",
+          columns: [
+            {
+              name: "id",
+              type: "TEXT",
+              nullable: true,
+              isPrimaryKey: false,
+              isForeignKey: false,
+            },
+          ],
+          source: { file: "002.sql", parser: "sql", confidence: 0.95 },
+        },
+      ];
+
+      const merged = mergeTables(tables);
+      const idCol = merged[0]!.columns.find((column) => column.name === "id")!;
+
+      expect(idCol.type).toBe("TEXT");
+      expect(idCol.nullable).toBe(false);
+      expect(idCol.isPrimaryKey).toBe(true);
+    });
+
+    it("keeps SQL as winner on equal-confidence cross-parser ties", () => {
+      const tables: TableInfo[] = [
+        {
+          name: "users",
+          columns: [{ name: "id", type: "TEXT", nullable: false }],
+          source: { file: "001.sql", parser: "sql", confidence: 0.95 },
+        },
+        {
+          name: "users",
+          columns: [{ name: "id", type: "STRING", nullable: true }],
+          source: { file: "schema.prisma", parser: "prisma", confidence: 0.95 },
+        },
+      ];
+
+      const merged = mergeTables(tables);
+      const idCol = merged[0]!.columns.find((column) => column.name === "id")!;
+      expect(merged[0]!.source.parser).toBe("sql");
+      expect(idCol.type).toBe("TEXT");
+      expect(idCol.nullable).toBe(false);
+    });
+
     it("returns summary counts correctly", () => {
       const tables: TableInfo[] = [
         {

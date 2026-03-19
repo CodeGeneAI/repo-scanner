@@ -47,6 +47,19 @@ CREATE TABLE users (
       expect(result.tables[0]!.columns[1]!.isPrimaryKey).toBe(true);
     });
 
+    it("detects CONSTRAINT ... PRIMARY KEY clause", () => {
+      const sql = `
+CREATE TABLE users (
+  id INTEGER NOT NULL,
+  tenant_id INTEGER NOT NULL,
+  CONSTRAINT users_pkey PRIMARY KEY (id, tenant_id)
+);`;
+      const result = parseSql(sql, "migrations/001.sql");
+      expect(result.tables[0]!.primaryKey).toEqual(["id", "tenant_id"]);
+      expect(result.tables[0]!.columns[0]!.isPrimaryKey).toBe(true);
+      expect(result.tables[0]!.columns[1]!.isPrimaryKey).toBe(true);
+    });
+
     it("detects inline REFERENCES (foreign key)", () => {
       const sql = `
 CREATE TABLE posts (
@@ -170,6 +183,31 @@ CREATE TABLE users (
       expect(result.tables[0]!.columns[1]!.defaultValue).toBe("true");
       expect(result.tables[0]!.columns[2]!.defaultValue).toBe("NOW()");
     });
+
+    it("preserves multi-word and precision SQL types", () => {
+      const sql = `
+CREATE TABLE events (
+  id BIGINT PRIMARY KEY,
+  occurred_at timestamp with time zone NOT NULL,
+  created_at timestamp without time zone NOT NULL,
+  email character varying(255),
+  title character varying (128)
+);`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const table = result.tables[0]!;
+      expect(table.columns.find((c) => c.name === "occurred_at")!.type).toBe(
+        "TIMESTAMP WITH TIME ZONE",
+      );
+      expect(table.columns.find((c) => c.name === "created_at")!.type).toBe(
+        "TIMESTAMP WITHOUT TIME ZONE",
+      );
+      expect(table.columns.find((c) => c.name === "email")!.type).toBe(
+        "CHARACTER VARYING(255)",
+      );
+      expect(table.columns.find((c) => c.name === "title")!.type).toBe(
+        "CHARACTER VARYING (128)",
+      );
+    });
   });
 
   describe("ALTER TABLE", () => {
@@ -198,6 +236,69 @@ ALTER TABLE users ADD email VARCHAR(255) NOT NULL;`;
       expect(result.tables[0]!.columns[1]!.name).toBe("email");
     });
 
+    it("handles ADD COLUMN IF NOT EXISTS clauses in a single ALTER statement", () => {
+      const sql = `
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY
+);
+
+ALTER TABLE public.sessions
+  ADD COLUMN IF NOT EXISTS app_id text,
+  ADD COLUMN IF NOT EXISTS device_type text,
+  ADD COLUMN IF NOT EXISTS browser_name text;`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const columns = result.tables[0]!.columns.map((column) => column.name);
+      expect(columns).toContain("app_id");
+      expect(columns).toContain("device_type");
+      expect(columns).toContain("browser_name");
+    });
+
+    it("preserves commas inside quoted defaults in ALTER TABLE ADD COLUMN", () => {
+      const sql = `
+CREATE TABLE labels (
+  id SERIAL PRIMARY KEY
+);
+
+ALTER TABLE labels
+  ADD COLUMN label TEXT DEFAULT 'alpha,beta';`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const label = result.tables[0]!.columns.find((c) => c.name === "label")!;
+      expect(label.defaultValue).toBe("'alpha,beta'");
+    });
+
+    it("preserves commas inside dollar-quoted defaults in ALTER TABLE ADD COLUMN", () => {
+      const sql = `
+CREATE TABLE labels (
+  id SERIAL PRIMARY KEY
+);
+
+ALTER TABLE labels
+  ADD COLUMN note TEXT DEFAULT $$alpha,beta$$;`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const note = result.tables[0]!.columns.find((c) => c.name === "note")!;
+      expect(note.defaultValue).toBe("$$alpha,beta$$");
+    });
+
+    it("handles ALTER COLUMN TYPE updates", () => {
+      const sql = `
+CREATE TABLE ai_conversations (
+  id UUID PRIMARY KEY,
+  agent_id UUID
+);
+
+ALTER TABLE public.ai_conversations
+  ALTER COLUMN id TYPE text USING id::text,
+  ALTER COLUMN agent_id TYPE text USING agent_id::text;`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const table = result.tables[0]!;
+      expect(table.columns.find((column) => column.name === "id")!.type).toBe(
+        "TEXT",
+      );
+      expect(
+        table.columns.find((column) => column.name === "agent_id")!.type,
+      ).toBe("TEXT");
+    });
+
     it("handles ADD CONSTRAINT FOREIGN KEY", () => {
       const sql = `
 CREATE TABLE posts (
@@ -213,6 +314,99 @@ ALTER TABLE posts ADD CONSTRAINT fk_author FOREIGN KEY (author_id) REFERENCES us
       expect(authorCol.isForeignKey).toBe(true);
       expect(authorCol.references).toEqual({ table: "users", column: "id" });
       expect(result.relationships).toHaveLength(1);
+    });
+
+    it("handles ALTER TABLE ONLY ... ADD CONSTRAINT FOREIGN KEY", () => {
+      const sql = `
+CREATE TABLE posts (
+  id SERIAL PRIMARY KEY,
+  author_id INTEGER
+);
+
+ALTER TABLE ONLY public.posts
+  ADD CONSTRAINT posts_author_fk FOREIGN KEY (author_id) REFERENCES public.users(id);`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const authorCol = result.tables[0]!.columns.find(
+        (c) => c.name === "author_id",
+      )!;
+      expect(authorCol.isForeignKey).toBe(true);
+      expect(authorCol.references).toEqual({ table: "users", column: "id" });
+      expect(result.relationships).toHaveLength(1);
+      expect(result.relationships[0]!.from).toEqual({
+        table: "posts",
+        column: "author_id",
+      });
+      expect(result.relationships[0]!.to).toEqual({
+        table: "users",
+        column: "id",
+      });
+    });
+
+    it("handles composite foreign keys in ALTER TABLE CONSTRAINT clauses", () => {
+      const sql = `
+CREATE TABLE project_workflow_trigger_schedules (
+  project_id INTEGER NOT NULL,
+  workflow_id INTEGER NOT NULL
+);
+
+ALTER TABLE project_workflow_trigger_schedules
+  ADD CONSTRAINT project_workflow_trigger_schedules_setting_fkey
+  FOREIGN KEY (project_id, workflow_id)
+  REFERENCES project_workflow_settings(project_id, workflow_id);`;
+      const result = parseSql(sql, "migrations/001.sql");
+      const table = result.tables[0]!;
+      const projectId = table.columns.find((c) => c.name === "project_id")!;
+      const workflowId = table.columns.find((c) => c.name === "workflow_id")!;
+
+      expect(projectId.isForeignKey).toBe(true);
+      expect(projectId.references).toEqual({
+        table: "project_workflow_settings",
+        column: "project_id",
+      });
+      expect(workflowId.isForeignKey).toBe(true);
+      expect(workflowId.references).toEqual({
+        table: "project_workflow_settings",
+        column: "workflow_id",
+      });
+
+      expect(result.relationships).toHaveLength(2);
+      expect(result.relationships).toContainEqual(
+        expect.objectContaining({
+          from: {
+            table: "project_workflow_trigger_schedules",
+            column: "project_id",
+          },
+          to: { table: "project_workflow_settings", column: "project_id" },
+        }),
+      );
+      expect(result.relationships).toContainEqual(
+        expect.objectContaining({
+          from: {
+            table: "project_workflow_trigger_schedules",
+            column: "workflow_id",
+          },
+          to: { table: "project_workflow_settings", column: "workflow_id" },
+        }),
+      );
+    });
+
+    it("emits ALTER TABLE FOREIGN KEY relationships even without same-file CREATE TABLE", () => {
+      const sql = `
+ALTER TABLE ONLY public.workspace_agent_thread_sandbox_sessions
+  ADD CONSTRAINT workspace_agent_thread_sandbox_sessions_workspace_sandbox_lease_id_fkey
+  FOREIGN KEY (workspace_sandbox_lease_id) REFERENCES public.workspace_sandbox_leases(id);`;
+      const result = parseSql(sql, "migrations/002.sql");
+
+      expect(result.tables).toHaveLength(0);
+      expect(result.relationships).toHaveLength(1);
+      expect(result.relationships[0]!.from).toEqual({
+        table: "workspace_agent_thread_sandbox_sessions",
+        column: "workspace_sandbox_lease_id",
+      });
+      expect(result.relationships[0]!.to).toEqual({
+        table: "workspace_sandbox_leases",
+        column: "id",
+      });
     });
 
     it("handles ADD CONSTRAINT PRIMARY KEY (pg_dump format)", () => {
