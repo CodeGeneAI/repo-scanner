@@ -2,6 +2,74 @@
 
 Universal repository structure scanner. Detects languages, frameworks, monorepo structure, CI providers, datastores, and more from any codebase — any repo, any size, any language(s).
 
+## Installation
+
+### Quick install (recommended)
+
+Auto-detects your platform (OS + architecture) and installs the latest binary:
+
+```bash
+curl -fsSL http://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
+  --version-url http://assets.codegene.dev/binaries/version.json
+```
+
+Verify the installation:
+
+```bash
+repo-scanner --version
+```
+
+### Pinned install (CI / reproducible builds)
+
+For CI pipelines or when you need a specific version, pass the bundle URL and SHA-256 checksum directly:
+
+```bash
+curl -fsSL http://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
+  --bundle-url <BUNDLE_URL> \
+  --bundle-sha256 <BUNDLE_SHA256>
+```
+
+The bundle URL and checksum for each release are published in [`version.json`](http://assets.codegene.dev/binaries/version.json).
+
+### Supported platforms
+
+| Platform | Key | Install method |
+|----------|-----|----------------|
+| Linux x64 | `bun-linux-x64` | Shell installer |
+| Linux x64 (no AVX2) | `bun-linux-x64-baseline` | Shell installer |
+| Linux ARM64 | `bun-linux-arm64` | Shell installer |
+| macOS x64 | `bun-darwin-x64` | Shell installer |
+| macOS x64 (no AVX2) | `bun-darwin-x64-baseline` | Shell installer |
+| macOS ARM64 (Apple Silicon) | `bun-darwin-arm64` | Shell installer |
+| Windows x64 | `bun-windows-x64` | Manual download |
+| Windows x64 (no AVX2) | `bun-windows-x64-baseline` | Manual download |
+
+#### Windows
+
+The shell installer does not support Windows. Download the bundle archive directly from:
+
+```
+http://assets.codegene.dev/binaries/scanner-tools-bundle-bun-windows-x64.tar.gz
+```
+
+Extract it and add the `bin/` directory to your `PATH`.
+
+### Prerequisites
+
+- `curl` and `tar`
+- `sha256sum` or `shasum` (checksum verification)
+- `python3` (only required for `--version-url` mode)
+
+### Install locations
+
+| Path | Purpose |
+|------|---------|
+| `~/.local/bin/repo-scanner` | Symlinked binary (ensure `~/.local/bin` is on your `PATH`) |
+| `~/.cache/codegene/scanner-tools/` | Downloaded archive cache |
+| `~/.local/share/codegene/scanner-tools/` | Extracted binary versions |
+
+These defaults can be overridden with `REPO_SCANNER_BIN_ROOT`, `REPO_SCANNER_CACHE_ROOT`, and `REPO_SCANNER_INSTALL_ROOT` environment variables.
+
 ## Usage
 
 ```bash
