@@ -1,5 +1,11 @@
+import type { DryCheckResult } from "../code-duplication/types";
 import { classifyCase } from "../detectors/naming-convention/case-classifier";
-import type { DiffScanResult, RepoScanResult } from "../types";
+import type {
+  DiffDuplicationResult,
+  DiffScanResult,
+  EnvVarInfo,
+  RepoScanResult,
+} from "../types";
 
 const CONVENTION_CONFIDENCE_THRESHOLD = 60;
 const DEFAULT_IGNORED_PATH_SEGMENTS = [
@@ -63,14 +69,9 @@ export const resetDiffConventionOptions = (): void => {
   diffConventionOptions = DEFAULT_DIFF_CONVENTION_OPTIONS;
 };
 
-const TEST_FILE_PATTERNS = [
-  ".unit.spec.",
-  ".int.spec.",
-  ".e2e.spec.",
-  ".test.",
-];
+const TEST_FILE_PATTERNS = [".spec.", ".test."];
 
-const isLikelyTestFile = (filePath: string): boolean => {
+export const isLikelyTestFile = (filePath: string): boolean => {
   return TEST_FILE_PATTERNS.some((pattern) => filePath.includes(pattern));
 };
 
@@ -251,6 +252,21 @@ const buildConventionViolations = (
   });
 };
 
+/**
+ * Identify env vars that are net-new to the codebase.
+ * A var is "net-new" if ALL its usages are exclusively in changed files
+ * (meaning it didn't exist anywhere else in the baseline repo).
+ */
+export const computeNetNewEnvVars = (
+  allEnvVars: readonly EnvVarInfo[],
+  changedFiles: readonly string[],
+): EnvVarInfo[] => {
+  const changedSet = new Set(changedFiles);
+  return allEnvVars.filter(
+    (v) => v.usages.length > 0 && v.usages.every((u) => changedSet.has(u.file)),
+  );
+};
+
 export const buildDiffScanResult = (
   result: RepoScanResult,
   changedFiles: readonly string[],
@@ -258,6 +274,8 @@ export const buildDiffScanResult = (
     readonly historyBaselines?: Readonly<
       Record<string, ComponentHistoryConventionBaseline>
     >;
+    readonly dryCheck?: DryCheckResult;
+    readonly envCheck?: boolean;
   },
 ): DiffScanResult => {
   const dependencyGraph = result.architecture.crossPackageDeps;
@@ -318,6 +336,18 @@ export const buildDiffScanResult = (
     ...new Set([...changedFiles, ...testFilesToUpdate]),
   ];
 
+  const newDuplication: DiffDuplicationResult | undefined = options?.dryCheck
+    ? {
+        stats: options.dryCheck.stats,
+        groups: options.dryCheck.groups,
+      }
+    : undefined;
+
+  const newEnvVars =
+    options?.envCheck && result.inventory.envVars
+      ? computeNetNewEnvVars(result.inventory.envVars, changedFiles)
+      : undefined;
+
   return {
     changedFiles: [...changedFiles].sort(),
     affectedComponents,
@@ -327,5 +357,7 @@ export const buildDiffScanResult = (
     newTodos,
     newDeadExports,
     suggestedReviewFocus,
+    newDuplication,
+    newEnvVars,
   };
 };

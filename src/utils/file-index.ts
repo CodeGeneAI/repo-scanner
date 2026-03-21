@@ -66,6 +66,39 @@ export class FileIndex {
     this.ignoreMatcher = ignoreMatcher;
   }
 
+  /** Add a single entry to the index, updating all lookup maps. */
+  private addEntry(entry: IndexedFile): void {
+    this.files.push(entry);
+
+    const byNameList = this.byName.get(entry.name);
+    if (byNameList) byNameList.push(entry);
+    else this.byName.set(entry.name, [entry]);
+
+    const byExtList = this.byExt.get(entry.ext);
+    if (byExtList) byExtList.push(entry);
+    else this.byExt.set(entry.ext, [entry]);
+  }
+
+  /**
+   * Build a FileIndex from an explicit list of relative file paths.
+   * Used for diff-scoped scanning where the file list is already known.
+   * Skips the filesystem walk — O(n) on the input list only.
+   */
+  static fromPaths(
+    rootPath: string,
+    relativePaths: readonly string[],
+  ): FileIndex {
+    const index = new FileIndex(rootPath);
+    for (const rawRel of relativePaths) {
+      const rel = path.normalize(rawRel);
+      const abs = path.join(rootPath, rel);
+      const name = path.basename(rel);
+      const ext = path.extname(name).toLowerCase();
+      index.addEntry({ path: abs, name, ext, relativePath: rel });
+    }
+    return index;
+  }
+
   /** Build the index by walking the filesystem once. */
   static async build(rootPath: string): Promise<FileIndex> {
     const rootRules = await collectScanignoreRules(rootPath);
@@ -82,17 +115,7 @@ export class FileIndex {
       const name = path.basename(filePath);
       const ext = path.extname(name).toLowerCase();
       const relativePath = path.relative(rootPath, filePath);
-      const entry: IndexedFile = { path: filePath, name, ext, relativePath };
-
-      index.files.push(entry);
-
-      const byNameList = index.byName.get(name);
-      if (byNameList) byNameList.push(entry);
-      else index.byName.set(name, [entry]);
-
-      const byExtList = index.byExt.get(ext);
-      if (byExtList) byExtList.push(entry);
-      else index.byExt.set(ext, [entry]);
+      index.addEntry({ path: filePath, name, ext, relativePath });
     }
     return index;
   }

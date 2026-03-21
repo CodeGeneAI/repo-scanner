@@ -1,4 +1,5 @@
 import type { SolidHealthResult } from "./ast/solid/types";
+import type { DryCheckStats, DuplicateGroup } from "./code-duplication/types";
 import type {
   DependencyComponentGroupingMode,
   DepScannerResult,
@@ -343,6 +344,11 @@ export interface DiffConventionViolation {
   readonly violation: string;
 }
 
+export interface DiffDuplicationResult {
+  readonly stats: DryCheckStats;
+  readonly groups: readonly DuplicateGroup[];
+}
+
 export interface DiffScanResult {
   readonly changedFiles: readonly string[];
   readonly affectedComponents: readonly string[];
@@ -353,6 +359,8 @@ export interface DiffScanResult {
   readonly newDeadExports: readonly DeadExport[];
   readonly suggestedReviewFocus: readonly string[];
   readonly warnings?: readonly string[];
+  readonly newDuplication?: DiffDuplicationResult;
+  readonly newEnvVars?: readonly EnvVarInfo[];
 }
 
 export interface ExternalService {
@@ -410,6 +418,11 @@ export interface CliOptions {
   readonly topologyDiagrams?: readonly DiagramKind[];
   readonly topologyOutput?: string;
   readonly diff?: string;
+  readonly diffDryCheck: boolean;
+  readonly diffDryIncludeTests: boolean;
+  readonly diffEnvCheck: boolean;
+  readonly failOnNewDuplicationPct?: number;
+  readonly failOnNewEnvVars: boolean;
   readonly callGraph: boolean;
   readonly failOnDeadDeps: boolean;
   readonly failOnDeadDepsCount?: number;

@@ -112,6 +112,7 @@ export const resolveScanProfile = (
   // Preserve explicit opt-in behavior for these optional detectors.
   if (options.solid) enabledDetectorIds.add("solid-health");
   if (options.callGraph) enabledDetectorIds.add("call-graph");
+  if (options.diffEnvCheck) enabledDetectorIds.add("env");
 
   // Enable db-schema detector when explicitly requested or when ERD diagram is requested.
   // Note: bin.ts also calls setDbSchemaOptions() for runtime config; this adds the detector ID.

@@ -258,4 +258,43 @@ describe("scoped rules", () => {
       expect(matcher.ignores("critical.test.ts", false, "env")).toBe(false);
     });
   });
+
+  describe("dirOnly rules match files inside directory", () => {
+    it("anchored dirOnly rule matches files inside the directory", () => {
+      const rules = parseIgnoreFile("[env]\n/e2e/");
+      const matcher = buildIgnoreMatcher(rules);
+
+      // Directory itself still matches
+      expect(matcher.ignores("e2e", true, "env")).toBe(true);
+      // Files inside should also match
+      expect(matcher.ignores("e2e/setup/global.setup.ts", false, "env")).toBe(
+        true,
+      );
+      expect(matcher.ignores("e2e/helpers/utils.ts", false, "env")).toBe(true);
+      // Files outside should not match
+      expect(matcher.ignores("src/e2e-utils.ts", false, "env")).toBe(false);
+      expect(matcher.ignores("src/index.ts", false, "env")).toBe(false);
+    });
+
+    it("unanchored dirOnly rule matches files inside matching directories", () => {
+      const rules = parseIgnoreFile("[env]\nbench/");
+      const matcher = buildIgnoreMatcher(rules);
+
+      // Top-level
+      expect(matcher.ignores("bench/run.ts", false, "env")).toBe(true);
+      // Nested
+      expect(matcher.ignores("packages/foo/bench/perf.ts", false, "env")).toBe(
+        true,
+      );
+      // Non-matching
+      expect(matcher.ignores("benchmark.ts", false, "env")).toBe(false);
+    });
+
+    it("dirOnly rule does not apply without matching scope", () => {
+      const rules = parseIgnoreFile("[env]\n/e2e/");
+      const matcher = buildIgnoreMatcher(rules);
+
+      expect(matcher.ignores("e2e/setup/global.setup.ts", false)).toBe(false);
+    });
+  });
 });

@@ -107,6 +107,11 @@ Options:
                               Valid: architecture,dependency,dataflow,api-topology,erd,call-graph
   --topology-output <path>    Write topology diagrams to file instead of stdout
   --diff <range>              Diff-focused scan for changed files (e.g. HEAD~1, main...feature)
+  --diff-dry-check            Enable duplication scanning on changed files during diff mode
+  --diff-dry-include-tests    Include test files in diff duplication scan (excluded by default)
+  --diff-env-check            Enable new env var detection on changed files during diff mode
+  --fail-on-new-duplication-pct <n>  Exit with code 1 when diff duplication % exceeds n
+  --fail-on-new-env-vars      Exit with code 1 when net-new env vars are detected in diff
   --db-schema                 Enable database schema detection (tables, columns, relationships)
   --no-update-check           Suppress background update check for this run
   --version, -v               Show version number
@@ -229,6 +234,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let topologyDiagrams: DiagramKind[] | undefined;
   let topologyOutput: string | undefined;
   let diff: string | undefined;
+  let diffDryCheck = false;
+  let diffDryIncludeTests = false;
+  let diffEnvCheck = false;
+  let failOnNewDuplicationPct: number | undefined;
+  let failOnNewEnvVars = false;
   let failOnDeadDeps = false;
   let failOnDeadDepsCount: number | undefined;
   let includeDevDeadDeps = false;
@@ -505,6 +515,38 @@ export const parseArgs = (argv: string[]): CliOptions => {
         diff = value;
         break;
       }
+      case "--diff-dry-check":
+        diffDryCheck = true;
+        break;
+      case "--diff-dry-include-tests":
+        diffDryIncludeTests = true;
+        break;
+      case "--diff-env-check":
+        diffEnvCheck = true;
+        break;
+      case "--fail-on-new-duplication-pct": {
+        const raw =
+          args[++i] ??
+          failCliParse(
+            "Error: --fail-on-new-duplication-pct requires a numeric value.",
+          );
+        if (isFlagToken(raw)) {
+          failCliParse(
+            "Error: --fail-on-new-duplication-pct requires a numeric value.",
+          );
+        }
+        const parsed = Number.parseFloat(raw);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          failCliParse(
+            `Error: invalid fail-on-new-duplication-pct "${raw}". Value must be a non-negative number.`,
+          );
+        }
+        failOnNewDuplicationPct = parsed;
+        break;
+      }
+      case "--fail-on-new-env-vars":
+        failOnNewEnvVars = true;
+        break;
       case "--fail-on-dead-deps":
         failOnDeadDeps = true;
         break;
@@ -562,6 +604,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
     topologyDiagrams,
     topologyOutput,
     diff,
+    diffDryCheck,
+    diffDryIncludeTests,
+    diffEnvCheck,
+    failOnNewDuplicationPct,
+    failOnNewEnvVars,
     failOnDeadDeps,
     failOnDeadDepsCount,
     includeDevDeadDeps,

@@ -4,6 +4,8 @@ export type { DetectorResult, Finding } from "./detectors/types";
 export { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
 export {
   buildDiffScanResult,
+  computeNetNewEnvVars,
+  isLikelyTestFile,
   resetDiffConventionOptions,
   setDiffConventionOptions,
 } from "./diff/scan-diff";
@@ -33,6 +35,7 @@ export type {
   CrossPackageDependencyGraph,
   DeadExport,
   DependencyScanConfig,
+  DiffDuplicationResult,
   DiffScanResult,
   EnvValueType,
   EnvVarInfo,

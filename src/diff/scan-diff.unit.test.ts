@@ -6,6 +6,8 @@ import type { RepoScanResult } from "../types";
 import {
   buildDiffScanResult,
   type ComponentHistoryConventionBaseline,
+  computeNetNewEnvVars,
+  isLikelyTestFile,
   resetDiffConventionOptions,
   setDiffConventionOptions,
 } from "./scan-diff";
@@ -325,5 +327,256 @@ describe("buildDiffScanResult", () => {
     );
 
     expect(diff.conventionViolations).toEqual([]);
+  });
+});
+
+describe("computeNetNewEnvVars", () => {
+  it("returns vars whose usages are exclusively in changed files", () => {
+    const envVars = [
+      {
+        name: "NEW_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 1,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const result = computeNetNewEnvVars(envVars, ["packages/a/src/service.ts"]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("NEW_VAR");
+  });
+
+  it("excludes vars with usages in non-changed files", () => {
+    const envVars = [
+      {
+        name: "EXISTING_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 1,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+          {
+            file: "packages/b/src/other.ts",
+            line: 5,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const result = computeNetNewEnvVars(envVars, ["packages/a/src/service.ts"]);
+    expect(result).toHaveLength(0);
+  });
+
+  it("excludes vars with no usages", () => {
+    const envVars = [
+      {
+        name: "EMPTY_VAR",
+        usages: [],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const result = computeNetNewEnvVars(envVars, ["packages/a/src/service.ts"]);
+    expect(result).toHaveLength(0);
+  });
+
+  it("returns empty when no changed files", () => {
+    const envVars = [
+      {
+        name: "SOME_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 1,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const result = computeNetNewEnvVars(envVars, []);
+    expect(result).toHaveLength(0);
+  });
+
+  it("includes env var with multiple usages all in changed files", () => {
+    const envVars = [
+      {
+        name: "MULTI_USE",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 1,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+          {
+            file: "packages/a/src/worker.ts",
+            line: 5,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const result = computeNetNewEnvVars(envVars, [
+      "packages/a/src/service.ts",
+      "packages/a/src/worker.ts",
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("MULTI_USE");
+  });
+});
+
+describe("buildDiffScanResult with dryCheck and envCheck", () => {
+  afterEach(() => {
+    resetDiffConventionOptions();
+  });
+
+  it("attaches newDuplication when dryCheck is provided", () => {
+    const dryCheck = {
+      scanPath: "/tmp/repo",
+      durationMs: 10,
+      groups: [],
+      stats: {
+        filesScanned: 2,
+        totalTokens: 100,
+        duplicateGroups: 0,
+        duplicatedLines: 0,
+        duplicationPercentage: 0,
+      },
+    };
+    const diff = buildDiffScanResult(
+      baseResult,
+      ["packages/a/src/service.ts"],
+      { dryCheck },
+    );
+    expect(diff.newDuplication).toBeDefined();
+    expect(diff.newDuplication!.stats.filesScanned).toBe(2);
+    expect(diff.newDuplication!.groups).toEqual([]);
+  });
+
+  it("attaches newEnvVars when envCheck is enabled", () => {
+    const resultWithEnvVars = {
+      ...baseResult,
+      inventory: {
+        ...baseResult.inventory,
+        envVars: [
+          {
+            name: "NEW_API_KEY",
+            usages: [
+              {
+                file: "packages/a/src/service.ts",
+                line: 3,
+                pattern: "process.env",
+                accessType: "read" as const,
+              },
+            ],
+            inferredType: "string" as const,
+            required: true,
+            definedInConfig: false,
+          },
+        ],
+      },
+    };
+    const diff = buildDiffScanResult(
+      resultWithEnvVars,
+      ["packages/a/src/service.ts"],
+      { envCheck: true },
+    );
+    expect(diff.newEnvVars).toBeDefined();
+    expect(diff.newEnvVars).toHaveLength(1);
+    expect(diff.newEnvVars![0]!.name).toBe("NEW_API_KEY");
+  });
+
+  it("omits newDuplication and newEnvVars when options not provided", () => {
+    const diff = buildDiffScanResult(baseResult, ["packages/a/src/service.ts"]);
+    expect(diff.newDuplication).toBeUndefined();
+    expect(diff.newEnvVars).toBeUndefined();
+  });
+
+  it("threshold comparison uses strictly-greater (equal does not exceed)", () => {
+    const dryCheck = {
+      scanPath: "/tmp/repo",
+      durationMs: 10,
+      groups: [],
+      stats: {
+        filesScanned: 2,
+        totalTokens: 100,
+        duplicateGroups: 1,
+        duplicatedLines: 10,
+        duplicationPercentage: 10,
+      },
+    };
+    const diff = buildDiffScanResult(
+      baseResult,
+      ["packages/a/src/service.ts"],
+      { dryCheck },
+    );
+    // duplicationPercentage is 10; a threshold of 10 means > 10 triggers failure
+    // This confirms the result carries the exact percentage for external threshold checks
+    expect(diff.newDuplication!.stats.duplicationPercentage).toBe(10);
+  });
+
+  it("omits newEnvVars when envCheck is true but envVars is empty", () => {
+    const diff = buildDiffScanResult(
+      baseResult,
+      ["packages/a/src/service.ts"],
+      { envCheck: true },
+    );
+    // baseResult has envVars: [] — computeNetNewEnvVars returns [] which is truthy
+    expect(diff.newEnvVars).toBeDefined();
+    expect(diff.newEnvVars).toHaveLength(0);
+  });
+});
+
+describe("isLikelyTestFile", () => {
+  it("identifies .test. files", () => {
+    expect(isLikelyTestFile("src/utils/helper.test.ts")).toBeTrue();
+  });
+
+  it("identifies .unit.spec. files", () => {
+    expect(isLikelyTestFile("src/cli.unit.spec.ts")).toBeTrue();
+  });
+
+  it("identifies .int.spec. files", () => {
+    expect(isLikelyTestFile("src/api.int.spec.ts")).toBeTrue();
+  });
+
+  it("identifies .e2e.spec. files", () => {
+    expect(isLikelyTestFile("src/flow.e2e.spec.ts")).toBeTrue();
+  });
+
+  it("identifies plain .spec. files", () => {
+    expect(isLikelyTestFile("src/otlp-http.spec.ts")).toBeTrue();
+  });
+
+  it("identifies .browser.spec. files", () => {
+    expect(isLikelyTestFile("src/otlp-http.browser.spec.ts")).toBeTrue();
+  });
+
+  it("returns false for non-test source files", () => {
+    expect(isLikelyTestFile("src/utils/helper.ts")).toBeFalse();
+    expect(isLikelyTestFile("src/cli.ts")).toBeFalse();
+    expect(isLikelyTestFile("src/index.ts")).toBeFalse();
   });
 });

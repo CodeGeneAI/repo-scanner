@@ -3,12 +3,13 @@ import fs from "fs";
 import path from "path";
 import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import { scanForDuplicates } from "./code-duplication/scanner";
+import type { DryCheckResult } from "./code-duplication/types";
 import { evaluateDependencyPolicy } from "./dependency/policy";
 import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
 import { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
 import { getChangedFiles } from "./diff/git";
-import { buildDiffScanResult } from "./diff/scan-diff";
+import { buildDiffScanResult, isLikelyTestFile } from "./diff/scan-diff";
 import "./detectors/init";
 import { setDuplicationOptions } from "./detectors/code-duplication";
 import { setLargeFileThreshold } from "./detectors/large-file";
@@ -253,8 +254,36 @@ const main = async () => {
                 )
               : undefined;
 
+          // Diff-scoped duplication scan (changed files only, test files excluded by default)
+          let duplicationResult: DryCheckResult | undefined;
+          if (options.diffDryCheck && changedFiles.length > 0) {
+            const dryCheckFiles = options.diffDryIncludeTests
+              ? changedFiles
+              : changedFiles.filter((f) => !isLikelyTestFile(f));
+            const diffIndex = FileIndex.fromPaths(options.path, dryCheckFiles);
+            duplicationResult = await scanForDuplicates(
+              options.path,
+              diffIndex,
+              {
+                minTokens: options.minTokens,
+                minLines: options.minLines,
+                extensions:
+                  options.extensions.length > 0
+                    ? new Set(options.extensions)
+                    : undefined,
+                filters: {
+                  minUniqueRatio: options.minUniqueRatio,
+                  maxLiteralRatio: options.maxLiteralRatio,
+                  ignoreBarrelExports: options.ignoreBarrelExports,
+                },
+              },
+            );
+          }
+
           return buildDiffScanResult(result, changedFiles, {
             historyBaselines,
+            dryCheck: duplicationResult,
+            envCheck: options.diffEnvCheck,
           });
         })()
       : undefined;
@@ -328,6 +357,36 @@ const main = async () => {
   }
 
   if (policyEvaluation?.failed) {
+    await flushWritable(process.stdout);
+    process.exit(1);
+  }
+
+  // Diff-scan threshold checks
+  if (
+    diffScan?.newDuplication &&
+    options.failOnNewDuplicationPct !== undefined
+  ) {
+    if (
+      diffScan.newDuplication.stats.duplicationPercentage >
+      options.failOnNewDuplicationPct
+    ) {
+      process.stderr.write(
+        `diff-dry-check: duplication ${diffScan.newDuplication.stats.duplicationPercentage}% exceeds threshold ${options.failOnNewDuplicationPct}%\n`,
+      );
+      await flushWritable(process.stdout);
+      process.exit(1);
+    }
+  }
+
+  if (
+    options.failOnNewEnvVars &&
+    diffScan?.newEnvVars &&
+    diffScan.newEnvVars.length > 0
+  ) {
+    const names = diffScan.newEnvVars.map((v) => v.name).join(", ");
+    process.stderr.write(
+      `diff-env-check: ${diffScan.newEnvVars.length} new env var(s) detected: ${names}\n`,
+    );
     await flushWritable(process.stdout);
     process.exit(1);
   }

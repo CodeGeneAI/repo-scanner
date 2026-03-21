@@ -101,4 +101,19 @@ describe("resolveScanProfile", () => {
     expect(profile.allDetectors).toBeFalse();
     expect(profile.enabledDetectorIds).toContain("call-graph");
   });
+
+  it("adds env detector when --diff-env-check is used", () => {
+    const profile = resolveScanProfile(
+      parseArgs(["bun", "repo-scanner", "--diff", "HEAD", "--diff-env-check"]),
+    );
+
+    expect(profile.allDetectors).toBeFalse();
+    expect(profile.enabledDetectorIds).toContain("env");
+  });
+
+  it("does not add env detector by default", () => {
+    const profile = resolveScanProfile(parseArgs(["bun", "repo-scanner"]));
+
+    expect(profile.enabledDetectorIds).not.toContain("env");
+  });
 });

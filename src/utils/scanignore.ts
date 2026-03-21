@@ -134,8 +134,20 @@ const ruleMatches = (
   relativePath: string,
   isDirectory: boolean,
 ): boolean => {
-  // dirOnly rules only match directories
-  if (rule.dirOnly && !isDirectory) return false;
+  // dirOnly rules only match directories when checking a directory entry.
+  // When checking a file, a dirOnly rule still matches if the file lives
+  // inside the matched directory (gitignore semantics: "e2e/" ignores
+  // everything under e2e/).
+  if (rule.dirOnly && !isDirectory) {
+    const dirPrefix = rule.anchored ? `${rule.pattern}/` : `${rule.pattern}/`;
+    // Check if the file is inside the directory
+    if (rule.anchored) {
+      return relativePath.startsWith(dirPrefix);
+    }
+    // Unanchored: match against any path segment prefix
+    if (relativePath.startsWith(dirPrefix)) return true;
+    return relativePath.includes(`/${dirPrefix}`);
+  }
 
   const { pattern, anchored } = rule;
 
