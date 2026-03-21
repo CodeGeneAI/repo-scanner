@@ -84,7 +84,6 @@ export const generateDependencyDiagram = (
   );
 
   // Render edges
-  const circularNodeIds = new Set<string>();
   lines.push("");
   for (const edge of visibleEdges) {
     const fromId = pathToId.get(edge.from) ?? toNodeId(edge.from, seen);
@@ -100,8 +99,6 @@ export const generateDependencyDiagram = (
     }
 
     if (isCircular) {
-      circularNodeIds.add(fromId);
-      circularNodeIds.add(toId);
       lines.push(`  ${fromId} ==>|${label}| ${toId}`);
     } else if (edge.isDev) {
       lines.push(`  ${fromId} -.->|${label}| ${toId}`);
@@ -122,13 +119,6 @@ export const generateDependencyDiagram = (
         subLines.push(`    ${id}[${escapeLabel(label)}]`);
       }
     });
-  }
-
-  // Style nodes involved in circular dependencies
-  if (circularNodeIds.size > 0) {
-    lines.push("");
-    lines.push("  classDef circular fill:#fee,stroke:#f00,stroke-width:2px");
-    lines.push(`  class ${[...circularNodeIds].join(",")} circular`);
   }
 
   return {

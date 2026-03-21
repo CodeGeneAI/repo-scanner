@@ -70,21 +70,6 @@ export const generateApiTopologyDiagram = (
     }
   }
 
-  // Styling
-  lines.push("");
-  lines.push("  classDef proto fill:#8b5cf6,stroke:#7c3aed,color:#fff");
-  lines.push("  classDef svc fill:#10b981,stroke:#059669,color:#fff");
-
-  const protoIdList = [...protocolIds.values()];
-  const svcIdList = [...compIds.values()];
-
-  if (protoIdList.length > 0) {
-    lines.push(`  class ${protoIdList.join(",")} proto`);
-  }
-  if (svcIdList.length > 0) {
-    lines.push(`  class ${svcIdList.join(",")} svc`);
-  }
-
   return {
     kind: "api-topology",
     title: "API Topology",

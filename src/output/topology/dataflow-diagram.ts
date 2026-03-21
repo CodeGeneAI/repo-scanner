@@ -105,26 +105,6 @@ export const generateDataflowDiagram = (
     lines.push(`  ${edge.from} --> ${edge.to}`);
   }
 
-  // Styling
-  lines.push("");
-  const compIdList = [...componentIds.values()];
-  const dsIdList = [...datastoreIds.values()];
-  const svcIdList = [...serviceIds.values()];
-
-  lines.push("  classDef comp fill:#10b981,stroke:#059669,color:#fff");
-  lines.push("  classDef ds fill:#6366f1,stroke:#4f46e5,color:#fff");
-  lines.push("  classDef ext fill:#f59e0b,stroke:#d97706,color:#fff");
-
-  if (compIdList.length > 0) {
-    lines.push(`  class ${compIdList.join(",")} comp`);
-  }
-  if (dsIdList.length > 0) {
-    lines.push(`  class ${dsIdList.join(",")} ds`);
-  }
-  if (svcIdList.length > 0) {
-    lines.push(`  class ${svcIdList.join(",")} ext`);
-  }
-
   return {
     kind: "dataflow",
     title: "Data Flow",

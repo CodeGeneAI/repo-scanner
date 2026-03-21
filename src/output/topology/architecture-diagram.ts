@@ -160,31 +160,6 @@ export const generateArchitectureDiagram = (
     }
   }
 
-  // Styling
-  lines.push("");
-  lines.push("  classDef app fill:#4a9eff,stroke:#2b7de9,color:#fff");
-  lines.push("  classDef svc fill:#10b981,stroke:#059669,color:#fff");
-  lines.push("  classDef worker fill:#f59e0b,stroke:#d97706,color:#fff");
-
-  if (apps.length > 0) {
-    const appIds = apps.map((c) => pathToId.get(c.path)).filter(Boolean);
-    if (appIds.length > 0) {
-      lines.push(`  class ${appIds.join(",")} app`);
-    }
-  }
-  if (apiServices.length > 0) {
-    const svcIds = apiServices.map((c) => pathToId.get(c.path)).filter(Boolean);
-    if (svcIds.length > 0) {
-      lines.push(`  class ${svcIds.join(",")} svc`);
-    }
-  }
-  if (workers.length > 0) {
-    const workerIds = workers.map((c) => pathToId.get(c.path)).filter(Boolean);
-    if (workerIds.length > 0) {
-      lines.push(`  class ${workerIds.join(",")} worker`);
-    }
-  }
-
   return {
     kind: "architecture",
     title: "Architecture Overview",

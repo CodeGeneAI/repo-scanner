@@ -116,9 +116,6 @@ describe("generateDependencyDiagram", () => {
     const diagram = generateDependencyDiagram(result)!;
     // Circular edges should use thick arrows
     expect(diagram.mermaid).toContain("==>");
-    // Circular nodes get classDef styling
-    expect(diagram.mermaid).toContain("classDef circular");
-    expect(diagram.mermaid).toContain("class ");
   });
 
   it("annotates layer violations on edges", () => {

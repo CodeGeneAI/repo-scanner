@@ -157,20 +157,6 @@ describe("generateArchitectureDiagram", () => {
     expect(diagram.mermaid).not.toContain("@codegeneai");
   });
 
-  it("applies classDef styling for apps, services, and workers", () => {
-    const result = makeResult([
-      makeComponent("web", "app"),
-      makeComponent("api", "service"),
-      makeComponent("worker", "service", "services/worker", {
-        platform: "worker",
-      }),
-    ]);
-    const diagram = generateArchitectureDiagram(result)!;
-    expect(diagram.mermaid).toContain("classDef app");
-    expect(diagram.mermaid).toContain("classDef svc");
-    expect(diagram.mermaid).toContain("classDef worker");
-  });
-
   it("promotes packages with secondary kind 'app' to Apps subgraph", () => {
     const result = makeResult([
       makeComponent("web", "app"),
