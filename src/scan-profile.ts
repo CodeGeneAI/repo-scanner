@@ -101,6 +101,15 @@ export const resolveScanProfile = (
     };
   }
 
+  // VCS-only mode: skip all section detectors, run only the VCS detector.
+  if (options.vcs && !hasExplicitSectionFlags(options)) {
+    return {
+      allDetectors: false,
+      selectedSections: [],
+      enabledDetectorIds: ["vcs"],
+    };
+  }
+
   const selectedSections = resolveSelectedSections(options);
   const enabledDetectorIds = new Set<string>();
   for (const section of selectedSections) {
@@ -108,6 +117,9 @@ export const resolveScanProfile = (
       enabledDetectorIds.add(detectorId);
     }
   }
+
+  // VCS detection is always enabled — it provides fundamental repo metadata.
+  enabledDetectorIds.add("vcs");
 
   // Preserve explicit opt-in behavior for these optional detectors.
   if (options.solid) enabledDetectorIds.add("solid-health");

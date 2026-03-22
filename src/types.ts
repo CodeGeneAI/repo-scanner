@@ -95,8 +95,18 @@ export interface LanguageStats {
   readonly percentage: number; // 0–100, rounded to 1 decimal
 }
 
+export interface VcsInfo {
+  readonly type: string;
+  readonly provider?: string;
+  readonly originUrl?: string;
+  readonly defaultBranch?: string;
+  readonly currentBranch?: string;
+  readonly branches?: readonly string[];
+}
+
 export interface RepoScanResult {
   readonly dependencies?: DepScannerResult;
+  readonly vcs?: VcsInfo;
   readonly inventory: {
     readonly languages: readonly string[];
     readonly languageStats: readonly LanguageStats[];
@@ -428,6 +438,7 @@ export interface CliOptions {
   readonly failOnDeadDepsCount?: number;
   readonly includeDevDeadDeps: boolean;
   readonly dbSchema: boolean;
+  readonly vcs: boolean;
 }
 export interface DependencyScanConfig {
   readonly enabled: boolean;

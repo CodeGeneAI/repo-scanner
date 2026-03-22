@@ -16,6 +16,7 @@ import type {
   RepoScanResult,
   RuntimeInfo,
   TodoAnnotation,
+  VcsInfo,
 } from "../types";
 import type { FileIndex } from "../utils/file-index";
 import {
@@ -81,6 +82,7 @@ export const aggregate = async (
   let externalServices: readonly ExternalService[] | undefined;
   let databaseSchema: DatabaseSchema | undefined;
   let callGraph: CallGraph | undefined;
+  let vcsInfo: VcsInfo | undefined;
   let namingConventions:
     | readonly {
         category: string;
@@ -324,6 +326,11 @@ export const aggregate = async (
       }
     }
 
+    // Extract VCS info
+    if (result.detectorId === "vcs" && result.metadata?.vcsInfo) {
+      vcsInfo = result.metadata.vcsInfo as VcsInfo;
+    }
+
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
@@ -373,6 +380,7 @@ export const aggregate = async (
   }
 
   return {
+    vcs: vcsInfo,
     inventory: {
       languages: sorted(languages),
       languageStats,

@@ -76,6 +76,7 @@ const buildSectionJsonPayload = (
     scanPath: result.scanPath,
     timestamp: result.timestamp,
     durationMs: result.durationMs,
+    ...(result.vcs ? { vcs: result.vcs } : {}),
   };
 
   if (sectionSet.has("architecture")) {
@@ -287,6 +288,44 @@ const main = async () => {
           });
         })()
       : undefined;
+
+  // VCS-only mode: output just the VCS info and exit.
+  const vcsOnlyMode = options.vcs && !hasExplicitSectionOutputFlags(options);
+  if (vcsOnlyMode) {
+    if (options.format === "json") {
+      renderJson(
+        {
+          scanPath: result.scanPath,
+          timestamp: result.timestamp,
+          durationMs: result.durationMs,
+          vcs: result.vcs ?? null,
+        },
+        process.stdout,
+      );
+    } else {
+      const vcs = result.vcs;
+      if (vcs) {
+        process.stdout.write("VCS Info\n");
+        process.stdout.write(`  Type:            ${vcs.type}\n`);
+        if (vcs.provider)
+          process.stdout.write(`  Provider:        ${vcs.provider}\n`);
+        if (vcs.originUrl)
+          process.stdout.write(`  Origin URL:      ${vcs.originUrl}\n`);
+        if (vcs.currentBranch)
+          process.stdout.write(`  Current Branch:  ${vcs.currentBranch}\n`);
+        if (vcs.defaultBranch)
+          process.stdout.write(`  Default Branch:  ${vcs.defaultBranch}\n`);
+        if (vcs.branches && vcs.branches.length > 0) {
+          process.stdout.write(
+            `  Branches:        ${vcs.branches.join(", ")}\n`,
+          );
+        }
+      } else {
+        process.stdout.write("No VCS detected.\n");
+      }
+    }
+    return;
+  }
 
   const sectionOutputExplicitlyRequested =
     hasExplicitSectionOutputFlags(options) || options.allDetectors;

@@ -113,6 +113,7 @@ Options:
   --fail-on-new-duplication-pct <n>  Exit with code 1 when diff duplication % exceeds n
   --fail-on-new-env-vars      Exit with code 1 when net-new env vars are detected in diff
   --db-schema                 Enable database schema detection (tables, columns, relationships)
+  --vcs                       Output VCS info only (type, provider, origin URL, branches)
   --no-update-check           Suppress background update check for this run
   --version, -v               Show version number
   --help, -h                  Show this help text
@@ -243,6 +244,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let failOnDeadDepsCount: number | undefined;
   let includeDevDeadDeps = false;
   let dbSchema = false;
+  let vcs = false;
 
   // Detect positional subcommand as the first non-flag argument.
   if (args[0] === "update") {
@@ -559,6 +561,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--include-dev-dead-deps":
         includeDevDeadDeps = true;
         break;
+      case "--vcs":
+        vcs = true;
+        break;
     }
   }
 
@@ -613,6 +618,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     failOnDeadDepsCount,
     includeDevDeadDeps,
     dbSchema,
+    vcs,
   };
 };
 
