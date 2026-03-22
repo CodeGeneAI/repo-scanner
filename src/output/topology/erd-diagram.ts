@@ -143,20 +143,20 @@ export const generateErdDiagram = (
     groups.get(group)!.push(table);
   }
 
-  // Single group (or all ungrouped) — produce one diagram as before
+  const combinedErd = generateSingleErd(
+    schema.tables,
+    schema.relationships,
+    new Set(),
+    "Entity-Relationship Diagram",
+  );
+
+  // Single group (or all ungrouped) — produce one diagram
   if (groups.size <= 1) {
-    return [
-      generateSingleErd(
-        schema.tables,
-        schema.relationships,
-        new Set(),
-        "Entity-Relationship Diagram",
-      ),
-    ];
+    return [combinedErd];
   }
 
-  // Multiple groups — one ERD per group
-  const diagrams: DiagramOutput[] = [];
+  // Multiple groups — combined ERD first, then one ERD per group
+  const diagrams: DiagramOutput[] = [combinedErd];
 
   for (const [groupName, groupTables] of groups) {
     const groupTableNames = new Set(groupTables.map((t) => t.name));
