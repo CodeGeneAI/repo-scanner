@@ -32,6 +32,7 @@ export interface TableInfo {
   readonly columns: readonly ColumnInfo[];
   readonly primaryKey?: readonly string[];
   readonly source: SchemaSource;
+  readonly databaseGroup?: string;
 }
 
 /** A relationship between two tables. */

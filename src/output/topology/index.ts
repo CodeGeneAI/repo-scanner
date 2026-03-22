@@ -12,7 +12,9 @@ import {
   type TopologyResult,
 } from "./types";
 
-type DiagramGenerator = (result: RepoScanResult) => DiagramOutput | null;
+type DiagramGenerator = (
+  result: RepoScanResult,
+) => DiagramOutput | DiagramOutput[] | null;
 
 const GENERATORS: Record<DiagramKind, DiagramGenerator> = {
   architecture: generateArchitectureDiagram,
@@ -40,9 +42,13 @@ export const generateTopology = (
   for (const kind of requested) {
     const generator = GENERATORS[kind];
     if (!generator) continue;
-    const diagram = generator(result);
-    if (diagram) {
-      diagrams.push(diagram);
+    const output = generator(result);
+    if (output) {
+      if (Array.isArray(output)) {
+        diagrams.push(...output);
+      } else {
+        diagrams.push(output);
+      }
     }
   }
 

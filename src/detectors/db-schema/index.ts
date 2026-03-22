@@ -2,6 +2,7 @@ import type { FileIndex } from "../../utils/file-index";
 import { registerDetector } from "../registry";
 import { createFindingAdder } from "../shared";
 import type { DetectorResult } from "../types";
+import { assignDatabaseGroups } from "./group-utils";
 import { parseDjangoFiles } from "./parsers/django";
 import { parseDrizzleFiles } from "./parsers/drizzle";
 import { parsePrismaFiles } from "./parsers/prisma";
@@ -113,6 +114,7 @@ export const mergeTables = (allTables: readonly TableInfo[]): TableInfo[] => {
     const mergedPk = winner.primaryKey ?? loser.primaryKey;
 
     byName.set(normalized, {
+      ...winner,
       name: normalized,
       columns: [...columnMap.values()],
       primaryKey: mergedPk,
@@ -216,6 +218,8 @@ registerDetector({
           !droppedTableNames.has(normalizeTableName(r.to.table)),
       );
     }
+
+    mergedTables = assignDatabaseGroups(mergedTables);
 
     const totalColumns = mergedTables.reduce(
       (sum, t) => sum + t.columns.length,

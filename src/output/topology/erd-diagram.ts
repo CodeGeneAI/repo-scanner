@@ -2,6 +2,7 @@ import type {
   ColumnInfo,
   DatabaseSchema,
   RelationshipInfo,
+  TableInfo,
 } from "../../detectors/db-schema/types";
 import type { RepoScanResult } from "../../types";
 import type { DiagramOutput } from "./types";
@@ -56,23 +57,20 @@ const relationshipNotation = (type: RelationshipInfo["type"]): string => {
 };
 
 /**
- * Generate a Mermaid erDiagram from the database schema in a RepoScanResult.
- * Returns null when no schema data is available.
+ * Generate a single Mermaid erDiagram for a set of tables and relationships.
+ * Tables in `stubTables` are rendered as empty entity blocks (no columns).
  */
-export const generateErdDiagram = (
-  result: RepoScanResult,
-): DiagramOutput | null => {
-  const schema: DatabaseSchema | undefined = result.inventory.databaseSchema;
-
-  if (!schema || schema.tables.length === 0) return null;
-
+const generateSingleErd = (
+  tables: readonly TableInfo[],
+  relationships: readonly RelationshipInfo[],
+  stubTableNames: ReadonlySet<string>,
+  title: string,
+): DiagramOutput => {
   const lines: string[] = ["erDiagram"];
-
-  // Track sanitized table names for relationship validation
   const knownTables = new Set<string>();
 
-  // Render entity blocks
-  for (const table of schema.tables) {
+  // Render entity blocks for real tables
+  for (const table of tables) {
     const tableName = sanitizeName(table.name);
     knownTables.add(tableName);
 
@@ -87,10 +85,21 @@ export const generateErdDiagram = (
     lines.push("  }");
   }
 
+  // Render stub entities (cross-group references)
+  for (const stubName of stubTableNames) {
+    const sanitized = sanitizeName(stubName);
+    if (!knownTables.has(sanitized)) {
+      knownTables.add(sanitized);
+      lines.push("");
+      lines.push(`  ${sanitized} {`);
+      lines.push("  }");
+    }
+  }
+
   // Render relationships
-  if (schema.relationships.length > 0) {
+  if (relationships.length > 0) {
     lines.push("");
-    for (const rel of schema.relationships) {
+    for (const rel of relationships) {
       const fromTable = sanitizeName(rel.from.table);
       const toTable = sanitizeName(rel.to.table);
 
@@ -105,7 +114,81 @@ export const generateErdDiagram = (
 
   return {
     kind: "erd",
-    title: "Entity-Relationship Diagram",
+    title,
     mermaid: lines.join("\n"),
   };
+};
+
+/**
+ * Generate Mermaid erDiagram(s) from the database schema in a RepoScanResult.
+ *
+ * When tables belong to multiple database groups (inferred from source file
+ * paths), generates one ERD per group. Cross-group relationships are included
+ * with the foreign table rendered as a stub entity (empty block).
+ *
+ * Returns null when no schema data is available.
+ */
+export const generateErdDiagram = (
+  result: RepoScanResult,
+): DiagramOutput[] | null => {
+  const schema: DatabaseSchema | undefined = result.inventory.databaseSchema;
+
+  if (!schema || schema.tables.length === 0) return null;
+
+  // Group tables by databaseGroup (undefined = ungrouped)
+  const groups = new Map<string | undefined, TableInfo[]>();
+  for (const table of schema.tables) {
+    const group = table.databaseGroup;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group)!.push(table);
+  }
+
+  // Single group (or all ungrouped) — produce one diagram as before
+  if (groups.size <= 1) {
+    return [
+      generateSingleErd(
+        schema.tables,
+        schema.relationships,
+        new Set(),
+        "Entity-Relationship Diagram",
+      ),
+    ];
+  }
+
+  // Multiple groups — one ERD per group
+  const diagrams: DiagramOutput[] = [];
+
+  for (const [groupName, groupTables] of groups) {
+    const groupTableNames = new Set(groupTables.map((t) => t.name));
+    const stubTables = new Set<string>();
+
+    // Find relationships relevant to this group
+    const groupRelationships: RelationshipInfo[] = [];
+    for (const rel of schema.relationships) {
+      const fromInGroup = groupTableNames.has(rel.from.table);
+      const toInGroup = groupTableNames.has(rel.to.table);
+
+      if (fromInGroup && toInGroup) {
+        // Both tables in this group — include normally
+        groupRelationships.push(rel);
+      } else if (fromInGroup) {
+        // from is here, to is in another group — stub the foreign table
+        groupRelationships.push(rel);
+        stubTables.add(rel.to.table);
+      } else if (toInGroup) {
+        // to is here, from is in another group — stub the foreign table
+        groupRelationships.push(rel);
+        stubTables.add(rel.from.table);
+      }
+    }
+
+    const label = groupName ?? "default";
+    const title = `Entity-Relationship Diagram (${label})`;
+
+    diagrams.push(
+      generateSingleErd(groupTables, groupRelationships, stubTables, title),
+    );
+  }
+
+  return diagrams;
 };

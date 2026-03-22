@@ -8,8 +8,8 @@ import type {
 import type { RepoScanResult } from "../../types";
 import { generateErdDiagram } from "./erd-diagram";
 
-const makeSource = () =>
-  ({ file: "schema.sql", parser: "sql" as const, confidence: 0.95 }) as const;
+const makeSource = (file = "schema.sql") =>
+  ({ file, parser: "sql" as const, confidence: 0.95 }) as const;
 
 const makeColumn = (
   name: string,
@@ -25,11 +25,13 @@ const makeTable = (
   name: string,
   columns: ColumnInfo[],
   primaryKey?: string[],
+  opts?: { sourceFile?: string; databaseGroup?: string },
 ): TableInfo => ({
   name,
   columns,
   primaryKey,
-  source: makeSource(),
+  source: makeSource(opts?.sourceFile),
+  ...(opts?.databaseGroup ? { databaseGroup: opts.databaseGroup } : {}),
 });
 
 const makeRelationship = (
@@ -69,6 +71,12 @@ const makeResult = (schema?: DatabaseSchema): RepoScanResult =>
     durationMs: 0,
   }) as unknown as RepoScanResult;
 
+/** Helper to get the first (or only) diagram from the result. */
+const firstDiagram = (result: RepoScanResult) => {
+  const diagrams = generateErdDiagram(result);
+  return diagrams ? diagrams[0]! : null;
+};
+
 describe("generateErdDiagram", () => {
   // --- Null / empty cases ---
 
@@ -88,7 +96,7 @@ describe("generateErdDiagram", () => {
     const schema = makeSchema([
       makeTable("users", [makeColumn("id", "int", { isPrimaryKey: true })]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema));
+    const diagram = firstDiagram(makeResult(schema));
     expect(diagram).not.toBeNull();
     expect(diagram!.mermaid).toMatch(/^erDiagram/);
   });
@@ -100,7 +108,7 @@ describe("generateErdDiagram", () => {
         makeColumn("email", "varchar"),
       ]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("users {");
     expect(diagram.mermaid).toContain("int id PK");
     expect(diagram.mermaid).toContain("varchar email");
@@ -118,7 +126,7 @@ describe("generateErdDiagram", () => {
         makeColumn("total", "decimal"),
       ]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("int id PK");
     expect(diagram.mermaid).toContain("int user_id FK");
     expect(diagram.mermaid).not.toMatch(/decimal total (PK|FK)/);
@@ -129,7 +137,7 @@ describe("generateErdDiagram", () => {
       makeTable("user-profiles", [makeColumn("id", "int")]),
       makeTable("auth.tokens", [makeColumn("id", "int")]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("user_profiles {");
     expect(diagram.mermaid).toContain("auth_tokens {");
     expect(diagram.mermaid).not.toContain("user-profiles");
@@ -143,7 +151,7 @@ describe("generateErdDiagram", () => {
         makeColumn("balance", "double precision"),
       ]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("character_varying name");
     expect(diagram.mermaid).toContain("double_precision balance");
   });
@@ -152,7 +160,7 @@ describe("generateErdDiagram", () => {
     const schema = makeSchema([
       makeTable("2fa_tokens", [makeColumn("id", "int")]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("_2fa_tokens {");
   });
 
@@ -165,7 +173,7 @@ describe("generateErdDiagram", () => {
         makeColumn("created_at", "TIMESTAMP WITH TIME ZONE"),
       ]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("VARCHAR_255 name");
     expect(diagram.mermaid).toContain("NUMERIC_10_2 balance");
     expect(diagram.mermaid).toContain("VARCHAR_50 flag");
@@ -175,7 +183,7 @@ describe("generateErdDiagram", () => {
 
   it("defaults to unknown for empty column type", () => {
     const schema = makeSchema([makeTable("users", [makeColumn("id", "")])]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("unknown id");
   });
 
@@ -188,25 +196,25 @@ describe("generateErdDiagram", () => {
         }),
       ]),
     ]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("int user_id PK");
     expect(diagram.mermaid).not.toContain("FK");
   });
 
   it("handles table names that are entirely special characters", () => {
     const schema = makeSchema([makeTable("@#$%", [makeColumn("id", "int")])]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("unknown {");
   });
 
   it("returns correct kind and title", () => {
     const schema = makeSchema([makeTable("users", [makeColumn("id", "int")])]);
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.kind).toBe("erd");
     expect(diagram.title).toBe("Entity-Relationship Diagram");
   });
 
-  // --- Relationship rendering (Inc 03) ---
+  // --- Relationship rendering ---
 
   it("renders one-to-many relationship", () => {
     const schema = makeSchema(
@@ -219,7 +227,7 @@ describe("generateErdDiagram", () => {
       ],
       [makeRelationship("users", "id", "orders", "user_id", "one-to-many")],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("users ||--o{ orders");
   });
 
@@ -233,7 +241,7 @@ describe("generateErdDiagram", () => {
       ],
       [makeRelationship("users", "id", "profiles", "user_id", "one-to-one")],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("users ||--|| profiles");
   });
 
@@ -247,7 +255,7 @@ describe("generateErdDiagram", () => {
       ],
       [makeRelationship("students", "id", "courses", "id", "many-to-many")],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("students }o--o{ courses");
   });
 
@@ -259,7 +267,7 @@ describe("generateErdDiagram", () => {
       ],
       [makeRelationship("users", "id", "orders", "user_id", "one-to-many")],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toMatch(/users \|\|--o\{ orders : "id"/);
   });
 
@@ -276,7 +284,7 @@ describe("generateErdDiagram", () => {
         ),
       ],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).not.toContain("ghost_table");
   });
 
@@ -289,7 +297,7 @@ describe("generateErdDiagram", () => {
       ],
       [makeRelationship("users", "id", "orders", "user_id", "one-to-many")],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toContain("users {");
     expect(diagram.mermaid).toContain("orders {");
     expect(diagram.mermaid).toContain("audit_log {");
@@ -338,7 +346,7 @@ describe("generateErdDiagram", () => {
         ),
       ],
     );
-    const diagram = generateErdDiagram(makeResult(schema))!;
+    const diagram = firstDiagram(makeResult(schema))!;
     expect(diagram.mermaid).toMatch(/^erDiagram/);
     expect(diagram.mermaid).toContain("users {");
     expect(diagram.mermaid).toContain("orders {");
@@ -347,5 +355,294 @@ describe("generateErdDiagram", () => {
     expect(diagram.mermaid).toContain("users ||--o{ orders");
     expect(diagram.mermaid).toContain("orders ||--o{ order_items");
     expect(diagram.mermaid).toContain("products ||--o{ order_items");
+  });
+
+  // --- Return type ---
+
+  it("returns an array with one diagram for single-group tables", () => {
+    const schema = makeSchema([makeTable("users", [makeColumn("id", "int")])]);
+    const diagrams = generateErdDiagram(makeResult(schema))!;
+    expect(Array.isArray(diagrams)).toBe(true);
+    expect(diagrams).toHaveLength(1);
+  });
+
+  // --- Multi-database group tests ---
+
+  describe("multi-database groups", () => {
+    it("produces separate diagrams for tables in different database groups", () => {
+      const schema = makeSchema([
+        makeTable("users", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("roles", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("projects", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "project",
+        }),
+      ]);
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      expect(diagrams).toHaveLength(2);
+
+      const authDiagram = diagrams.find((d) => d.title.includes("(auth)"))!;
+      const projectDiagram = diagrams.find((d) =>
+        d.title.includes("(project)"),
+      )!;
+
+      expect(authDiagram).toBeDefined();
+      expect(projectDiagram).toBeDefined();
+
+      expect(authDiagram.mermaid).toContain("users {");
+      expect(authDiagram.mermaid).toContain("roles {");
+      expect(authDiagram.mermaid).not.toContain("projects {");
+
+      expect(projectDiagram.mermaid).toContain("projects {");
+      expect(projectDiagram.mermaid).not.toContain("users {");
+    });
+
+    it("includes group name in diagram title", () => {
+      const schema = makeSchema([
+        makeTable("users", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("projects", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "pm",
+        }),
+      ]);
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      expect(diagrams[0]!.title).toBe("Entity-Relationship Diagram (auth)");
+      expect(diagrams[1]!.title).toBe("Entity-Relationship Diagram (pm)");
+    });
+
+    it("all diagrams have kind erd", () => {
+      const schema = makeSchema([
+        makeTable("users", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("projects", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "pm",
+        }),
+      ]);
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      for (const d of diagrams) {
+        expect(d.kind).toBe("erd");
+      }
+    });
+
+    it("includes cross-group relationships with stub entities", () => {
+      const schema = makeSchema(
+        [
+          makeTable(
+            "users",
+            [makeColumn("id", "int", { isPrimaryKey: true })],
+            undefined,
+            { databaseGroup: "auth" },
+          ),
+          makeTable(
+            "projects",
+            [
+              makeColumn("id", "int", { isPrimaryKey: true }),
+              makeColumn("owner_id", "int", { isForeignKey: true }),
+            ],
+            undefined,
+            { databaseGroup: "pm" },
+          ),
+        ],
+        [
+          makeRelationship(
+            "users",
+            "id",
+            "projects",
+            "owner_id",
+            "one-to-many",
+          ),
+        ],
+      );
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+
+      const authDiagram = diagrams.find((d) => d.title.includes("(auth)"))!;
+      const pmDiagram = diagrams.find((d) => d.title.includes("(pm)"))!;
+
+      // Auth diagram should have the relationship and projects as a stub
+      expect(authDiagram.mermaid).toContain("users ||--o{ projects");
+      expect(authDiagram.mermaid).toContain("projects {");
+      // Stub entity should have no columns (just opening and closing braces)
+      const projectsBlock = authDiagram.mermaid
+        .split("projects {")[1]!
+        .split("}")[0]!;
+      expect(projectsBlock.trim()).toBe("");
+
+      // PM diagram should have the relationship and users as a stub
+      expect(pmDiagram.mermaid).toContain("users ||--o{ projects");
+      expect(pmDiagram.mermaid).toContain("users {");
+      const usersBlock = pmDiagram.mermaid.split("users {")[1]!.split("}")[0]!;
+      expect(usersBlock.trim()).toBe("");
+    });
+
+    it("renders intra-group relationships normally", () => {
+      const schema = makeSchema(
+        [
+          makeTable(
+            "users",
+            [makeColumn("id", "int", { isPrimaryKey: true })],
+            undefined,
+            { databaseGroup: "auth" },
+          ),
+          makeTable(
+            "roles",
+            [
+              makeColumn("id", "int", { isPrimaryKey: true }),
+              makeColumn("user_id", "int", { isForeignKey: true }),
+            ],
+            undefined,
+            { databaseGroup: "auth" },
+          ),
+          makeTable(
+            "projects",
+            [makeColumn("id", "int", { isPrimaryKey: true })],
+            undefined,
+            { databaseGroup: "pm" },
+          ),
+        ],
+        [makeRelationship("users", "id", "roles", "user_id", "one-to-many")],
+      );
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      const authDiagram = diagrams.find((d) => d.title.includes("(auth)"))!;
+
+      expect(authDiagram.mermaid).toContain("users ||--o{ roles");
+      // Roles should have its columns (not a stub)
+      expect(authDiagram.mermaid).toContain("int user_id FK");
+    });
+
+    it("produces single diagram when all tables have the same databaseGroup", () => {
+      const schema = makeSchema([
+        makeTable("users", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("roles", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+      ]);
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      expect(diagrams).toHaveLength(1);
+      expect(diagrams[0]!.title).toBe("Entity-Relationship Diagram");
+    });
+
+    it("handles three or more database groups", () => {
+      const schema = makeSchema([
+        makeTable("users", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("projects", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "pm",
+        }),
+        makeTable("events", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "events",
+        }),
+      ]);
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      expect(diagrams).toHaveLength(3);
+      expect(diagrams.map((d) => d.title)).toEqual([
+        "Entity-Relationship Diagram (auth)",
+        "Entity-Relationship Diagram (pm)",
+        "Entity-Relationship Diagram (events)",
+      ]);
+    });
+
+    it("renders stub entity in multiple groups when table has cross-group relationships", () => {
+      const schema = makeSchema(
+        [
+          makeTable(
+            "users",
+            [makeColumn("id", "int", { isPrimaryKey: true })],
+            undefined,
+            { databaseGroup: "auth" },
+          ),
+          makeTable(
+            "projects",
+            [makeColumn("owner_id", "int", { isForeignKey: true })],
+            undefined,
+            { databaseGroup: "pm" },
+          ),
+          makeTable(
+            "audit_log",
+            [makeColumn("actor_id", "int", { isForeignKey: true })],
+            undefined,
+            { databaseGroup: "audit" },
+          ),
+        ],
+        [
+          makeRelationship(
+            "users",
+            "id",
+            "projects",
+            "owner_id",
+            "one-to-many",
+          ),
+          makeRelationship(
+            "users",
+            "id",
+            "audit_log",
+            "actor_id",
+            "one-to-many",
+          ),
+        ],
+      );
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+
+      // Users table should appear as stub in both pm and audit diagrams
+      const pmDiagram = diagrams.find((d) => d.title.includes("(pm)"))!;
+      const auditDiagram = diagrams.find((d) => d.title.includes("(audit)"))!;
+
+      expect(pmDiagram.mermaid).toContain("users {");
+      expect(auditDiagram.mermaid).toContain("users {");
+    });
+
+    it("skips relationships where neither table is in the current group", () => {
+      const schema = makeSchema(
+        [
+          makeTable("users", [makeColumn("id", "int")], undefined, {
+            databaseGroup: "auth",
+          }),
+          makeTable("projects", [makeColumn("id", "int")], undefined, {
+            databaseGroup: "pm",
+          }),
+          makeTable("events", [makeColumn("id", "int")], undefined, {
+            databaseGroup: "events",
+          }),
+        ],
+        [
+          makeRelationship(
+            "users",
+            "id",
+            "projects",
+            "owner_id",
+            "one-to-many",
+          ),
+        ],
+      );
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      const eventsDiagram = diagrams.find((d) => d.title.includes("(events)"))!;
+
+      // Events diagram should not contain the users->projects relationship
+      expect(eventsDiagram.mermaid).not.toContain("users");
+      expect(eventsDiagram.mermaid).not.toContain("projects");
+    });
+
+    it("handles mixed undefined and defined databaseGroup", () => {
+      const schema = makeSchema([
+        makeTable("users", [makeColumn("id", "int")], undefined, {
+          databaseGroup: "auth",
+        }),
+        makeTable("config", [makeColumn("id", "int")]),
+      ]);
+      const diagrams = generateErdDiagram(makeResult(schema))!;
+      expect(diagrams).toHaveLength(2);
+      // Undefined group should get "default" in title
+      const defaultDiagram = diagrams.find((d) =>
+        d.title.includes("(default)"),
+      );
+      expect(defaultDiagram).toBeDefined();
+    });
   });
 });
