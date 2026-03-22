@@ -102,6 +102,19 @@ export interface VcsInfo {
   readonly defaultBranch?: string;
   readonly currentBranch?: string;
   readonly branches?: readonly string[];
+  readonly metadataSources?: Partial<
+    Record<
+      "originUrl" | "provider" | "currentBranch" | "defaultBranch" | "branches",
+      string
+    >
+  >;
+  readonly metadataConfidence?: Partial<
+    Record<
+      "originUrl" | "provider" | "currentBranch" | "defaultBranch" | "branches",
+      number
+    >
+  >;
+  readonly branchSources?: Record<string, readonly string[]>;
 }
 
 export interface RepoScanResult {
