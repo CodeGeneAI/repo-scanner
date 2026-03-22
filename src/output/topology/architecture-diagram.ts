@@ -16,7 +16,8 @@ const buildLabel = (component: Component): string => {
     annotations.push(`:${meta.ports.join(",")}`);
   }
   if (annotations.length > 0) {
-    return truncateLabel(`${name}\\n${annotations.join(" ")}`, 50);
+    // Truncate name before composing to avoid splitting <br/> mid-token
+    return `${truncateLabel(name, 40)}<br/>${annotations.join(" ")}`;
   }
   return truncateLabel(name, 50);
 };

@@ -13,7 +13,7 @@ export const generateCallGraphDiagram = (
 
   for (const node of callGraph.nodes) {
     const nodeId = toNodeId(`fn-${node.id}`, seen);
-    const label = escapeLabel(`${node.name}\\n${node.file}:${node.line}`);
+    const label = escapeLabel(`${node.name}<br/>${node.file}:${node.line}`);
     lines.push(`  ${nodeId}[${label}]`);
   }
 

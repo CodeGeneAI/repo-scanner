@@ -90,6 +90,38 @@ describe("escapeLabel", () => {
     const result = escapeLabel("apps/web");
     expect(result).toBe('"apps/web"');
   });
+
+  it("converts backslash-n to <br/>", () => {
+    const result = escapeLabel("handler\\nsrc/a.ts:10");
+    expect(result).toBe('"handler<br/>src/a.ts:10"');
+  });
+
+  it("converts multiple backslash-n sequences to <br/>", () => {
+    const result = escapeLabel("a\\nb\\nc");
+    expect(result).toBe('"a<br/>b<br/>c"');
+  });
+
+  it("handles backslash-n combined with quotes and pipes", () => {
+    const result = escapeLabel('name\\n"port"|8080');
+    expect(result).toBe('"name<br/>#quot;port#quot;#124;8080"');
+  });
+
+  it("passes through <br/> unchanged", () => {
+    const result = escapeLabel("name<br/>:3000");
+    expect(result).toBe('"name<br/>:3000"');
+  });
+
+  it("wraps mermaid reserved keywords in quotes", () => {
+    expect(escapeLabel("if")).toBe('"if"');
+    expect(escapeLabel("end")).toBe('"end"');
+    expect(escapeLabel("subgraph")).toBe('"subgraph"');
+    expect(escapeLabel("class")).toBe('"class"');
+  });
+
+  it("does not quote non-reserved alphanumeric labels", () => {
+    expect(escapeLabel("WebApp")).toBe("WebApp");
+    expect(escapeLabel("handler")).toBe("handler");
+  });
 });
 
 describe("truncateLabel", () => {

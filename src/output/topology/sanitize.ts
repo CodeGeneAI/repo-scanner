@@ -3,6 +3,25 @@ const MAX_NODE_ID_LENGTH = 100;
 const NEEDS_QUOTING = /[^a-zA-Z0-9_]/;
 
 /**
+ * Mermaid flowchart reserved keywords that must be quoted when used as
+ * node labels, even if they contain only alphanumeric characters.
+ */
+const MERMAID_RESERVED = new Set([
+  "if",
+  "else",
+  "end",
+  "graph",
+  "subgraph",
+  "direction",
+  "click",
+  "style",
+  "classDef",
+  "class",
+  "linkStyle",
+  "callback",
+]);
+
+/**
  * Convert a component name/path to a safe mermaid node ID.
  * Only [a-zA-Z_][a-zA-Z0-9_]* are valid mermaid IDs.
  *
@@ -71,7 +90,8 @@ export const toNodeId = (name: string, seen?: Set<string>): string => {
 
 /**
  * Escape a string for use as a mermaid node label.
- * Wraps in double quotes if it contains special characters.
+ * Wraps in double quotes if it contains special characters or is a
+ * mermaid reserved keyword (e.g. `if`, `end`, `subgraph`).
  * Escapes double quotes (#quot;) and pipe characters (#124;)
  * using mermaid HTML numeric entities.
  */
@@ -80,11 +100,14 @@ export const escapeLabel = (label: string): string => {
     return '""';
   }
 
-  if (!NEEDS_QUOTING.test(label)) {
+  if (!NEEDS_QUOTING.test(label) && !MERMAID_RESERVED.has(label)) {
     return label;
   }
 
-  const escaped = label.replace(/"/g, "#quot;").replace(/\|/g, "#124;");
+  const escaped = label
+    .replace(/\\n/g, "<br/>")
+    .replace(/"/g, "#quot;")
+    .replace(/\|/g, "#124;");
   return `"${escaped}"`;
 };
 

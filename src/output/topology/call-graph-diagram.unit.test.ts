@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 import type { RepoScanResult } from "../../types";
 import { generateCallGraphDiagram } from "./call-graph-diagram";
 
@@ -81,5 +81,29 @@ describe("generateCallGraphDiagram", () => {
     expect(diagram?.kind).toBe("call-graph");
     expect(diagram?.mermaid).toContain("flowchart LR");
     expect(diagram?.mermaid).toContain("-->");
+  });
+
+  it("uses <br/> instead of backslash-n for line breaks in node labels", () => {
+    const result: RepoScanResult = {
+      ...buildBaseResult(),
+      inventory: {
+        ...buildBaseResult().inventory,
+        callGraph: {
+          nodes: [
+            {
+              id: "a",
+              name: "handler",
+              file: "packages/dev-scanner/src/index.ts",
+              line: 42,
+            },
+          ],
+          edges: [],
+        },
+      },
+    };
+
+    const diagram = generateCallGraphDiagram(result);
+    expect(diagram?.mermaid).toContain("<br/>");
+    expect(diagram?.mermaid).not.toContain("\\n");
   });
 });
