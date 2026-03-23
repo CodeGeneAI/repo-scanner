@@ -70,6 +70,99 @@ const hasExplicitSectionFlags = (
   options.scanExternalServices ||
   options.scanBuildAndTest;
 
+const resolveExplicitDetectorIds = (
+  options: Pick<
+    CliOptions,
+    | "env"
+    | "vcs"
+    | "solid"
+    | "callGraph"
+    | "diffEnvCheck"
+    | "dbSchema"
+    | "topology"
+    | "topologyDiagrams"
+    | "namingConvention"
+    | "runtime"
+    | "largeFile"
+    | "todo"
+    | "deadExport"
+    | "codeDuplication"
+    | "complexityHotspots"
+    | "languageDetector"
+    | "frameworkDetector"
+    | "monorepoDetector"
+    | "dependencyManagerDetector"
+    | "ciDetector"
+    | "containerizationDetector"
+    | "iacDetector"
+    | "testingDetector"
+    | "datastoreDetector"
+    | "lintingDetector"
+    | "buildDetector"
+    | "repoToolsDetector"
+    | "crossPackageDepsDetector"
+    | "codeQualityDetector"
+    | "deploymentPlatformDetector"
+    | "externalServicesDetector"
+    | "apiSurfaceDetector"
+  >,
+): string[] => {
+  const explicitDetectorIds = new Set<string>();
+  if (options.env) explicitDetectorIds.add("env");
+  if (options.vcs) explicitDetectorIds.add("vcs");
+  if (options.solid) explicitDetectorIds.add("solid-health");
+  if (options.callGraph) explicitDetectorIds.add("call-graph");
+  if (options.diffEnvCheck) explicitDetectorIds.add("env");
+  if (options.namingConvention) explicitDetectorIds.add("naming-convention");
+  if (options.runtime) explicitDetectorIds.add("runtime");
+  if (options.largeFile) explicitDetectorIds.add("large-file");
+  if (options.todo) explicitDetectorIds.add("todo");
+  if (options.deadExport) explicitDetectorIds.add("dead-export");
+  if (options.codeDuplication) explicitDetectorIds.add("code-duplication");
+  if (options.complexityHotspots)
+    explicitDetectorIds.add("complexity-hotspots");
+  if (options.languageDetector) explicitDetectorIds.add("language");
+  if (options.frameworkDetector) explicitDetectorIds.add("framework");
+  if (options.monorepoDetector) explicitDetectorIds.add("monorepo");
+  if (options.dependencyManagerDetector)
+    explicitDetectorIds.add("dependency-manager");
+  if (options.ciDetector) explicitDetectorIds.add("ci");
+  if (options.containerizationDetector)
+    explicitDetectorIds.add("containerization");
+  if (options.iacDetector) explicitDetectorIds.add("iac");
+  if (options.testingDetector) explicitDetectorIds.add("testing");
+  if (options.datastoreDetector) explicitDetectorIds.add("datastore");
+  if (options.lintingDetector) explicitDetectorIds.add("linting");
+  if (options.buildDetector) explicitDetectorIds.add("build");
+  if (options.repoToolsDetector) explicitDetectorIds.add("repo-tools");
+  if (options.crossPackageDepsDetector)
+    explicitDetectorIds.add("cross-package-deps");
+  if (options.codeQualityDetector) explicitDetectorIds.add("code-quality");
+  if (options.deploymentPlatformDetector)
+    explicitDetectorIds.add("deployment-platform");
+  if (options.externalServicesDetector)
+    explicitDetectorIds.add("external-services");
+  if (options.apiSurfaceDetector) explicitDetectorIds.add("api-surface");
+
+  // Enable db-schema detector when explicitly requested or when ERD topology diagram is requested.
+  const erdRequested =
+    options.topology &&
+    (!options.topologyDiagrams || options.topologyDiagrams.includes("erd"));
+  if (options.dbSchema || erdRequested) {
+    explicitDetectorIds.add("db-schema");
+  }
+
+  if (
+    options.topology &&
+    (!options.topologyDiagrams ||
+      options.topologyDiagrams.includes("call-graph"))
+  ) {
+    explicitDetectorIds.add("call-graph");
+  }
+
+  return [...explicitDetectorIds];
+};
+
 const resolveSelectedSections = (
   options: Pick<
     CliOptions,
@@ -94,6 +187,8 @@ const resolveSelectedSections = (
 export const resolveScanProfile = (
   options: CliOptions,
 ): ResolvedScanProfile => {
+  const explicitDetectorIds = resolveExplicitDetectorIds(options);
+
   if (options.allDetectors) {
     return {
       allDetectors: true,
@@ -101,12 +196,13 @@ export const resolveScanProfile = (
     };
   }
 
-  // VCS-only mode: skip all section detectors, run only the VCS detector.
-  if (options.vcs && !hasExplicitSectionFlags(options)) {
+  // Explicit detector-only mode: skip all section detectors and run only
+  // explicitly requested detector flags when no section flags are provided.
+  if (explicitDetectorIds.length > 0 && !hasExplicitSectionFlags(options)) {
     return {
       allDetectors: false,
       selectedSections: [],
-      enabledDetectorIds: ["vcs"],
+      enabledDetectorIds: explicitDetectorIds,
     };
   }
 
@@ -121,25 +217,9 @@ export const resolveScanProfile = (
   // VCS detection is always enabled — it provides fundamental repo metadata.
   enabledDetectorIds.add("vcs");
 
-  // Preserve explicit opt-in behavior for these optional detectors.
-  if (options.solid) enabledDetectorIds.add("solid-health");
-  if (options.callGraph) enabledDetectorIds.add("call-graph");
-  if (options.diffEnvCheck) enabledDetectorIds.add("env");
-
-  // Enable db-schema detector when explicitly requested or when ERD diagram is requested.
-  // Note: bin.ts also calls setDbSchemaOptions() for runtime config; this adds the detector ID.
-  const erdRequested =
-    options.topology &&
-    (!options.topologyDiagrams || options.topologyDiagrams.includes("erd"));
-  const callGraphRequested =
-    options.topology &&
-    (!options.topologyDiagrams ||
-      options.topologyDiagrams.includes("call-graph"));
-  if (options.dbSchema || erdRequested) {
-    enabledDetectorIds.add("db-schema");
-  }
-  if (callGraphRequested) {
-    enabledDetectorIds.add("call-graph");
+  // Preserve explicit opt-in behavior for optional detectors.
+  for (const detectorId of explicitDetectorIds) {
+    enabledDetectorIds.add(detectorId);
   }
 
   // Ensure requested topology diagrams have required detector data even when

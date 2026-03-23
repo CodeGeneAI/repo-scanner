@@ -451,6 +451,31 @@ export interface CliOptions {
   readonly failOnDeadDepsCount?: number;
   readonly includeDevDeadDeps: boolean;
   readonly dbSchema: boolean;
+  readonly env: boolean;
+  readonly namingConvention: boolean;
+  readonly runtime: boolean;
+  readonly largeFile: boolean;
+  readonly todo: boolean;
+  readonly deadExport: boolean;
+  readonly codeDuplication: boolean;
+  readonly complexityHotspots: boolean;
+  readonly languageDetector: boolean;
+  readonly frameworkDetector: boolean;
+  readonly monorepoDetector: boolean;
+  readonly dependencyManagerDetector: boolean;
+  readonly ciDetector: boolean;
+  readonly containerizationDetector: boolean;
+  readonly iacDetector: boolean;
+  readonly testingDetector: boolean;
+  readonly datastoreDetector: boolean;
+  readonly lintingDetector: boolean;
+  readonly buildDetector: boolean;
+  readonly repoToolsDetector: boolean;
+  readonly crossPackageDepsDetector: boolean;
+  readonly codeQualityDetector: boolean;
+  readonly deploymentPlatformDetector: boolean;
+  readonly externalServicesDetector: boolean;
+  readonly apiSurfaceDetector: boolean;
   readonly vcs: boolean;
 }
 export interface DependencyScanConfig {

@@ -113,6 +113,31 @@ Options:
   --fail-on-new-duplication-pct <n>  Exit with code 1 when diff duplication % exceeds n
   --fail-on-new-env-vars      Exit with code 1 when net-new env vars are detected in diff
   --db-schema                 Enable database schema detection (tables, columns, relationships)
+  --env                       Run env detector only (env var usage + inference)
+  --naming-convention         Run naming convention detector
+  --runtime                   Run runtime detector
+  --large-file                Run large-file detector
+  --todo                      Run TODO annotation detector
+  --dead-export               Run dead-export detector
+  --code-duplication          Run code-duplication detector
+  --complexity-hotspots       Run complexity hotspots detector
+  --language                  Run language detector
+  --framework                 Run framework detector
+  --monorepo                  Run monorepo detector
+  --dependency-manager        Run dependency-manager detector
+  --ci                        Run CI detector
+  --containerization          Run containerization detector
+  --iac-detector              Run IaC detector
+  --testing-detector          Run testing detector
+  --datastore                 Run datastore detector
+  --linting-detector          Run linting detector
+  --build                     Run build detector
+  --repo-tools                Run repo-tools detector
+  --cross-package-deps        Run cross-package-deps detector
+  --code-quality              Run code-quality detector
+  --deployment-platform       Run deployment-platform detector
+  --external-services-detector Run external-services detector
+  --api-surface               Run api-surface detector
   --vcs                       Output VCS info only (type, provider, origin URL, branches)
   --no-update-check           Suppress background update check for this run
   --version, -v               Show version number
@@ -244,6 +269,31 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let failOnDeadDepsCount: number | undefined;
   let includeDevDeadDeps = false;
   let dbSchema = false;
+  let env = false;
+  let namingConvention = false;
+  let runtime = false;
+  let largeFile = false;
+  let todo = false;
+  let deadExport = false;
+  let codeDuplication = false;
+  let complexityHotspots = false;
+  let languageDetector = false;
+  let frameworkDetector = false;
+  let monorepoDetector = false;
+  let dependencyManagerDetector = false;
+  let ciDetector = false;
+  let containerizationDetector = false;
+  let iacDetector = false;
+  let testingDetector = false;
+  let datastoreDetector = false;
+  let lintingDetector = false;
+  let buildDetector = false;
+  let repoToolsDetector = false;
+  let crossPackageDepsDetector = false;
+  let codeQualityDetector = false;
+  let deploymentPlatformDetector = false;
+  let externalServicesDetector = false;
+  let apiSurfaceDetector = false;
   let vcs = false;
 
   // Detect positional subcommand as the first non-flag argument.
@@ -450,6 +500,81 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--db-schema":
         dbSchema = true;
         break;
+      case "--env":
+        env = true;
+        break;
+      case "--naming-convention":
+        namingConvention = true;
+        break;
+      case "--runtime":
+        runtime = true;
+        break;
+      case "--large-file":
+        largeFile = true;
+        break;
+      case "--todo":
+        todo = true;
+        break;
+      case "--dead-export":
+        deadExport = true;
+        break;
+      case "--code-duplication":
+        codeDuplication = true;
+        break;
+      case "--complexity-hotspots":
+        complexityHotspots = true;
+        break;
+      case "--language":
+        languageDetector = true;
+        break;
+      case "--framework":
+        frameworkDetector = true;
+        break;
+      case "--monorepo":
+        monorepoDetector = true;
+        break;
+      case "--dependency-manager":
+        dependencyManagerDetector = true;
+        break;
+      case "--ci":
+        ciDetector = true;
+        break;
+      case "--containerization":
+        containerizationDetector = true;
+        break;
+      case "--iac-detector":
+        iacDetector = true;
+        break;
+      case "--testing-detector":
+        testingDetector = true;
+        break;
+      case "--datastore":
+        datastoreDetector = true;
+        break;
+      case "--linting-detector":
+        lintingDetector = true;
+        break;
+      case "--build":
+        buildDetector = true;
+        break;
+      case "--repo-tools":
+        repoToolsDetector = true;
+        break;
+      case "--cross-package-deps":
+        crossPackageDepsDetector = true;
+        break;
+      case "--code-quality":
+        codeQualityDetector = true;
+        break;
+      case "--deployment-platform":
+        deploymentPlatformDetector = true;
+        break;
+      case "--external-services-detector":
+        externalServicesDetector = true;
+        break;
+      case "--api-surface":
+        apiSurfaceDetector = true;
+        break;
       case "--solid":
         solid = true;
         break;
@@ -618,6 +743,31 @@ export const parseArgs = (argv: string[]): CliOptions => {
     failOnDeadDepsCount,
     includeDevDeadDeps,
     dbSchema,
+    env,
+    namingConvention,
+    runtime,
+    largeFile,
+    todo,
+    deadExport,
+    codeDuplication,
+    complexityHotspots,
+    languageDetector,
+    frameworkDetector,
+    monorepoDetector,
+    dependencyManagerDetector,
+    ciDetector,
+    containerizationDetector,
+    iacDetector,
+    testingDetector,
+    datastoreDetector,
+    lintingDetector,
+    buildDetector,
+    repoToolsDetector,
+    crossPackageDepsDetector,
+    codeQualityDetector,
+    deploymentPlatformDetector,
+    externalServicesDetector,
+    apiSurfaceDetector,
     vcs,
   };
 };

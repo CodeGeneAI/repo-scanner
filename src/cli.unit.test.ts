@@ -30,6 +30,31 @@ describe("parseArgs", () => {
     expect(result.scanExternalServices).toBeFalse();
     expect(result.scanBuildAndTest).toBeFalse();
     expect(result.allDetectors).toBeFalse();
+    expect(result.env).toBeFalse();
+    expect(result.namingConvention).toBeFalse();
+    expect(result.runtime).toBeFalse();
+    expect(result.largeFile).toBeFalse();
+    expect(result.todo).toBeFalse();
+    expect(result.deadExport).toBeFalse();
+    expect(result.codeDuplication).toBeFalse();
+    expect(result.complexityHotspots).toBeFalse();
+    expect(result.languageDetector).toBeFalse();
+    expect(result.frameworkDetector).toBeFalse();
+    expect(result.monorepoDetector).toBeFalse();
+    expect(result.dependencyManagerDetector).toBeFalse();
+    expect(result.ciDetector).toBeFalse();
+    expect(result.containerizationDetector).toBeFalse();
+    expect(result.iacDetector).toBeFalse();
+    expect(result.testingDetector).toBeFalse();
+    expect(result.datastoreDetector).toBeFalse();
+    expect(result.lintingDetector).toBeFalse();
+    expect(result.buildDetector).toBeFalse();
+    expect(result.repoToolsDetector).toBeFalse();
+    expect(result.crossPackageDepsDetector).toBeFalse();
+    expect(result.codeQualityDetector).toBeFalse();
+    expect(result.deploymentPlatformDetector).toBeFalse();
+    expect(result.externalServicesDetector).toBeFalse();
+    expect(result.apiSurfaceDetector).toBeFalse();
   });
 
   it("parses section profile flags", () => {
@@ -52,6 +77,75 @@ describe("parseArgs", () => {
   it("parses --all-detectors", () => {
     const result = parseArgs(["bun", "repo-scanner", "--all-detectors"]);
     expect(result.allDetectors).toBeTrue();
+  });
+
+  it("parses --env", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--env"]);
+    expect(result.env).toBeTrue();
+  });
+
+  it("parses detector-specific flags for optional detectors", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--naming-convention",
+      "--runtime",
+      "--large-file",
+      "--todo",
+      "--dead-export",
+      "--code-duplication",
+      "--complexity-hotspots",
+    ]);
+
+    expect(result.namingConvention).toBeTrue();
+    expect(result.runtime).toBeTrue();
+    expect(result.largeFile).toBeTrue();
+    expect(result.todo).toBeTrue();
+    expect(result.deadExport).toBeTrue();
+    expect(result.codeDuplication).toBeTrue();
+    expect(result.complexityHotspots).toBeTrue();
+  });
+
+  it("parses detector-specific flags for core inventory/architecture detectors", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--language",
+      "--framework",
+      "--monorepo",
+      "--dependency-manager",
+      "--ci",
+      "--containerization",
+      "--iac-detector",
+      "--testing-detector",
+      "--datastore",
+      "--linting-detector",
+      "--build",
+      "--repo-tools",
+      "--cross-package-deps",
+      "--code-quality",
+      "--deployment-platform",
+      "--external-services-detector",
+      "--api-surface",
+    ]);
+
+    expect(result.languageDetector).toBeTrue();
+    expect(result.frameworkDetector).toBeTrue();
+    expect(result.monorepoDetector).toBeTrue();
+    expect(result.dependencyManagerDetector).toBeTrue();
+    expect(result.ciDetector).toBeTrue();
+    expect(result.containerizationDetector).toBeTrue();
+    expect(result.iacDetector).toBeTrue();
+    expect(result.testingDetector).toBeTrue();
+    expect(result.datastoreDetector).toBeTrue();
+    expect(result.lintingDetector).toBeTrue();
+    expect(result.buildDetector).toBeTrue();
+    expect(result.repoToolsDetector).toBeTrue();
+    expect(result.crossPackageDepsDetector).toBeTrue();
+    expect(result.codeQualityDetector).toBeTrue();
+    expect(result.deploymentPlatformDetector).toBeTrue();
+    expect(result.externalServicesDetector).toBeTrue();
+    expect(result.apiSurfaceDetector).toBeTrue();
   });
 
   it("parses --full-scan as an alias for --all-detectors", () => {
