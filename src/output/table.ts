@@ -18,6 +18,7 @@ export interface TableRenderOptions {
   readonly selectedSections?: readonly ScanSection[];
   readonly includeDependencies?: boolean;
   readonly includeSignals?: boolean;
+  readonly showEnvSection?: boolean;
 }
 
 export const renderTable = (
@@ -35,6 +36,7 @@ export const renderTable = (
     ? sectionSet.has("external-services")
     : true;
   const showBuildAndTest = sectionSet ? sectionSet.has("build-and-test") : true;
+  const showEnvSection = options?.showEnvSection ?? showInventory;
   const includeDependencies =
     options?.includeDependencies ?? sectionSet === undefined;
   const includeSignals = options?.includeSignals ?? sectionSet === undefined;
@@ -249,32 +251,6 @@ export const renderTable = (
       w(`  Deploy:       ${list(result.inventory.deploymentPlatforms)}\n`);
     if (result.inventory.repoTools.length > 0)
       w(`  Other Tools:  ${list(result.inventory.repoTools)}\n`);
-
-    if (result.inventory.envVars.length > 0) {
-      w(section("Environment Variables"));
-      w(`  Found: ${result.inventory.envVars.length} unique variables\n`);
-      for (const v of result.inventory.envVars) {
-        const type =
-          v.inferredType !== "unknown"
-            ? ` ${DIM}(${v.inferredType})${RESET}`
-            : "";
-        const req = v.required
-          ? `${YELLOW}required${RESET}`
-          : `${DIM}optional${RESET}`;
-        const def = v.defaultValue
-          ? ` ${DIM}default: ${v.defaultValue}${RESET}`
-          : "";
-        const prefix = v.frameworkPrefix
-          ? ` ${CYAN}[${v.frameworkPrefix}]${RESET}`
-          : "";
-        w(`    ${v.name}${type}  ${req}${def}${prefix}\n`);
-        for (const u of v.usages.slice(0, 3)) {
-          w(`      ${DIM}${u.file}:${u.line}${RESET}\n`);
-        }
-        if (v.usages.length > 3)
-          w(`      ${DIM}... +${v.usages.length - 3} more${RESET}\n`);
-      }
-    }
 
     if (
       result.inventory.namingConventions &&
@@ -589,6 +565,32 @@ export const renderTable = (
           );
         }
       }
+    }
+  }
+
+  if (showEnvSection && result.inventory.envVars.length > 0) {
+    w(section("Environment Variables"));
+    w(`  Found: ${result.inventory.envVars.length} unique variables\n`);
+    for (const v of result.inventory.envVars) {
+      const type =
+        v.inferredType !== "unknown"
+          ? ` ${DIM}(${v.inferredType})${RESET}`
+          : "";
+      const req = v.required
+        ? `${YELLOW}required${RESET}`
+        : `${DIM}optional${RESET}`;
+      const def = v.defaultValue
+        ? ` ${DIM}default: ${v.defaultValue}${RESET}`
+        : "";
+      const prefix = v.frameworkPrefix
+        ? ` ${CYAN}[${v.frameworkPrefix}]${RESET}`
+        : "";
+      w(`    ${v.name}${type}  ${req}${def}${prefix}\n`);
+      for (const u of v.usages.slice(0, 3)) {
+        w(`      ${DIM}${u.file}:${u.line}${RESET}\n`);
+      }
+      if (v.usages.length > 3)
+        w(`      ${DIM}... +${v.usages.length - 3} more${RESET}\n`);
     }
   }
 

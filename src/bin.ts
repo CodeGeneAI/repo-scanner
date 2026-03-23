@@ -9,6 +9,7 @@ import {
   DETECTOR_CATALOG,
   DETECTOR_IDS,
   DETECTOR_PRESETS,
+  type DetectorId,
 } from "./detectors/catalog";
 import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
@@ -234,8 +235,130 @@ const buildSectionJsonPayload = (
 
 const resolveRenderedSections = (
   selectedSections: readonly ScanSection[],
+  options?: { fallbackToCoreSections?: boolean },
 ): readonly ScanSection[] =>
-  selectedSections.length > 0 ? selectedSections : SCAN_SECTIONS;
+  selectedSections.length > 0 || options?.fallbackToCoreSections === false
+    ? selectedSections
+    : SCAN_SECTIONS;
+
+type DetectorJsonProjection = (result: RepoScanResult) => unknown;
+
+const DETECTOR_JSON_PROJECTION_MAP: Record<DetectorId, DetectorJsonProjection> =
+  {
+    "api-surface": (result) => result.inventory.apiSurface ?? null,
+    build: (result) => ({
+      buildCommands: result.buildAndTest.buildCommands,
+      buildTools: result.inventory.buildTools,
+    }),
+    "call-graph": (result) => result.inventory.callGraph ?? null,
+    ci: (result) => ({ ciSystems: result.buildAndTest.ciSystems }),
+    "code-duplication": (result) => result.inventory.codeDuplication ?? null,
+    "code-quality": (result) => result.inventory.codeQuality,
+    "complexity-hotspots": (result) =>
+      result.inventory.complexityHotspots ?? [],
+    containerization: (result) => result.inventory.containerization,
+    "cross-package-deps": (result) =>
+      result.architecture.crossPackageDeps ?? null,
+    datastore: (result) => result.inventory.datastores,
+    "db-schema": (result) => result.inventory.databaseSchema ?? null,
+    "dead-export": (result) => result.inventory.deadExports ?? [],
+    "dependency-manager": (result) => result.inventory.dependencyManagers,
+    "deployment-platform": (result) => result.inventory.deploymentPlatforms,
+    env: (result) => result.inventory.envVars,
+    "external-services": (result) => result.inventory.externalServices ?? [],
+    framework: (result) => result.inventory.frameworks,
+    iac: (result) => result.inventory.iac,
+    language: (result) => ({
+      languages: result.inventory.languages,
+      languageStats: result.inventory.languageStats,
+      totalFiles: result.inventory.totalFiles,
+      totalLinesOfCode: result.inventory.totalLinesOfCode,
+    }),
+    "large-file": (result) => result.inventory.largeFiles ?? [],
+    linting: (result) => ({
+      linting: result.inventory.linting,
+      lintCommands: result.buildAndTest.lintCommands,
+    }),
+    monorepo: (result) => ({
+      monorepo: result.architecture.monorepo,
+      components: result.architecture.components,
+    }),
+    "naming-convention": (result) => result.inventory.namingConventions ?? [],
+    "repo-tools": (result) => result.inventory.repoTools,
+    runtime: (result) => result.inventory.runtimes,
+    "solid-health": (result) => result.inventory.solidHealth ?? null,
+    testing: (result) => ({
+      testing: result.inventory.testing,
+      testCommands: result.buildAndTest.testCommands,
+    }),
+    todo: (result) => result.inventory.todoAnnotations ?? [],
+    vcs: (result) => result.vcs ?? null,
+  };
+
+const buildDetectorOnlyJsonPayload = (
+  result: RepoScanResult,
+  detectorIds: readonly string[],
+): Record<string, unknown> => {
+  const uniqueDetectorIds = [...new Set(detectorIds)] as DetectorId[];
+  const detectorsPayload: Record<string, unknown> = {};
+  for (const detectorId of uniqueDetectorIds) {
+    const projection = DETECTOR_JSON_PROJECTION_MAP[detectorId];
+    if (!projection) continue;
+    detectorsPayload[detectorId] = projection(result);
+  }
+
+  return {
+    scanPath: result.scanPath,
+    timestamp: result.timestamp,
+    durationMs: result.durationMs,
+    detectors: detectorsPayload,
+  };
+};
+
+const DETECTOR_SECTION_MAP: Record<ScanSection, readonly string[]> = {
+  architecture: ["monorepo", "cross-package-deps"],
+  inventory: [
+    "language",
+    "framework",
+    "datastore",
+    "dependency-manager",
+    "containerization",
+    "iac",
+    "testing",
+    "build",
+    "linting",
+    "code-quality",
+    "deployment-platform",
+    "repo-tools",
+    "runtime",
+    "naming-convention",
+    "large-file",
+    "todo",
+    "dead-export",
+    "code-duplication",
+    "complexity-hotspots",
+    "api-surface",
+    "db-schema",
+    "call-graph",
+    "solid-health",
+  ],
+  "external-services": ["external-services"],
+  "build-and-test": ["build", "ci"],
+};
+
+const resolveSectionsForDetectors = (
+  detectorIds: readonly string[],
+): readonly ScanSection[] => {
+  const requestedDetectors = new Set(detectorIds);
+  const selectedSections: ScanSection[] = [];
+  for (const section of SCAN_SECTIONS) {
+    const detectorSet = DETECTOR_SECTION_MAP[section];
+    if (detectorSet.some((detectorId) => requestedDetectors.has(detectorId))) {
+      selectedSections.push(section);
+    }
+  }
+  return selectedSections;
+};
 
 const hasExplicitSectionOutputFlags = (
   options: ReturnType<typeof parseArgs>,
@@ -515,6 +638,15 @@ const main = async () => {
 
   const sectionOutputExplicitlyRequested =
     hasExplicitSectionOutputFlags(options) || options.allDetectors;
+  const explicitDetectorOnlyMode =
+    !scanProfile.allDetectors &&
+    scanProfile.selectedSections.length === 0 &&
+    (scanProfile.enabledDetectorIds?.length ?? 0) > 0 &&
+    !sectionOutputExplicitlyRequested &&
+    !options.topology;
+  const explicitDetectorSections = explicitDetectorOnlyMode
+    ? resolveSectionsForDetectors(scanProfile.enabledDetectorIds ?? [])
+    : [];
   const dependencyOutputExplicitlyRequested =
     hasExplicitDependencyOutputFlags(options);
   const policyOutputExplicitlyRequested = hasExplicitPolicyOutputFlags(options);
@@ -525,10 +657,11 @@ const main = async () => {
   const topologyOnlyOutput =
     options.topology && !nonTopologyOutputExplicitlyRequested;
   const includeReportOutput = !topologyOnlyOutput;
-  const includeSectionOutput =
-    scanProfile.allDetectors ||
-    !options.topology ||
-    sectionOutputExplicitlyRequested;
+  const includeSectionOutput = explicitDetectorOnlyMode
+    ? explicitDetectorSections.length > 0
+    : scanProfile.allDetectors ||
+      !options.topology ||
+      sectionOutputExplicitlyRequested;
   const includeDependencyOutput =
     !!result.dependencies &&
     (!options.topology ||
@@ -541,19 +674,28 @@ const main = async () => {
       policyOutputExplicitlyRequested);
 
   if (options.format === "json") {
-    const renderedSections = resolveRenderedSections(
-      scanProfile.selectedSections,
-    );
+    const sectionSelection = explicitDetectorOnlyMode
+      ? explicitDetectorSections
+      : scanProfile.selectedSections;
+    const renderedSections = resolveRenderedSections(sectionSelection, {
+      fallbackToCoreSections: includeSectionOutput,
+    });
+    const detectorOnlyPayload =
+      explicitDetectorOnlyMode && scanProfile.enabledDetectorIds
+        ? buildDetectorOnlyJsonPayload(result, scanProfile.enabledDetectorIds)
+        : undefined;
     const jsonPayload = topologyOnlyOutput
       ? topology
         ? { topology }
         : {}
       : {
-          ...(scanProfile.allDetectors
-            ? ({ ...result } as Record<string, unknown>)
-            : includeSectionOutput
-              ? buildSectionJsonPayload(result, renderedSections)
-              : {}),
+          ...(detectorOnlyPayload
+            ? detectorOnlyPayload
+            : scanProfile.allDetectors
+              ? ({ ...result } as Record<string, unknown>)
+              : includeSectionOutput
+                ? buildSectionJsonPayload(result, renderedSections)
+                : {}),
           ...(includeDependencyOutput
             ? { dependencies: result.dependencies }
             : {}),
@@ -563,9 +705,13 @@ const main = async () => {
         };
     renderJson(jsonPayload, process.stdout);
   } else if (includeReportOutput) {
-    const renderedSections = resolveRenderedSections(
-      scanProfile.selectedSections,
-    );
+    const sectionSelection = explicitDetectorOnlyMode
+      ? explicitDetectorSections
+      : scanProfile.selectedSections;
+    const renderedSections = resolveRenderedSections(sectionSelection, {
+      fallbackToCoreSections: includeSectionOutput,
+    });
+    const enabledDetectorSet = new Set(scanProfile.enabledDetectorIds ?? []);
     renderTable(result, process.stdout, {
       selectedSections: scanProfile.allDetectors
         ? undefined
@@ -574,6 +720,9 @@ const main = async () => {
           : [],
       includeDependencies: includeDependencyOutput,
       includeSignals: scanProfile.allDetectors,
+      showEnvSection:
+        includeSectionOutput ||
+        (explicitDetectorOnlyMode && enabledDetectorSet.has("env")),
     });
   }
 

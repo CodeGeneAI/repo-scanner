@@ -70,6 +70,16 @@ const createCoreProfileFixtureRepo = async (): Promise<string> => {
   return repoPath;
 };
 
+const createEnvFixtureRepo = async (): Promise<string> => {
+  const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-env-"));
+  await writeFile(path.join(repoPath, "README.md"), "# env fixture\n");
+  await writeFile(
+    path.join(repoPath, "index.ts"),
+    "export const apiKey = process.env.OPENAI_API_KEY;\n",
+  );
+  return repoPath;
+};
+
 const runRepoScanner = (
   args: readonly string[],
   envOverrides?: Record<string, string>,
@@ -543,35 +553,33 @@ describe("repo-scanner bin", () => {
     }
   });
 
-  it("shows inventory output in table mode for explicit detector-only flags", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
+  it("shows env-only output in table mode for --detectors env", async () => {
+    const repoPath = await createEnvFixtureRepo();
 
     try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "language",
-      ]);
+      const result = runRepoScanner(["--path", repoPath, "--detectors", "env"]);
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("Inventory");
-      expect(stdout).toContain("Languages:");
+      expect(stdout).toContain("Environment Variables");
+      expect(stdout).toContain("OPENAI_API_KEY");
+      expect(stdout).not.toContain("Architecture");
+      expect(stdout).not.toContain("Inventory");
+      expect(stdout).not.toContain("Build & Test");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("includes inventory in json mode for explicit detector-only flags", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
+  it("returns detector-projected json in explicit detector-only mode", async () => {
+    const repoPath = await createEnvFixtureRepo();
 
     try {
       const result = runRepoScanner([
         "--path",
         repoPath,
         "--detectors",
-        "language",
+        "env",
         "--format",
         "json",
       ]);
@@ -579,10 +587,46 @@ describe("repo-scanner bin", () => {
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
 
-      expect(payload.scanPath).toBeDefined();
-      expect(payload.inventory).toBeDefined();
-      expect(payload.inventory.languages).toBeArray();
-      expect(payload.architecture).toBeDefined();
+      expect(payload.scanPath).toBeString();
+      expect(payload.timestamp).toBeString();
+      expect(payload.durationMs).toBeNumber();
+      expect(payload.detectors).toBeDefined();
+      expect(payload.detectors.env).toBeArray();
+      expect(payload.detectors.env[0].name).toBe("OPENAI_API_KEY");
+      expect(payload.inventory).toBeUndefined();
+      expect(payload.architecture).toBeUndefined();
+      expect(payload.buildAndTest).toBeUndefined();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("projects each requested detector in detector-only json mode", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "language,build,ci",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+
+      expect(payload.detectors).toBeDefined();
+      expect(payload.detectors.language).toBeDefined();
+      expect(payload.detectors.language.languages).toBeArray();
+      expect(payload.detectors.build).toBeDefined();
+      expect(payload.detectors.build.buildCommands).toBeArray();
+      expect(payload.detectors.ci).toBeDefined();
+      expect(payload.detectors.ci.ciSystems).toBeArray();
+      expect(payload.detectors.env).toBeUndefined();
+      expect(payload.architecture).toBeUndefined();
+      expect(payload.inventory).toBeUndefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
