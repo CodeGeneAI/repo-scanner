@@ -30,6 +30,12 @@ describe("parseArgs", () => {
     expect(result.scanExternalServices).toBeFalse();
     expect(result.scanBuildAndTest).toBeFalse();
     expect(result.allDetectors).toBeFalse();
+    expect(result.showDetectors).toBeFalse();
+    expect(result.completionShell).toBeUndefined();
+    expect(result.completionInstall).toBeFalse();
+    expect(result.completionUninstall).toBeFalse();
+    expect(result.detectorsSchema).toBeFalse();
+    expect(result.detectorSelectionWarnings).toEqual([]);
     expect(result.env).toBeFalse();
     expect(result.namingConvention).toBeFalse();
     expect(result.runtime).toBeFalse();
@@ -79,73 +85,69 @@ describe("parseArgs", () => {
     expect(result.allDetectors).toBeTrue();
   });
 
-  it("parses --env", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--env"]);
-    expect(result.env).toBeTrue();
-  });
-
-  it("parses detector-specific flags for optional detectors", () => {
+  it("parses --detectors with multiple detector ids", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
-      "--naming-convention",
-      "--runtime",
-      "--large-file",
-      "--todo",
-      "--dead-export",
-      "--code-duplication",
-      "--complexity-hotspots",
+      "--detectors",
+      "env,language,todo,external-services,solid-health,vcs",
     ]);
 
-    expect(result.namingConvention).toBeTrue();
-    expect(result.runtime).toBeTrue();
-    expect(result.largeFile).toBeTrue();
+    expect(result.env).toBeTrue();
+    expect(result.languageDetector).toBeTrue();
     expect(result.todo).toBeTrue();
-    expect(result.deadExport).toBeTrue();
-    expect(result.codeDuplication).toBeTrue();
-    expect(result.complexityHotspots).toBeTrue();
+    expect(result.externalServicesDetector).toBeTrue();
+    expect(result.solid).toBeTrue();
+    expect(result.vcs).toBeTrue();
   });
 
-  it("parses detector-specific flags for core inventory/architecture detectors", () => {
+  it("expands detector presets in --detectors", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
-      "--language",
-      "--framework",
-      "--monorepo",
-      "--dependency-manager",
-      "--ci",
-      "--containerization",
-      "--iac-detector",
-      "--testing-detector",
-      "--datastore",
-      "--linting-detector",
-      "--build",
-      "--repo-tools",
-      "--cross-package-deps",
-      "--code-quality",
-      "--deployment-platform",
-      "--external-services-detector",
-      "--api-surface",
+      "--detectors",
+      "@inventory,@quality",
     ]);
 
     expect(result.languageDetector).toBeTrue();
     expect(result.frameworkDetector).toBeTrue();
-    expect(result.monorepoDetector).toBeTrue();
-    expect(result.dependencyManagerDetector).toBeTrue();
-    expect(result.ciDetector).toBeTrue();
-    expect(result.containerizationDetector).toBeTrue();
-    expect(result.iacDetector).toBeTrue();
-    expect(result.testingDetector).toBeTrue();
-    expect(result.datastoreDetector).toBeTrue();
-    expect(result.lintingDetector).toBeTrue();
-    expect(result.buildDetector).toBeTrue();
-    expect(result.repoToolsDetector).toBeTrue();
-    expect(result.crossPackageDepsDetector).toBeTrue();
     expect(result.codeQualityDetector).toBeTrue();
-    expect(result.deploymentPlatformDetector).toBeTrue();
-    expect(result.externalServicesDetector).toBeTrue();
-    expect(result.apiSurfaceDetector).toBeTrue();
+    expect(result.codeDuplication).toBeTrue();
+  });
+
+  it("emits warnings for duplicate detector selection via mixed presets", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--detectors",
+      "@inventory,language,@quality,code-quality",
+    ]);
+
+    expect(result.detectorSelectionWarnings.length).toBeGreaterThan(0);
+    expect(result.detectorSelectionWarnings.join(" ")).toContain("language");
+    expect(result.detectorSelectionWarnings.join(" ")).toContain(
+      "code-quality",
+    );
+  });
+
+  it("rejects invalid detector id in --detectors", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--detectors", "env,not-real"]),
+    ).toThrow(/invalid detector ids/i);
+  });
+
+  it("supports short aliases for common flags", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "-p",
+      "/tmp/repo",
+      "-f",
+      "json",
+    ]);
+
+    expect(result.path).toBe("/tmp/repo");
+    expect(result.format).toBe("json");
   });
 
   it("parses --full-scan as an alias for --all-detectors", () => {
@@ -154,6 +156,70 @@ describe("parseArgs", () => {
 
     expect(fullScan.allDetectors).toBeTrue();
     expect(fullScan.allDetectors).toBe(allDetectors.allDetectors);
+  });
+
+  it("rejects unknown option flags", () => {
+    expect(() => parseArgs(["bun", "repo-scanner", "--wat-is-this"])).toThrow(
+      /unknown option/i,
+    );
+  });
+
+  it("rejects removed legacy detector flags", () => {
+    expect(() => parseArgs(["bun", "repo-scanner", "--language"])).toThrow(
+      /unknown option/i,
+    );
+    expect(() => parseArgs(["bun", "repo-scanner", "--env"])).toThrow(
+      /unknown option/i,
+    );
+  });
+
+  it("parses detectors subcommand", () => {
+    const result = parseArgs(["bun", "repo-scanner", "detectors"]);
+    expect(result.showDetectors).toBeTrue();
+  });
+
+  it("parses completion subcommand", () => {
+    const result = parseArgs(["bun", "repo-scanner", "completion", "bash"]);
+    expect(result.completionShell).toBe("bash");
+    expect(result.completionInstall).toBeFalse();
+  });
+
+  it("parses completion install subcommand", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "completion",
+      "install",
+      "fish",
+    ]);
+    expect(result.completionShell).toBe("fish");
+    expect(result.completionInstall).toBeTrue();
+    expect(result.completionUninstall).toBeFalse();
+  });
+
+  it("parses completion uninstall subcommand", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "completion",
+      "uninstall",
+      "fish",
+    ]);
+    expect(result.completionShell).toBe("fish");
+    expect(result.completionUninstall).toBeTrue();
+  });
+
+  it("parses --schema option", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "detectors",
+      "--format",
+      "json",
+      "--schema",
+    ]);
+    expect(result.showDetectors).toBeTrue();
+    expect(result.detectorsSchema).toBeTrue();
   });
 
   it("parses dependency options", () => {

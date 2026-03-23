@@ -9,8 +9,8 @@ Universal repository structure scanner. Detects languages, frameworks, monorepo 
 Auto-detects your platform (OS + architecture) and installs the latest binary:
 
 ```bash
-curl -fsSL http://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
-  --version-url http://assets.codegene.dev/binaries/version.json
+curl -fsSL https://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
+  --version-url https://assets.codegene.dev/binaries/version.json
 ```
 
 Verify the installation:
@@ -24,12 +24,12 @@ repo-scanner --version
 For CI pipelines or when you need a specific version, pass the bundle URL and SHA-256 checksum directly:
 
 ```bash
-curl -fsSL http://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
+curl -fsSL https://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
   --bundle-url <BUNDLE_URL> \
   --bundle-sha256 <BUNDLE_SHA256>
 ```
 
-The bundle URL and checksum for each release are published in [`version.json`](http://assets.codegene.dev/binaries/version.json).
+The bundle URL and checksum for each release are published in [`version.json`](https://assets.codegene.dev/binaries/version.json).
 
 ### Supported platforms
 
@@ -49,7 +49,7 @@ The bundle URL and checksum for each release are published in [`version.json`](h
 The shell installer does not support Windows. Download the bundle archive directly from:
 
 ```
-http://assets.codegene.dev/binaries/scanner-tools-bundle-bun-windows-x64.tar.gz
+https://assets.codegene.dev/binaries/scanner-tools-bundle-bun-windows-x64.tar.gz
 ```
 
 Extract it and add the `bin/` directory to your `PATH`.
@@ -81,6 +81,24 @@ bun packages/repo-scanner/src/bin.ts --path /path/to/repo --format json
 
 # enable dependency intelligence
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps
+
+# detector-only scan (advanced)
+bun packages/repo-scanner/src/bin.ts --detectors @inventory,@quality
+
+# list available detector IDs and descriptions
+bun packages/repo-scanner/src/bin.ts detectors
+
+# machine-readable detector schema
+bun packages/repo-scanner/src/bin.ts detectors --format json --schema
+
+# generate completion script
+bun packages/repo-scanner/src/bin.ts completion zsh > _repo-scanner
+
+# install completion script automatically
+bun packages/repo-scanner/src/bin.ts completion install fish
+
+# uninstall completion script
+bun packages/repo-scanner/src/bin.ts completion uninstall fish
 
 # JSON + dependency scan controls
 bun packages/repo-scanner/src/bin.ts --path /path/to/repo --format json --deps --ecosystems npm,pypi --no-security
@@ -120,6 +138,22 @@ bun packages/repo-scanner/src/bin.ts --version
 - Zero runtime dependencies (except optional tree-sitter for SOLID)
 - ~140ms for a 1800-package monorepo
 - Built-in dependency intelligence subsystem exposed via API (`scanDependencies`) and CLI (`--deps`)
+
+## Advanced detector selection
+
+`repo-scanner` now uses `--detectors` as the single advanced entrypoint for detector-only runs.
+
+```bash
+# Run inventory + quality presets
+repo-scanner --detectors @inventory,@quality
+
+# Mix section profile with additional detectors
+repo-scanner --inventory --detectors solid-health,db-schema
+```
+
+See `repo-scanner detectors --format json --schema` for machine-readable detector metadata and preset mappings.
+Schema definition endpoint: `https://assets.codegene.dev/binaries/repo-scanner/schemas/detectors-v1.schema.json`.
+Schema changelog: `packages/repo-scanner/schemas/CHANGELOG.md`.
 
 ## Detectors
 
@@ -492,8 +526,8 @@ import type {
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--path <dir>` | Directory to scan | cwd |
-| `--format <fmt>` | Output format: `table` or `json` | `table` |
+| `-p`, `--path <dir>` | Directory to scan | cwd |
+| `-f`, `--format <fmt>` | Output format: `table` or `json` | `table` |
 | `--version`, `-v` | Show version number | |
 | `--help`, `-h` | Show help text | |
 
@@ -547,5 +581,16 @@ Use `--deps` to enable. Optional flags:
 Valid ecosystems: `npm`, `pypi`, `go`, `cargo`, `rubygems`, `maven`, `nuget`, `packagist`, `cocoapods`, `pub`, `conan`
 
 Valid component grouping modes: `default`, `apps-only`, `services-only`, `workspace-package`
+
+### Detector-only mode
+
+| Command/Flag | Description |
+|--------------|-------------|
+| `--detectors <list>` | Comma-separated canonical detector IDs (e.g. `env,language,todo`) |
+| `detectors` | Print supported detector IDs and descriptions |
+| `completion <shell>` | Generate shell completion script (`bash`, `zsh`, or `fish`) |
+| `completion install <shell>` | Install shell completion script in the default user completion path |
+| `completion uninstall <shell>` | Remove installed shell completion script from the default user completion path |
+| `detectors --format json --schema` | Emit schema-friendly detector + preset metadata payload |
 
 Dependency JSON output includes summary lists (`topOutdated`, `topVulnerable`), component-level grouping (`byComponent`), and a machine-readable `policyEvaluation` block when dependency scanning is enabled.

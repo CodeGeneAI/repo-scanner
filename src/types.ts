@@ -406,6 +406,12 @@ export interface CliOptions {
   readonly showHelp: boolean;
   readonly showVersion: boolean;
   readonly showUpdate: boolean;
+  readonly showDetectors: boolean;
+  readonly completionShell?: "bash" | "zsh" | "fish";
+  readonly completionInstall: boolean;
+  readonly completionUninstall: boolean;
+  readonly detectorsSchema: boolean;
+  readonly detectorSelectionWarnings: readonly string[];
   readonly noUpdateCheck: boolean;
   readonly scanArchitecture: boolean;
   readonly scanInventory: boolean;

@@ -65,8 +65,8 @@ describe("resolveScanProfile", () => {
         "bun",
         "repo-scanner",
         "--inventory",
-        "--solid",
-        "--db-schema",
+        "--detectors",
+        "solid-health,db-schema",
       ]),
     );
 
@@ -111,9 +111,9 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("env");
   });
 
-  it("runs env-only mode when --env is set without section flags", () => {
+  it("runs env-only mode via --detectors without section flags", () => {
     const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--env"]),
+      parseArgs(["bun", "repo-scanner", "--detectors", "env"]),
     );
 
     expect(profile.allDetectors).toBeFalse();
@@ -121,14 +121,13 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toEqual(["env"]);
   });
 
-  it("runs explicit detector-only mode for optional detector flags", () => {
+  it("runs explicit detector-only mode via --detectors list", () => {
     const profile = resolveScanProfile(
       parseArgs([
         "bun",
         "repo-scanner",
-        "--runtime",
-        "--todo",
-        "--code-duplication",
+        "--detectors",
+        "runtime,todo,code-duplication",
       ]),
     );
 
@@ -139,9 +138,26 @@ describe("resolveScanProfile", () => {
     );
   });
 
+  it("runs explicit detector-only mode for --detectors selector", () => {
+    const profile = resolveScanProfile(
+      parseArgs([
+        "bun",
+        "repo-scanner",
+        "--detectors",
+        "language,env,todo,external-services",
+      ]),
+    );
+
+    expect(profile.allDetectors).toBeFalse();
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.enabledDetectorIds).toEqual(
+      expect.arrayContaining(["language", "env", "todo", "external-services"]),
+    );
+  });
+
   it("adds env detector to section profile when combined with section flags", () => {
     const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--inventory", "--env"]),
+      parseArgs(["bun", "repo-scanner", "--inventory", "--detectors", "env"]),
     );
 
     expect(profile.allDetectors).toBeFalse();
@@ -150,19 +166,14 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("language");
   });
 
-  it("adds optional detector flags to section profiles", () => {
+  it("adds optional detector IDs to section profiles from --detectors", () => {
     const profile = resolveScanProfile(
       parseArgs([
         "bun",
         "repo-scanner",
         "--inventory",
-        "--naming-convention",
-        "--runtime",
-        "--large-file",
-        "--todo",
-        "--dead-export",
-        "--code-duplication",
-        "--complexity-hotspots",
+        "--detectors",
+        "naming-convention,runtime,large-file,todo,dead-export,code-duplication,complexity-hotspots",
       ]),
     );
 
@@ -175,28 +186,13 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("complexity-hotspots");
   });
 
-  it("runs detector-only mode for newly added core detector flags", () => {
+  it("runs detector-only mode for core detector IDs via --detectors", () => {
     const profile = resolveScanProfile(
       parseArgs([
         "bun",
         "repo-scanner",
-        "--language",
-        "--framework",
-        "--monorepo",
-        "--dependency-manager",
-        "--ci",
-        "--containerization",
-        "--iac-detector",
-        "--testing-detector",
-        "--datastore",
-        "--linting-detector",
-        "--build",
-        "--repo-tools",
-        "--cross-package-deps",
-        "--code-quality",
-        "--deployment-platform",
-        "--external-services-detector",
-        "--api-surface",
+        "--detectors",
+        "language,framework,monorepo,dependency-manager,ci,containerization,iac,testing,datastore,linting,build,repo-tools,cross-package-deps,code-quality,deployment-platform,external-services,api-surface",
       ]),
     );
 

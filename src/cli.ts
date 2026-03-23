@@ -5,6 +5,12 @@ import type {
   OutdatedThreshold,
   VulnerabilitySeverity,
 } from "./dependency/types";
+import {
+  DETECTOR_IDS,
+  DETECTOR_PRESETS,
+  type DetectorId,
+  type DetectorPreset,
+} from "./detectors/catalog";
 import { ALL_DIAGRAM_KINDS } from "./output/topology/types";
 import type { CliOptions, DiagramKind } from "./types";
 import { BUILD_SHA } from "./update/build-version";
@@ -53,95 +59,91 @@ const VALID_COMPONENT_GROUPING_MODES = new Set<DependencyComponentGroupingMode>(
   ["default", "apps-only", "services-only", "workspace-package"],
 );
 
-const HELP_TEXT = `repo-scanner - Universal repository structure scanner
+const VALID_DETECTOR_ID_SET = new Set<string>(DETECTOR_IDS);
+const VALID_DETECTOR_IDS_TEXT = DETECTOR_IDS.join(",");
+
+const HELP_TEXT = `repo-scanner — universal repository scanner
 
 Usage: repo-scanner [command] [options]
 
 Commands:
-  update                      Check for updates and install the latest version
+  update                             Check for updates and install latest binary
+  detectors                          List supported detector IDs
+  completion <shell>                 Generate shell completion script (bash|zsh|fish)
+  completion install <shell>         Install completion script for your shell
+  completion uninstall <shell>       Remove installed completion script for your shell
 
-Options:
-  --path <dir>                Directory to scan (default: cwd)
-  --format <fmt>              Output format: table | json (default: table)
-  --architecture              Scan/render Architecture section only
-  --inventory                 Scan/render Inventory section only
-  --external-services         Scan/render External Services section only
-  --build-and-test            Scan/render Build & Test section only
-  --all-detectors             Run full legacy detector set
-  --full-scan                 Alias for --all-detectors
-  --dry-check                 Run duplication-only scan with dry-check output contract
-  --deps                      Enable deep dependency analysis
-  --deps-debug                Emit dependency debug diagnostics to stderr
-  --ecosystems <list>         Comma-separated ecosystems to scan (default: all)
-                              Valid: npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan
-  --no-usage                  Skip dependency usage scanning
-  --no-security               Skip vulnerability checks
-  --no-version-lookup         Skip registry version lookups
-  --concurrency <n>           Max dependency scan parallel operations (default: CPU count)
-  --component-grouping <m>    Component grouping for dependency summaries
-                              Valid: default,apps-only,services-only,workspace-package (default: default)
-  --fail-on-vulns             Exit with code 1 when vulnerabilities match threshold
-  --fail-on-vulns-count <n>   Exit with code 1 when vulnerability matches >= n
-  --severity-threshold <lvl>  Vulnerability threshold for --fail-on-vulns
-                              Valid: unknown,low,moderate,high,critical (default: low)
-  --fail-on-outdated          Exit with code 1 when updates match outdated threshold
-  --fail-on-outdated-count <n> Exit with code 1 when outdated matches >= n
-  --outdated-threshold <lvl>  Update threshold for --fail-on-outdated
-                              Valid: patch,minor,major (default: patch)
-  --fail-on-dead-deps         Exit with code 1 when dead (unused) dependencies are found
-  --fail-on-dead-deps-count <n> Exit with code 1 when dead dependency count >= n
-  --include-dev-dead-deps     Include dev dependencies in dead dependency detection
-  --large-file-threshold <n>  Line count threshold for large file detection (default: 500)
-  --min-tokens <n>            Minimum token window for duplication detection (default: 50)
-  --min-lines <n>             Minimum duplicate lines to report (default: 6)
-  --extensions <list>         Comma-separated file extensions for duplication scan
-  --min-unique-ratio <f>      Min distinct/total token ratio for duplication filtering (default: 0.10)
-  --max-literal-ratio <f>     Max literal token ratio for duplication filtering (default: 0.50)
-  --no-barrel-filter          Disable barrel re-export duplication filtering
-  --solid                     Enable SOLID principles analysis (uses tree-sitter AST)
-  --call-graph                Enable call graph detector output in scan JSON
-  --solid-threshold <n>       SOLID score threshold for reporting (default: 80)
-  --env-include-tests         Include test files in env var detection
-  --topology                  Generate mermaid architecture diagrams from scan results
-  --topology-diagrams <list>  Comma-separated diagram types to generate (default: all)
-                              Valid: architecture,dependency,dataflow,api-topology,erd,call-graph
-  --topology-output <path>    Write topology diagrams to file instead of stdout
-  --diff <range>              Diff-focused scan for changed files (e.g. HEAD~1, main...feature)
-  --diff-dry-check            Enable duplication scanning on changed files during diff mode
-  --diff-dry-include-tests    Include test files in diff duplication scan (excluded by default)
-  --diff-env-check            Enable new env var detection on changed files during diff mode
-  --fail-on-new-duplication-pct <n>  Exit with code 1 when diff duplication % exceeds n
-  --fail-on-new-env-vars      Exit with code 1 when net-new env vars are detected in diff
-  --db-schema                 Enable database schema detection (tables, columns, relationships)
-  --env                       Run env detector only (env var usage + inference)
-  --naming-convention         Run naming convention detector
-  --runtime                   Run runtime detector
-  --large-file                Run large-file detector
-  --todo                      Run TODO annotation detector
-  --dead-export               Run dead-export detector
-  --code-duplication          Run code-duplication detector
-  --complexity-hotspots       Run complexity hotspots detector
-  --language                  Run language detector
-  --framework                 Run framework detector
-  --monorepo                  Run monorepo detector
-  --dependency-manager        Run dependency-manager detector
-  --ci                        Run CI detector
-  --containerization          Run containerization detector
-  --iac-detector              Run IaC detector
-  --testing-detector          Run testing detector
-  --datastore                 Run datastore detector
-  --linting-detector          Run linting detector
-  --build                     Run build detector
-  --repo-tools                Run repo-tools detector
-  --cross-package-deps        Run cross-package-deps detector
-  --code-quality              Run code-quality detector
-  --deployment-platform       Run deployment-platform detector
-  --external-services-detector Run external-services detector
-  --api-surface               Run api-surface detector
-  --vcs                       Output VCS info only (type, provider, origin URL, branches)
-  --no-update-check           Suppress background update check for this run
-  --version, -v               Show version number
-  --help, -h                  Show this help text
+Core output profile:
+  --architecture                     Render Architecture section only
+  --inventory                        Render Inventory section only
+  --external-services                Render External Services section only
+  --build-and-test                   Render Build & Test section only
+  --all-detectors, --full-scan       Enable all detectors and Signals output
+  --detectors <list>                 Comma-separated detector IDs (advanced)
+                                      Valid: ${VALID_DETECTOR_IDS_TEXT}
+                                      Presets: @inventory,@quality,@architecture
+
+Dependency analysis:
+  --deps                             Enable dependency analysis
+  --ecosystems <list>                Limit ecosystems (npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan)
+  --no-usage                         Skip dependency usage scan
+  --no-security                      Skip vulnerability checks
+  --no-version-lookup                Skip registry version lookups
+  --concurrency <n>                  Max dependency lookup concurrency (default: CPU count)
+  --component-grouping <mode>        Group dependency summary by default|apps-only|services-only|workspace-package
+  --deps-debug                       Emit dependency debug diagnostics to stderr
+
+Policy gates (CI):
+  --fail-on-vulns                    Exit 1 when vulnerability threshold is met
+  --fail-on-vulns-count <n>          Exit 1 when vulnerability matches >= n
+  --severity-threshold <level>       unknown|low|moderate|high|critical (default: low)
+  --fail-on-outdated                 Exit 1 when update threshold is met
+  --fail-on-outdated-count <n>       Exit 1 when outdated matches >= n
+  --outdated-threshold <level>       patch|minor|major (default: patch)
+  --fail-on-dead-deps                Exit 1 when unused dependencies are found
+  --fail-on-dead-deps-count <n>      Exit 1 when dead dependency count >= n
+  --include-dev-dead-deps            Include dev dependencies in dead-dependency checks
+
+Specialized scans:
+  --dry-check                        Duplication-only scan with dry-check output
+  --diff <git-range>                 Diff-focused scan (e.g. HEAD~1, main...feature)
+  --diff-dry-check                   Run duplication scan for changed files
+  --diff-dry-include-tests           Include tests in diff duplication scan
+  --diff-env-check                   Check net-new env vars in changed files
+  --fail-on-new-duplication-pct <n>  Exit 1 if diff duplication percentage exceeds n
+  --fail-on-new-env-vars             Exit 1 if diff introduces new env vars
+  --topology                         Generate mermaid topology diagrams
+  --topology-diagrams <list>         architecture|dependency|dataflow|api-topology|erd|call-graph
+  --topology-output <path>           Write topology markdown to file
+
+General:
+  -p, --path <dir>                   Directory to scan (default: cwd)
+  -f, --format <table|json>          Output format (default: table)
+  --env-include-tests                Include test files in env-var detection
+  --large-file-threshold <n>         Large-file threshold in lines (default: 500)
+  --min-tokens <n>                   Duplication token window (default: 50)
+  --min-lines <n>                    Minimum duplicate lines (default: 6)
+  --extensions <list>                Duplication file extensions (comma-separated)
+  --min-unique-ratio <f>             Duplication distinct token floor (0..1, default: 0.10)
+  --max-literal-ratio <f>            Duplication literal token ceiling (0..1, default: 0.50)
+  --no-barrel-filter                 Disable barrel re-export duplication filtering
+  --solid-threshold <n>              SOLID score threshold (default: 80)
+  --no-update-check                  Suppress background update check
+  --version, -v                      Show version
+  --help, -h                         Show help
+  --schema                           JSON schema payload mode for detectors JSON output
+
+Examples:
+  repo-scanner --inventory
+  repo-scanner --detectors @inventory,@quality
+  repo-scanner detectors
+  repo-scanner detectors --format json --schema
+  repo-scanner completion zsh > _repo-scanner
+  repo-scanner completion install fish
+  repo-scanner completion uninstall fish
+  repo-scanner --deps --fail-on-vulns --severity-threshold high
+  repo-scanner --deps --fail-on-outdated --outdated-threshold minor
+  repo-scanner --diff main...HEAD --diff-dry-check --diff-env-check
 `;
 
 const parseSeverity = (raw: string): VulnerabilitySeverity | undefined => {
@@ -190,6 +192,29 @@ const parseUnitInterval = (raw: string): number | undefined => {
   return parsed;
 };
 
+const parseCommaSeparatedValues = (
+  raw: string | undefined,
+  optionName: string,
+): string[] => {
+  const value =
+    raw ??
+    failCliParse(`Error: ${optionName} requires a comma-separated value.`);
+  if (isFlagToken(value)) {
+    failCliParse(`Error: ${optionName} requires a comma-separated value.`);
+  }
+
+  const values = value
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (values.length === 0) {
+    failCliParse(`Error: ${optionName} must include at least one value.`);
+  }
+
+  return values;
+};
+
 const isFlagToken = (raw: string | undefined): boolean =>
   raw?.startsWith("--") ?? false;
 
@@ -224,6 +249,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let showHelp = false;
   let showVersion = false;
   let showUpdate = false;
+  let showDetectors = false;
+  let completionShell: "bash" | "zsh" | "fish" | undefined;
+  let completionInstall = false;
+  let completionUninstall = false;
+  let detectorsSchema = false;
+  const detectorSelectionWarnings: string[] = [];
   let noUpdateCheck = false;
   let scanArchitecture = false;
   let scanInventory = false;
@@ -295,11 +326,124 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let externalServicesDetector = false;
   let apiSurfaceDetector = false;
   let vcs = false;
+  const enableDetector = (detectorId: DetectorId): void => {
+    switch (detectorId) {
+      case "api-surface":
+        apiSurfaceDetector = true;
+        return;
+      case "build":
+        buildDetector = true;
+        return;
+      case "call-graph":
+        callGraph = true;
+        return;
+      case "ci":
+        ciDetector = true;
+        return;
+      case "code-duplication":
+        codeDuplication = true;
+        return;
+      case "code-quality":
+        codeQualityDetector = true;
+        return;
+      case "complexity-hotspots":
+        complexityHotspots = true;
+        return;
+      case "containerization":
+        containerizationDetector = true;
+        return;
+      case "cross-package-deps":
+        crossPackageDepsDetector = true;
+        return;
+      case "datastore":
+        datastoreDetector = true;
+        return;
+      case "db-schema":
+        dbSchema = true;
+        return;
+      case "dead-export":
+        deadExport = true;
+        return;
+      case "dependency-manager":
+        dependencyManagerDetector = true;
+        return;
+      case "deployment-platform":
+        deploymentPlatformDetector = true;
+        return;
+      case "env":
+        env = true;
+        return;
+      case "external-services":
+        externalServicesDetector = true;
+        return;
+      case "framework":
+        frameworkDetector = true;
+        return;
+      case "iac":
+        iacDetector = true;
+        return;
+      case "language":
+        languageDetector = true;
+        return;
+      case "large-file":
+        largeFile = true;
+        return;
+      case "linting":
+        lintingDetector = true;
+        return;
+      case "monorepo":
+        monorepoDetector = true;
+        return;
+      case "naming-convention":
+        namingConvention = true;
+        return;
+      case "repo-tools":
+        repoToolsDetector = true;
+        return;
+      case "runtime":
+        runtime = true;
+        return;
+      case "solid-health":
+        solid = true;
+        return;
+      case "testing":
+        testingDetector = true;
+        return;
+      case "todo":
+        todo = true;
+        return;
+      case "vcs":
+        vcs = true;
+        return;
+    }
+  };
 
   // Detect positional subcommand as the first non-flag argument.
-  if (args[0] === "update") {
+  const command = args[0];
+  if (command === "update") {
     showUpdate = true;
     args.splice(0, 1);
+  } else if (command === "detectors") {
+    showDetectors = true;
+    args.splice(0, 1);
+  } else if (command === "completion") {
+    const completionAction = args[1];
+    const isInstall = completionAction === "install";
+    const isUninstall = completionAction === "uninstall";
+    const shellIndex = isInstall || isUninstall ? 2 : 1;
+    const shell = args[shellIndex];
+    if (!shell || isFlagToken(shell)) {
+      failCliParse("Error: completion requires a shell: bash, zsh, or fish.");
+    }
+    if (shell !== "bash" && shell !== "zsh" && shell !== "fish") {
+      failCliParse(
+        `Error: invalid completion shell "${shell}". Use bash, zsh, or fish.`,
+      );
+    }
+    completionShell = shell as "bash" | "zsh" | "fish";
+    completionInstall = isInstall;
+    completionUninstall = isUninstall;
+    args.splice(0, isInstall || isUninstall ? 3 : 2);
   }
 
   for (let i = 0; i < args.length; i++) {
@@ -333,9 +477,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--full-scan":
         allDetectors = true;
         break;
+      case "-p":
       case "--path":
         pathArg = args[++i] ?? pathArg;
         break;
+      case "-f":
       case "--format": {
         const fmtArg = args[++i];
         const fmt = fmtArg ?? "table";
@@ -357,21 +503,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
         depsDebug = true;
         break;
       case "--ecosystems": {
-        const raw = args[++i];
-        if (!raw || isFlagToken(raw)) {
-          failCliParse("Error: --ecosystems requires a comma-separated value.");
-        }
-
-        const tokens = raw
-          .split(",")
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0);
-
-        if (tokens.length === 0) {
-          failCliParse(
-            "Error: --ecosystems must include at least one ecosystem.",
-          );
-        }
+        const tokens = parseCommaSeparatedValues(args[++i], "--ecosystems");
 
         const invalid = tokens.filter(
           (value) => !VALID_ECOSYSTEMS.has(value as Ecosystem),
@@ -386,6 +518,51 @@ export const parseArgs = (argv: string[]): CliOptions => {
         ecosystems = [...new Set(tokens)] as Ecosystem[];
         break;
       }
+      case "--detectors": {
+        const detectorIds = parseCommaSeparatedValues(args[++i], "--detectors");
+        const detectorSources = new Map<string, string[]>();
+        const expandedDetectorIds = detectorIds.flatMap((detectorId) => {
+          if (detectorId.startsWith("@")) {
+            const preset = DETECTOR_PRESETS[detectorId as DetectorPreset];
+            if (preset) {
+              for (const resolvedId of preset) {
+                const sources = detectorSources.get(resolvedId) ?? [];
+                sources.push(detectorId);
+                detectorSources.set(resolvedId, sources);
+              }
+              return [...preset];
+            }
+            return [detectorId];
+          }
+          const sources = detectorSources.get(detectorId) ?? [];
+          sources.push("explicit");
+          detectorSources.set(detectorId, sources);
+          return [detectorId];
+        });
+        const invalid = expandedDetectorIds.filter(
+          (detectorId) => !VALID_DETECTOR_ID_SET.has(detectorId),
+        );
+        if (invalid.length > 0) {
+          failCliParse(
+            `Error: invalid detector ids "${invalid.join(",")}". Use one of ${VALID_DETECTOR_IDS_TEXT} or presets @inventory,@quality,@architecture.`,
+          );
+        }
+
+        for (const detectorId of expandedDetectorIds) {
+          enableDetector(detectorId as DetectorId);
+        }
+
+        for (const [detectorId, sources] of detectorSources.entries()) {
+          if (sources.length <= 1) continue;
+          detectorSelectionWarnings.push(
+            `detector "${detectorId}" selected multiple times (${sources.join(" + ")})`,
+          );
+        }
+        break;
+      }
+      case "--schema":
+        detectorsSchema = true;
+        break;
       case "--no-usage":
         skipUsage = true;
         break;
@@ -497,90 +674,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--env-include-tests":
         envIncludeTests = true;
         break;
-      case "--db-schema":
-        dbSchema = true;
-        break;
-      case "--env":
-        env = true;
-        break;
-      case "--naming-convention":
-        namingConvention = true;
-        break;
-      case "--runtime":
-        runtime = true;
-        break;
-      case "--large-file":
-        largeFile = true;
-        break;
-      case "--todo":
-        todo = true;
-        break;
-      case "--dead-export":
-        deadExport = true;
-        break;
-      case "--code-duplication":
-        codeDuplication = true;
-        break;
-      case "--complexity-hotspots":
-        complexityHotspots = true;
-        break;
-      case "--language":
-        languageDetector = true;
-        break;
-      case "--framework":
-        frameworkDetector = true;
-        break;
-      case "--monorepo":
-        monorepoDetector = true;
-        break;
-      case "--dependency-manager":
-        dependencyManagerDetector = true;
-        break;
-      case "--ci":
-        ciDetector = true;
-        break;
-      case "--containerization":
-        containerizationDetector = true;
-        break;
-      case "--iac-detector":
-        iacDetector = true;
-        break;
-      case "--testing-detector":
-        testingDetector = true;
-        break;
-      case "--datastore":
-        datastoreDetector = true;
-        break;
-      case "--linting-detector":
-        lintingDetector = true;
-        break;
-      case "--build":
-        buildDetector = true;
-        break;
-      case "--repo-tools":
-        repoToolsDetector = true;
-        break;
-      case "--cross-package-deps":
-        crossPackageDepsDetector = true;
-        break;
-      case "--code-quality":
-        codeQualityDetector = true;
-        break;
-      case "--deployment-platform":
-        deploymentPlatformDetector = true;
-        break;
-      case "--external-services-detector":
-        externalServicesDetector = true;
-        break;
-      case "--api-surface":
-        apiSurfaceDetector = true;
-        break;
-      case "--solid":
-        solid = true;
-        break;
-      case "--call-graph":
-        callGraph = true;
-        break;
       case "--solid-threshold":
         solidThreshold = parseRequiredPositiveIntegerOption(
           args[++i],
@@ -591,23 +684,10 @@ export const parseArgs = (argv: string[]): CliOptions => {
         topology = true;
         break;
       case "--topology-diagrams": {
-        const raw = args[++i];
-        if (!raw || isFlagToken(raw)) {
-          failCliParse(
-            "Error: --topology-diagrams requires a comma-separated value.",
-          );
-        }
-
-        const tokens = raw
-          .split(",")
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0);
-
-        if (tokens.length === 0) {
-          failCliParse(
-            "Error: --topology-diagrams must include at least one diagram type.",
-          );
-        }
+        const tokens = parseCommaSeparatedValues(
+          args[++i],
+          "--topology-diagrams",
+        );
 
         const invalid = tokens.filter(
           (value) => !VALID_DIAGRAM_KINDS.has(value as DiagramKind),
@@ -689,6 +769,13 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--vcs":
         vcs = true;
         break;
+      default:
+        if (arg.startsWith("-")) {
+          failCliParse(`Error: unknown option "${arg}". Use --help for usage.`);
+        }
+        failCliParse(
+          `Error: unexpected argument "${arg}". Use --help for usage.`,
+        );
     }
   }
 
@@ -698,6 +785,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
     showHelp,
     showVersion,
     showUpdate,
+    showDetectors,
+    completionShell,
+    completionInstall,
+    completionUninstall,
+    detectorsSchema,
+    detectorSelectionWarnings,
     noUpdateCheck,
     scanArchitecture,
     scanInventory,

@@ -70,14 +70,17 @@ const createCoreProfileFixtureRepo = async (): Promise<string> => {
   return repoPath;
 };
 
-const runRepoScanner = (args: readonly string[]) =>
+const runRepoScanner = (
+  args: readonly string[],
+  envOverrides?: Record<string, string>,
+) =>
   Bun.spawnSync(
     [process.execPath, "packages/repo-scanner/src/bin.ts", ...args],
     {
       cwd: repoRootPath,
       stdout: "pipe",
       stderr: "pipe",
-      env: process.env,
+      env: { ...process.env, ...envOverrides },
     },
   );
 
@@ -258,6 +261,121 @@ describe("repo-scanner bin", () => {
     }
   });
 
+  it("prints detector catalog for detectors subcommand", () => {
+    const result = runRepoScanner(["detectors"]);
+    const stdout = decode(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(stdout).toContain("Supported detectors");
+    expect(stdout).toContain("language");
+    expect(stdout).toContain("repo-scanner --detectors");
+  });
+
+  it("prints detector schema for detectors --format json --schema", () => {
+    const result = runRepoScanner([
+      "detectors",
+      "--format",
+      "json",
+      "--schema",
+    ]);
+    const payload = JSON.parse(decode(result.stdout));
+
+    expect(result.exitCode).toBe(0);
+    expect(payload.$schema).toContain("detectors-v1.schema.json");
+    expect(payload.detectors.length).toBeGreaterThan(0);
+    expect(payload.presets["@inventory"].length).toBeGreaterThan(0);
+  });
+
+  it("prints bash completion script for completion subcommand", () => {
+    const result = runRepoScanner(["completion", "bash"]);
+    const stdout = decode(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(stdout).toContain("complete -F _repo_scanner repo-scanner");
+    expect(stdout).toContain("--detectors");
+  });
+
+  it("installs completion script for completion install subcommand", async () => {
+    const homePath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-home-"),
+    );
+
+    try {
+      const result = runRepoScanner(["completion", "install", "fish"], {
+        HOME: homePath,
+      });
+      const stdout = decode(result.stdout);
+      const completionFile = path.join(
+        homePath,
+        ".config",
+        "fish",
+        "completions",
+        "repo-scanner.fish",
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Installed fish completion:");
+      const content = await Bun.file(completionFile).text();
+      expect(content).toContain("# fish completion for repo-scanner");
+    } finally {
+      await rm(homePath, { recursive: true, force: true });
+    }
+  });
+
+  it("uninstalls completion script for completion uninstall subcommand", async () => {
+    const homePath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-home-"),
+    );
+
+    try {
+      const installResult = runRepoScanner(["completion", "install", "fish"], {
+        HOME: homePath,
+      });
+      expect(installResult.exitCode).toBe(0);
+
+      const uninstallResult = runRepoScanner(
+        ["completion", "uninstall", "fish"],
+        {
+          HOME: homePath,
+        },
+      );
+      const stdout = decode(uninstallResult.stdout);
+      const completionFile = path.join(
+        homePath,
+        ".config",
+        "fish",
+        "completions",
+        "repo-scanner.fish",
+      );
+
+      expect(uninstallResult.exitCode).toBe(0);
+      expect(stdout).toContain("Removed fish completion:");
+      expect(await Bun.file(completionFile).exists()).toBeFalse();
+    } finally {
+      await rm(homePath, { recursive: true, force: true });
+    }
+  });
+
+  it("prints duplicate detector composition warnings to stderr", async () => {
+    const repoPath = await createCliFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "@inventory,language,@quality,code-quality",
+      ]);
+      const stderr = decode(result.stderr);
+
+      expect(result.exitCode).toBe(0);
+      expect(stderr).toContain('[detectors] warning: detector "language"');
+      expect(stderr).toContain('[detectors] warning: detector "code-quality"');
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
   it("enables dependency scan when --fail-on-dead-deps is used without --deps", async () => {
     const repoPath = await createCliFixtureRepo();
 
@@ -420,6 +538,51 @@ describe("repo-scanner bin", () => {
       expect(stdout).not.toContain("Inventory");
       expect(stdout).not.toContain("External Services");
       expect(stdout).not.toContain("Signals");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("shows inventory output in table mode for explicit detector-only flags", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "language",
+      ]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Inventory");
+      expect(stdout).toContain("Languages:");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("includes inventory in json mode for explicit detector-only flags", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "language",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+
+      expect(payload.scanPath).toBeDefined();
+      expect(payload.inventory).toBeDefined();
+      expect(payload.inventory.languages).toBeArray();
+      expect(payload.architecture).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

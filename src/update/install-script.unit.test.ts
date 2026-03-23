@@ -75,6 +75,10 @@ describe("repo-scanner installer script", () => {
     expect(script).not.toMatch(/python3\s+-c\s+"[^"]*\$platform/);
   });
 
+  it("does not combine a python heredoc with piped version_json", () => {
+    const script = fs.readFileSync(installerScriptPath, "utf8");
+    expect(script).not.toContain(`python3 - "$platform" <<'PYEOF'`);
+  });
   it("invokes python3 only once to extract both bundleUrl and bundleChecksum", () => {
     const script = fs.readFileSync(installerScriptPath, "utf8");
     // The version-url resolution section should only spawn python3 once.
@@ -88,6 +92,12 @@ describe("repo-scanner installer script", () => {
     const python3Invocations = (resolveSection.match(/\|\s*python3\b/g) || [])
       .length;
     expect(python3Invocations).toBe(1);
+  });
+
+  it("does not require repo-scanner to already be on PATH", () => {
+    const script = fs.readFileSync(installerScriptPath, "utf8");
+    expect(script).not.toContain("command -v repo-scanner");
+    expect(script).toContain('"$bin_root/repo-scanner" --help');
   });
 
   it("does not error on missing --bundle-url when --version-url is provided", () => {

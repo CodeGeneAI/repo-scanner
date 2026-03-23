@@ -142,16 +142,17 @@ if [ -n "$version_url" ] && [ -z "$bundle_url" ]; then
   # Pass the platform string as a positional argument to the Python interpreter
   # rather than interpolating it into the script body, eliminating injection risk.
   # Single invocation extracts both bundleUrl and bundleChecksum (space-separated).
-  resolved="$(printf '%s' "$version_json" | python3 - "$platform" <<'PYEOF'
-import json, sys
+  resolved="$(printf '%s' "$version_json" | python3 -c '
+import json
+import sys
+
 platform = sys.argv[1]
 data = json.load(sys.stdin)
-entry = data.get('platforms', {}).get(platform)
+entry = data.get("platforms", {}).get(platform)
 if not entry:
-    raise SystemExit('No bundle available for platform: ' + platform)
-print(entry['bundleUrl'] + ' ' + entry['bundleChecksum'])
-PYEOF
-)" || fail "Failed to extract bundle info for platform '$platform' from version.json"
+    raise SystemExit("No bundle available for platform: " + platform)
+print(entry["bundleUrl"] + " " + entry["bundleChecksum"])
+' "$platform")" || fail "Failed to extract bundle info for platform '$platform' from version.json"
 
   bundle_url="${resolved%% *}"
   bundle_sha256="${resolved#* }"
@@ -231,5 +232,5 @@ fi
 
 [ -x "$target_dir/bin/repo-scanner" ] || fail "repo-scanner binary missing after extraction"
 ln -sf "$target_dir/bin/repo-scanner" "$bin_root/repo-scanner"
-command -v repo-scanner >/dev/null 2>&1 || fail "repo-scanner symlink verification failed"
-repo-scanner --help >/dev/null 2>&1 || fail "repo-scanner executable validation failed"
+[ -x "$bin_root/repo-scanner" ] || fail "repo-scanner symlink verification failed"
+"$bin_root/repo-scanner" --help >/dev/null 2>&1 || fail "repo-scanner executable validation failed"

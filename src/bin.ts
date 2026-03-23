@@ -5,6 +5,11 @@ import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import { scanForDuplicates } from "./code-duplication/scanner";
 import type { DryCheckResult } from "./code-duplication/types";
 import { evaluateDependencyPolicy } from "./dependency/policy";
+import {
+  DETECTOR_CATALOG,
+  DETECTOR_IDS,
+  DETECTOR_PRESETS,
+} from "./detectors/catalog";
 import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
 import { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
@@ -19,7 +24,11 @@ import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { generateTopology } from "./output/topology";
 import { renderTopologyToString } from "./output/topology/render";
-import { resolveScanProfile, type ScanSection } from "./scan-profile";
+import {
+  resolveScanProfile,
+  SCAN_SECTIONS,
+  type ScanSection,
+} from "./scan-profile";
 import { scanRepo } from "./scanner";
 import type { RepoScanResult } from "./types";
 import { BUILD_SHA, BUILD_UPDATE_URL } from "./update/build-version";
@@ -67,6 +76,134 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
     new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
   ]);
 
+const renderDetectorsOutput = (
+  format: "table" | "json",
+  schema: boolean,
+  stream: NodeJS.WritableStream,
+): void => {
+  if (format === "json") {
+    if (schema) {
+      renderJson(
+        {
+          $schema:
+            "https://assets.codegene.dev/binaries/repo-scanner/schemas/detectors-v1.schema.json",
+          version: 1,
+          detectors: DETECTOR_CATALOG,
+          presets: DETECTOR_PRESETS,
+        },
+        stream,
+      );
+      return;
+    }
+    renderJson(
+      { detectors: DETECTOR_CATALOG, presets: DETECTOR_PRESETS },
+      stream,
+    );
+    return;
+  }
+
+  stream.write("Supported detectors\n");
+  for (const detector of DETECTOR_CATALOG) {
+    stream.write(`  - ${detector.id.padEnd(20)} ${detector.description}\n`);
+  }
+  stream.write(`\nPresets: ${Object.keys(DETECTOR_PRESETS).join(", ")}\n`);
+  stream.write(
+    `Use with: repo-scanner --detectors ${DETECTOR_IDS.slice(0, 3).join(",")}\n`,
+  );
+};
+
+const buildCompletionScript = (shell: "bash" | "zsh" | "fish"): string => {
+  const detectorIds = DETECTOR_IDS.join(" ");
+  if (shell === "bash") {
+    return `# bash completion for repo-scanner
+_repo_scanner()
+{
+  local current previous
+  COMPREPLY=()
+  current="\${COMP_WORDS[COMP_CWORD]}"
+  previous="\${COMP_WORDS[COMP_CWORD-1]}"
+  if [[ "\${previous}" == "--detectors" ]]; then
+    COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
+    return 0
+  fi
+  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors --deps --topology --diff" -- "\${current}") )
+}
+complete -F _repo_scanner repo-scanner
+`;
+  }
+  if (shell === "zsh") {
+    return `#compdef repo-scanner
+_repo_scanner() {
+  local -a detector_ids
+  detector_ids=(${DETECTOR_IDS.join(" ")})
+  _arguments \\
+    '--detectors[Comma-separated detector IDs]:detectors:->detectors' \\
+    '--path[Directory to scan]:path:_files -/' \\
+    '--format[Output format]:format:(table json)' \\
+    '--help[Show help]' \\
+    '--version[Show version]'
+  case $state in
+    detectors)
+      _describe 'detector ids' detector_ids
+      ;;
+  esac
+}
+_repo_scanner "$@"
+`;
+  }
+  return `# fish completion for repo-scanner
+set -l detector_ids ${DETECTOR_IDS.join(" ")}
+for detector in $detector_ids
+  complete -c repo-scanner -l detectors -xa "$detector"
+end
+complete -c repo-scanner -l path -r
+complete -c repo-scanner -l format -xa "table json"
+complete -c repo-scanner -l help
+complete -c repo-scanner -l version
+`;
+};
+
+const installCompletionScript = (
+  shell: "bash" | "zsh" | "fish",
+  script: string,
+): string => {
+  const homeDir = process.env.HOME ?? process.cwd();
+  const targetPath =
+    shell === "bash"
+      ? path.join(homeDir, ".bash_completion.d", "repo-scanner")
+      : shell === "zsh"
+        ? path.join(homeDir, ".zfunc", "_repo-scanner")
+        : path.join(
+            homeDir,
+            ".config",
+            "fish",
+            "completions",
+            "repo-scanner.fish",
+          );
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  fs.writeFileSync(targetPath, script);
+  return targetPath;
+};
+
+const resolveCompletionInstallPath = (
+  shell: "bash" | "zsh" | "fish",
+): string => {
+  const homeDir = process.env.HOME ?? process.cwd();
+  if (shell === "bash") {
+    return path.join(homeDir, ".bash_completion.d", "repo-scanner");
+  }
+  if (shell === "zsh") {
+    return path.join(homeDir, ".zfunc", "_repo-scanner");
+  }
+  return path.join(
+    homeDir,
+    ".config",
+    "fish",
+    "completions",
+    "repo-scanner.fish",
+  );
+};
+
 const buildSectionJsonPayload = (
   result: RepoScanResult,
   selectedSections: readonly ScanSection[],
@@ -95,6 +232,11 @@ const buildSectionJsonPayload = (
   return payload;
 };
 
+const resolveRenderedSections = (
+  selectedSections: readonly ScanSection[],
+): readonly ScanSection[] =>
+  selectedSections.length > 0 ? selectedSections : SCAN_SECTIONS;
+
 const hasExplicitSectionOutputFlags = (
   options: ReturnType<typeof parseArgs>,
 ): boolean =>
@@ -119,6 +261,11 @@ const hasExplicitPolicyOutputFlags = (
 
 const main = async () => {
   const options = parseArgs(process.argv);
+  if (options.detectorSelectionWarnings.length > 0) {
+    for (const warning of options.detectorSelectionWarnings) {
+      process.stderr.write(`[detectors] warning: ${warning}\n`);
+    }
+  }
   setLargeFileThreshold(options.largeFileThreshold);
   setDuplicationOptions({
     minTokens: options.minTokens,
@@ -158,6 +305,45 @@ const main = async () => {
       updateUrl: BUILD_UPDATE_URL,
       stderr: process.stderr,
     });
+    process.exit(0);
+  }
+
+  if (options.showDetectors) {
+    renderDetectorsOutput(
+      options.format,
+      options.detectorsSchema,
+      process.stdout,
+    );
+    process.exit(0);
+  }
+
+  if (options.completionShell) {
+    const script = buildCompletionScript(options.completionShell);
+    if (options.completionInstall) {
+      const installedPath = installCompletionScript(
+        options.completionShell,
+        script,
+      );
+      process.stdout.write(
+        `Installed ${options.completionShell} completion: ${installedPath}\n`,
+      );
+      process.exit(0);
+    }
+    if (options.completionUninstall) {
+      const installPath = resolveCompletionInstallPath(options.completionShell);
+      if (fs.existsSync(installPath)) {
+        fs.unlinkSync(installPath);
+        process.stdout.write(
+          `Removed ${options.completionShell} completion: ${installPath}\n`,
+        );
+      } else {
+        process.stdout.write(
+          `No ${options.completionShell} completion found at: ${installPath}\n`,
+        );
+      }
+      process.exit(0);
+    }
+    process.stdout.write(script);
     process.exit(0);
   }
 
@@ -355,6 +541,9 @@ const main = async () => {
       policyOutputExplicitlyRequested);
 
   if (options.format === "json") {
+    const renderedSections = resolveRenderedSections(
+      scanProfile.selectedSections,
+    );
     const jsonPayload = topologyOnlyOutput
       ? topology
         ? { topology }
@@ -363,7 +552,7 @@ const main = async () => {
           ...(scanProfile.allDetectors
             ? ({ ...result } as Record<string, unknown>)
             : includeSectionOutput
-              ? buildSectionJsonPayload(result, scanProfile.selectedSections)
+              ? buildSectionJsonPayload(result, renderedSections)
               : {}),
           ...(includeDependencyOutput
             ? { dependencies: result.dependencies }
@@ -374,11 +563,14 @@ const main = async () => {
         };
     renderJson(jsonPayload, process.stdout);
   } else if (includeReportOutput) {
+    const renderedSections = resolveRenderedSections(
+      scanProfile.selectedSections,
+    );
     renderTable(result, process.stdout, {
       selectedSections: scanProfile.allDetectors
         ? undefined
         : includeSectionOutput
-          ? scanProfile.selectedSections
+          ? renderedSections
           : [],
       includeDependencies: includeDependencyOutput,
       includeSignals: scanProfile.allDetectors,
