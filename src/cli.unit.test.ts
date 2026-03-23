@@ -45,8 +45,11 @@ describe("parseArgs", () => {
     expect(result.codeDuplication).toBeFalse();
     expect(result.complexityHotspots).toBeFalse();
     expect(result.languageDetector).toBeFalse();
+    expect(result.languageStatsDetector).toBeFalse();
+    expect(result.codebaseSizeDetector).toBeFalse();
     expect(result.frameworkDetector).toBeFalse();
     expect(result.monorepoDetector).toBeFalse();
+    expect(result.componentsDetector).toBeFalse();
     expect(result.dependencyManagerDetector).toBeFalse();
     expect(result.ciDetector).toBeFalse();
     expect(result.containerizationDetector).toBeFalse();
@@ -55,8 +58,14 @@ describe("parseArgs", () => {
     expect(result.datastoreDetector).toBeFalse();
     expect(result.lintingDetector).toBeFalse();
     expect(result.buildDetector).toBeFalse();
+    expect(result.buildCommandsDetector).toBeFalse();
+    expect(result.testCommandsDetector).toBeFalse();
+    expect(result.lintCommandsDetector).toBeFalse();
     expect(result.repoToolsDetector).toBeFalse();
     expect(result.crossPackageDepsDetector).toBeFalse();
+    expect(result.circularDepsDetector).toBeFalse();
+    expect(result.layerViolationsDetector).toBeFalse();
+    expect(result.highImpactComponentsDetector).toBeFalse();
     expect(result.codeQualityDetector).toBeFalse();
     expect(result.deploymentPlatformDetector).toBeFalse();
     expect(result.externalServicesDetector).toBeFalse();
@@ -85,6 +94,11 @@ describe("parseArgs", () => {
     expect(result.allDetectors).toBeTrue();
   });
 
+  it("parses --solid legacy convenience flag", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--solid"]);
+    expect(result.solid).toBeTrue();
+  });
+
   it("parses --detectors with multiple detector ids", () => {
     const result = parseArgs([
       "bun",
@@ -99,6 +113,25 @@ describe("parseArgs", () => {
     expect(result.externalServicesDetector).toBeTrue();
     expect(result.solid).toBeTrue();
     expect(result.vcs).toBeTrue();
+  });
+
+  it("parses expanded split selectors", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--detectors",
+      "components,language-stats,codebase-size,build-commands,test-commands,lint-commands,circular-deps,layer-violations,high-impact-components",
+    ]);
+
+    expect(result.componentsDetector).toBeTrue();
+    expect(result.languageStatsDetector).toBeTrue();
+    expect(result.codebaseSizeDetector).toBeTrue();
+    expect(result.buildCommandsDetector).toBeTrue();
+    expect(result.testCommandsDetector).toBeTrue();
+    expect(result.lintCommandsDetector).toBeTrue();
+    expect(result.circularDepsDetector).toBeTrue();
+    expect(result.layerViolationsDetector).toBeTrue();
+    expect(result.highImpactComponentsDetector).toBeTrue();
   });
 
   it("expands detector presets in --detectors", () => {

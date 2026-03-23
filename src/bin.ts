@@ -136,8 +136,9 @@ complete -F _repo_scanner repo-scanner
     return `#compdef repo-scanner
 _repo_scanner() {
   local -a detector_ids
+  local context state state_descr line
   detector_ids=(${DETECTOR_IDS.join(" ")})
-  _arguments \\
+  _arguments -C \\
     '--detectors[Comma-separated detector IDs]:detectors:->detectors' \\
     '--path[Directory to scan]:path:_files -/' \\
     '--format[Output format]:format:(table json)' \\
@@ -149,7 +150,9 @@ _repo_scanner() {
       ;;
   esac
 }
-_repo_scanner "$@"
+if (( $+functions[compdef] )); then
+  compdef _repo_scanner repo-scanner
+fi
 `;
   }
   return `# fish completion for repo-scanner
@@ -168,19 +171,7 @@ const installCompletionScript = (
   shell: "bash" | "zsh" | "fish",
   script: string,
 ): string => {
-  const homeDir = process.env.HOME ?? process.cwd();
-  const targetPath =
-    shell === "bash"
-      ? path.join(homeDir, ".bash_completion.d", "repo-scanner")
-      : shell === "zsh"
-        ? path.join(homeDir, ".zfunc", "_repo-scanner")
-        : path.join(
-            homeDir,
-            ".config",
-            "fish",
-            "completions",
-            "repo-scanner.fish",
-          );
+  const targetPath = resolveCompletionInstallPath(shell);
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(targetPath, script);
   return targetPath;
@@ -191,7 +182,16 @@ const resolveCompletionInstallPath = (
 ): string => {
   const homeDir = process.env.HOME ?? process.cwd();
   if (shell === "bash") {
-    return path.join(homeDir, ".bash_completion.d", "repo-scanner");
+    const xdgDataHome =
+      process.env.XDG_DATA_HOME && process.env.XDG_DATA_HOME.length > 0
+        ? process.env.XDG_DATA_HOME
+        : path.join(homeDir, ".local", "share");
+    return path.join(
+      xdgDataHome,
+      "bash-completion",
+      "completions",
+      "repo-scanner",
+    );
   }
   if (shell === "zsh") {
     return path.join(homeDir, ".zfunc", "_repo-scanner");
@@ -241,123 +241,205 @@ const resolveRenderedSections = (
     ? selectedSections
     : SCAN_SECTIONS;
 
-type DetectorJsonProjection = (result: RepoScanResult) => unknown;
+type DetectorOutputEntry = {
+  readonly key: string;
+  readonly value: unknown;
+};
 
-const DETECTOR_JSON_PROJECTION_MAP: Record<DetectorId, DetectorJsonProjection> =
-  {
-    "api-surface": (result) => result.inventory.apiSurface ?? null,
-    build: (result) => ({
-      buildCommands: result.buildAndTest.buildCommands,
-      buildTools: result.inventory.buildTools,
-    }),
-    "call-graph": (result) => result.inventory.callGraph ?? null,
-    ci: (result) => ({ ciSystems: result.buildAndTest.ciSystems }),
-    "code-duplication": (result) => result.inventory.codeDuplication ?? null,
-    "code-quality": (result) => result.inventory.codeQuality,
-    "complexity-hotspots": (result) =>
-      result.inventory.complexityHotspots ?? [],
-    containerization: (result) => result.inventory.containerization,
-    "cross-package-deps": (result) =>
-      result.architecture.crossPackageDeps ?? null,
-    datastore: (result) => result.inventory.datastores,
-    "db-schema": (result) => result.inventory.databaseSchema ?? null,
-    "dead-export": (result) => result.inventory.deadExports ?? [],
-    "dependency-manager": (result) => result.inventory.dependencyManagers,
-    "deployment-platform": (result) => result.inventory.deploymentPlatforms,
-    env: (result) => result.inventory.envVars,
-    "external-services": (result) => result.inventory.externalServices ?? [],
-    framework: (result) => result.inventory.frameworks,
-    iac: (result) => result.inventory.iac,
-    language: (result) => ({
-      languages: result.inventory.languages,
-      languageStats: result.inventory.languageStats,
-      totalFiles: result.inventory.totalFiles,
-      totalLinesOfCode: result.inventory.totalLinesOfCode,
-    }),
-    "large-file": (result) => result.inventory.largeFiles ?? [],
-    linting: (result) => ({
-      linting: result.inventory.linting,
-      lintCommands: result.buildAndTest.lintCommands,
-    }),
-    monorepo: (result) => ({
-      monorepo: result.architecture.monorepo,
-      components: result.architecture.components,
-    }),
-    "naming-convention": (result) => result.inventory.namingConventions ?? [],
-    "repo-tools": (result) => result.inventory.repoTools,
-    runtime: (result) => result.inventory.runtimes,
-    "solid-health": (result) => result.inventory.solidHealth ?? null,
-    testing: (result) => ({
-      testing: result.inventory.testing,
-      testCommands: result.buildAndTest.testCommands,
-    }),
-    todo: (result) => result.inventory.todoAnnotations ?? [],
-    vcs: (result) => result.vcs ?? null,
-  };
+const toComponentIdentity = (result: RepoScanResult) =>
+  result.architecture.components.map((component) => ({
+    name: component.name,
+    path: component.path,
+    kind: component.kind,
+    secondaryKinds: component.secondaryKinds,
+    description: component.description,
+    confidence: component.confidence,
+    evidence: component.evidence,
+  }));
 
-const buildDetectorOnlyJsonPayload = (
+const resolveLanguageSelectorOutput = (
   result: RepoScanResult,
-  detectorIds: readonly string[],
+): readonly string[] => {
+  if (result.inventory.languages.length > 0) {
+    return result.inventory.languages;
+  }
+  const languageNames = result.inventory.languageStats
+    .map((entry) => entry.name.trim())
+    .filter((name) => name.length > 0);
+  return [...new Set(languageNames)];
+};
+
+const resolveDetectorOutputEntry = (
+  result: RepoScanResult,
+  detectorId: DetectorId,
+): DetectorOutputEntry => {
+  switch (detectorId) {
+    case "api-surface":
+      return { key: "apiSurface", value: result.inventory.apiSurface ?? null };
+    case "build":
+      return { key: "buildTools", value: result.inventory.buildTools };
+    case "build-commands":
+      return { key: "buildCommands", value: result.buildAndTest.buildCommands };
+    case "call-graph":
+      return { key: "callGraph", value: result.inventory.callGraph ?? null };
+    case "ci":
+      return { key: "ciSystems", value: result.buildAndTest.ciSystems };
+    case "codebase-size":
+      return {
+        key: "codebaseSize",
+        value: {
+          totalFiles: result.inventory.totalFiles,
+          totalLinesOfCode: result.inventory.totalLinesOfCode,
+        },
+      };
+    case "code-duplication":
+      return {
+        key: "codeDuplication",
+        value: result.inventory.codeDuplication ?? null,
+      };
+    case "code-quality":
+      return { key: "codeQuality", value: result.inventory.codeQuality };
+    case "complexity-hotspots":
+      return {
+        key: "complexityHotspots",
+        value: result.inventory.complexityHotspots ?? [],
+      };
+    case "components":
+      return { key: "components", value: toComponentIdentity(result) };
+    case "containerization":
+      return {
+        key: "containerization",
+        value: result.inventory.containerization,
+      };
+    case "circular-deps":
+      return {
+        key: "circularDeps",
+        value: result.architecture.circularDeps ?? [],
+      };
+    case "cross-package-deps":
+      return {
+        key: "crossPackageDeps",
+        value: result.architecture.crossPackageDeps ?? null,
+      };
+    case "datastore":
+      return { key: "datastores", value: result.inventory.datastores };
+    case "db-schema":
+      return {
+        key: "databaseSchema",
+        value: result.inventory.databaseSchema ?? null,
+      };
+    case "dead-export":
+      return { key: "deadExports", value: result.inventory.deadExports ?? [] };
+    case "dependency-manager":
+      return {
+        key: "dependencyManagers",
+        value: result.inventory.dependencyManagers,
+      };
+    case "deployment-platform":
+      return {
+        key: "deploymentPlatforms",
+        value: result.inventory.deploymentPlatforms,
+      };
+    case "env":
+      return { key: "envVars", value: result.inventory.envVars };
+    case "external-services":
+      return {
+        key: "externalServices",
+        value: result.inventory.externalServices ?? [],
+      };
+    case "framework":
+      return { key: "frameworks", value: result.inventory.frameworks };
+    case "high-impact-components":
+      return {
+        key: "highImpactComponents",
+        value: result.architecture.highImpactComponents ?? [],
+      };
+    case "iac":
+      return { key: "iac", value: result.inventory.iac };
+    case "language":
+      return { key: "languages", value: resolveLanguageSelectorOutput(result) };
+    case "language-stats":
+      return { key: "languageStats", value: result.inventory.languageStats };
+    case "large-file":
+      return { key: "largeFiles", value: result.inventory.largeFiles ?? [] };
+    case "layer-violations":
+      return {
+        key: "layerViolations",
+        value: result.architecture.layerViolations ?? [],
+      };
+    case "lint-commands":
+      return { key: "lintCommands", value: result.buildAndTest.lintCommands };
+    case "linting":
+      return { key: "linting", value: result.inventory.linting };
+    case "monorepo":
+      return { key: "monorepo", value: result.architecture.monorepo };
+    case "naming-convention":
+      return {
+        key: "namingConventions",
+        value: result.inventory.namingConventions ?? [],
+      };
+    case "repo-tools":
+      return { key: "repoTools", value: result.inventory.repoTools };
+    case "runtime":
+      return { key: "runtimes", value: result.inventory.runtimes };
+    case "solid-health":
+      return {
+        key: "solidHealth",
+        value: result.inventory.solidHealth ?? null,
+      };
+    case "test-commands":
+      return { key: "testCommands", value: result.buildAndTest.testCommands };
+    case "testing":
+      return { key: "testing", value: result.inventory.testing };
+    case "todo":
+      return {
+        key: "todoAnnotations",
+        value: result.inventory.todoAnnotations ?? [],
+      };
+    case "vcs":
+      return { key: "vcs", value: result.vcs ?? null };
+  }
+};
+
+const buildDetectorJsonPayload = (
+  result: RepoScanResult,
+  detectorIds: readonly DetectorId[],
 ): Record<string, unknown> => {
-  const uniqueDetectorIds = [...new Set(detectorIds)] as DetectorId[];
-  const detectorsPayload: Record<string, unknown> = {};
-  for (const detectorId of uniqueDetectorIds) {
-    const projection = DETECTOR_JSON_PROJECTION_MAP[detectorId];
-    if (!projection) continue;
-    detectorsPayload[detectorId] = projection(result);
+  const payload: Record<string, unknown> = {};
+  for (const detectorId of detectorIds) {
+    const entry = resolveDetectorOutputEntry(result, detectorId);
+    payload[entry.key] = entry.value;
+  }
+  return payload;
+};
+
+const renderDetectorTablePayload = (
+  result: RepoScanResult,
+  detectorIds: readonly DetectorId[],
+  stream: NodeJS.WritableStream,
+  includeHeader: boolean,
+): void => {
+  if (detectorIds.length === 0) return;
+  if (includeHeader) {
+    stream.write(
+      `repo-scanner — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
+    );
   }
 
-  return {
-    scanPath: result.scanPath,
-    timestamp: result.timestamp,
-    durationMs: result.durationMs,
-    detectors: detectorsPayload,
-  };
-};
-
-const DETECTOR_SECTION_MAP: Record<ScanSection, readonly string[]> = {
-  architecture: ["monorepo", "cross-package-deps"],
-  inventory: [
-    "language",
-    "framework",
-    "datastore",
-    "dependency-manager",
-    "containerization",
-    "iac",
-    "testing",
-    "build",
-    "linting",
-    "code-quality",
-    "deployment-platform",
-    "repo-tools",
-    "runtime",
-    "naming-convention",
-    "large-file",
-    "todo",
-    "dead-export",
-    "code-duplication",
-    "complexity-hotspots",
-    "api-surface",
-    "db-schema",
-    "call-graph",
-    "solid-health",
-  ],
-  "external-services": ["external-services"],
-  "build-and-test": ["build", "ci"],
-};
-
-const resolveSectionsForDetectors = (
-  detectorIds: readonly string[],
-): readonly ScanSection[] => {
-  const requestedDetectors = new Set(detectorIds);
-  const selectedSections: ScanSection[] = [];
-  for (const section of SCAN_SECTIONS) {
-    const detectorSet = DETECTOR_SECTION_MAP[section];
-    if (detectorSet.some((detectorId) => requestedDetectors.has(detectorId))) {
-      selectedSections.push(section);
+  for (const detectorId of detectorIds) {
+    const { key, value } = resolveDetectorOutputEntry(result, detectorId);
+    stream.write(`\n${key}\n`);
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      value === null
+    ) {
+      stream.write(`  ${String(value)}\n`);
+      continue;
     }
+    stream.write(`${JSON.stringify(value, null, 2)}\n`);
   }
-  return selectedSections;
 };
 
 const hasExplicitSectionOutputFlags = (
@@ -401,8 +483,9 @@ const main = async () => {
       ignoreBarrelExports: options.ignoreBarrelExports,
     },
   });
+  const allDetectorsEnabled = options.allDetectors;
   setSolidOptions({
-    enabled: options.solid,
+    enabled: options.solid || allDetectorsEnabled,
     threshold: options.solidThreshold,
   });
   setEnvIncludeTestFiles(options.envIncludeTests);
@@ -410,7 +493,9 @@ const main = async () => {
   const erdRequested = options.topologyDiagrams
     ? options.topologyDiagrams.includes("erd")
     : options.topology;
-  setDbSchemaOptions({ enabled: options.dbSchema || erdRequested });
+  setDbSchemaOptions({
+    enabled: options.dbSchema || erdRequested || allDetectorsEnabled,
+  });
 
   if (options.showVersion) {
     process.stdout.write(`${getVersion()}\n`);
@@ -598,70 +683,24 @@ const main = async () => {
         })()
       : undefined;
 
-  // VCS-only mode: output just the VCS info and exit.
-  const vcsOnlyMode = options.vcs && !hasExplicitSectionOutputFlags(options);
-  if (vcsOnlyMode) {
-    if (options.format === "json") {
-      renderJson(
-        {
-          scanPath: result.scanPath,
-          timestamp: result.timestamp,
-          durationMs: result.durationMs,
-          vcs: result.vcs ?? null,
-        },
-        process.stdout,
-      );
-    } else {
-      const vcs = result.vcs;
-      if (vcs) {
-        process.stdout.write("VCS Info\n");
-        process.stdout.write(`  Type:            ${vcs.type}\n`);
-        if (vcs.provider)
-          process.stdout.write(`  Provider:        ${vcs.provider}\n`);
-        if (vcs.originUrl)
-          process.stdout.write(`  Origin URL:      ${vcs.originUrl}\n`);
-        if (vcs.currentBranch)
-          process.stdout.write(`  Current Branch:  ${vcs.currentBranch}\n`);
-        if (vcs.defaultBranch)
-          process.stdout.write(`  Default Branch:  ${vcs.defaultBranch}\n`);
-        if (vcs.branches && vcs.branches.length > 0) {
-          process.stdout.write(
-            `  Branches:        ${vcs.branches.join(", ")}\n`,
-          );
-        }
-      } else {
-        process.stdout.write("No VCS detected.\n");
-      }
-    }
-    return;
-  }
-
   const sectionOutputExplicitlyRequested =
     hasExplicitSectionOutputFlags(options) || options.allDetectors;
-  const explicitDetectorOnlyMode =
-    !scanProfile.allDetectors &&
-    scanProfile.selectedSections.length === 0 &&
-    (scanProfile.enabledDetectorIds?.length ?? 0) > 0 &&
-    !sectionOutputExplicitlyRequested &&
-    !options.topology;
-  const explicitDetectorSections = explicitDetectorOnlyMode
-    ? resolveSectionsForDetectors(scanProfile.enabledDetectorIds ?? [])
-    : [];
+  const detectorOutputExplicitlyRequested =
+    scanProfile.explicitDetectorOutputIds.length > 0;
   const dependencyOutputExplicitlyRequested =
     hasExplicitDependencyOutputFlags(options);
   const policyOutputExplicitlyRequested = hasExplicitPolicyOutputFlags(options);
   const nonTopologyOutputExplicitlyRequested =
     sectionOutputExplicitlyRequested ||
+    detectorOutputExplicitlyRequested ||
     dependencyOutputExplicitlyRequested ||
     policyOutputExplicitlyRequested;
   const topologyOnlyOutput =
     options.topology && !nonTopologyOutputExplicitlyRequested;
   const includeReportOutput = !topologyOnlyOutput;
-  const includeSectionOutput = explicitDetectorOnlyMode
-    ? explicitDetectorSections.length > 0
-    : scanProfile.allDetectors ||
-      !options.topology ||
-      sectionOutputExplicitlyRequested;
+  const includeSectionOutput =
+    (scanProfile.allDetectors || scanProfile.selectedSections.length > 0) &&
+    (!options.topology || sectionOutputExplicitlyRequested);
   const includeDependencyOutput =
     !!result.dependencies &&
     (!options.topology ||
@@ -674,56 +713,74 @@ const main = async () => {
       policyOutputExplicitlyRequested);
 
   if (options.format === "json") {
-    const sectionSelection = explicitDetectorOnlyMode
-      ? explicitDetectorSections
-      : scanProfile.selectedSections;
-    const renderedSections = resolveRenderedSections(sectionSelection, {
-      fallbackToCoreSections: includeSectionOutput,
-    });
-    const detectorOnlyPayload =
-      explicitDetectorOnlyMode && scanProfile.enabledDetectorIds
-        ? buildDetectorOnlyJsonPayload(result, scanProfile.enabledDetectorIds)
-        : undefined;
-    const jsonPayload = topologyOnlyOutput
+    const renderedSections = resolveRenderedSections(
+      scanProfile.selectedSections,
+    );
+    const jsonPayload: Record<string, unknown> = topologyOnlyOutput
       ? topology
         ? { topology }
         : {}
-      : {
-          ...(detectorOnlyPayload
-            ? detectorOnlyPayload
-            : scanProfile.allDetectors
-              ? ({ ...result } as Record<string, unknown>)
-              : includeSectionOutput
-                ? buildSectionJsonPayload(result, renderedSections)
-                : {}),
-          ...(includeDependencyOutput
-            ? { dependencies: result.dependencies }
-            : {}),
-          ...(includePolicyOutput ? { policyEvaluation } : {}),
-          ...(topology ? { topology } : {}),
-          ...(diffScan ? { diffScan } : {}),
-        };
+      : scanProfile.allDetectors
+        ? ({ ...result } as Record<string, unknown>)
+        : includeSectionOutput
+          ? buildSectionJsonPayload(result, renderedSections)
+          : detectorOutputExplicitlyRequested
+            ? {
+                scanPath: result.scanPath,
+                timestamp: result.timestamp,
+                durationMs: result.durationMs,
+              }
+            : {};
+
+    if (!topologyOnlyOutput && detectorOutputExplicitlyRequested) {
+      Object.assign(
+        jsonPayload,
+        buildDetectorJsonPayload(result, scanProfile.explicitDetectorOutputIds),
+      );
+    }
+    if (includeDependencyOutput) {
+      jsonPayload.dependencies = result.dependencies;
+    }
+    if (includePolicyOutput) {
+      jsonPayload.policyEvaluation = policyEvaluation;
+    }
+    if (topology) {
+      jsonPayload.topology = topology;
+    }
+    if (diffScan) {
+      jsonPayload.diffScan = diffScan;
+    }
     renderJson(jsonPayload, process.stdout);
   } else if (includeReportOutput) {
-    const sectionSelection = explicitDetectorOnlyMode
-      ? explicitDetectorSections
-      : scanProfile.selectedSections;
-    const renderedSections = resolveRenderedSections(sectionSelection, {
-      fallbackToCoreSections: includeSectionOutput,
-    });
-    const enabledDetectorSet = new Set(scanProfile.enabledDetectorIds ?? []);
-    renderTable(result, process.stdout, {
-      selectedSections: scanProfile.allDetectors
-        ? undefined
-        : includeSectionOutput
-          ? renderedSections
-          : [],
-      includeDependencies: includeDependencyOutput,
-      includeSignals: scanProfile.allDetectors,
-      showEnvSection:
-        includeSectionOutput ||
-        (explicitDetectorOnlyMode && enabledDetectorSet.has("env")),
-    });
+    let renderedMainTable = false;
+    if (
+      scanProfile.allDetectors ||
+      includeSectionOutput ||
+      includeDependencyOutput
+    ) {
+      const renderedSections = resolveRenderedSections(
+        scanProfile.selectedSections,
+      );
+      renderTable(result, process.stdout, {
+        selectedSections: scanProfile.allDetectors
+          ? undefined
+          : includeSectionOutput
+            ? renderedSections
+            : [],
+        includeDependencies: includeDependencyOutput,
+        includeSignals: scanProfile.allDetectors,
+      });
+      renderedMainTable = true;
+    }
+
+    if (detectorOutputExplicitlyRequested) {
+      renderDetectorTablePayload(
+        result,
+        scanProfile.explicitDetectorOutputIds,
+        process.stdout,
+        !renderedMainTable,
+      );
+    }
   }
 
   if (topology) {

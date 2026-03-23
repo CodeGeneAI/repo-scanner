@@ -127,6 +127,7 @@ General:
   --min-unique-ratio <f>             Duplication distinct token floor (0..1, default: 0.10)
   --max-literal-ratio <f>            Duplication literal token ceiling (0..1, default: 0.50)
   --no-barrel-filter                 Disable barrel re-export duplication filtering
+  --solid                            Enable SOLID analysis detector
   --solid-threshold <n>              SOLID score threshold (default: 80)
   --no-update-check                  Suppress background update check
   --version, -v                      Show version
@@ -309,8 +310,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let codeDuplication = false;
   let complexityHotspots = false;
   let languageDetector = false;
+  let languageStatsDetector = false;
+  let codebaseSizeDetector = false;
   let frameworkDetector = false;
   let monorepoDetector = false;
+  let componentsDetector = false;
   let dependencyManagerDetector = false;
   let ciDetector = false;
   let containerizationDetector = false;
@@ -319,8 +323,14 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let datastoreDetector = false;
   let lintingDetector = false;
   let buildDetector = false;
+  let buildCommandsDetector = false;
+  let testCommandsDetector = false;
+  let lintCommandsDetector = false;
   let repoToolsDetector = false;
   let crossPackageDepsDetector = false;
+  let circularDepsDetector = false;
+  let layerViolationsDetector = false;
+  let highImpactComponentsDetector = false;
   let codeQualityDetector = false;
   let deploymentPlatformDetector = false;
   let externalServicesDetector = false;
@@ -334,11 +344,17 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "build":
         buildDetector = true;
         return;
+      case "build-commands":
+        buildCommandsDetector = true;
+        return;
       case "call-graph":
         callGraph = true;
         return;
       case "ci":
         ciDetector = true;
+        return;
+      case "codebase-size":
+        codebaseSizeDetector = true;
         return;
       case "code-duplication":
         codeDuplication = true;
@@ -349,8 +365,14 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "complexity-hotspots":
         complexityHotspots = true;
         return;
+      case "components":
+        componentsDetector = true;
+        return;
       case "containerization":
         containerizationDetector = true;
+        return;
+      case "circular-deps":
+        circularDepsDetector = true;
         return;
       case "cross-package-deps":
         crossPackageDepsDetector = true;
@@ -379,8 +401,14 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "framework":
         frameworkDetector = true;
         return;
+      case "high-impact-components":
+        highImpactComponentsDetector = true;
+        return;
       case "iac":
         iacDetector = true;
+        return;
+      case "language-stats":
+        languageStatsDetector = true;
         return;
       case "language":
         languageDetector = true;
@@ -390,6 +418,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "linting":
         lintingDetector = true;
+        return;
+      case "layer-violations":
+        layerViolationsDetector = true;
+        return;
+      case "lint-commands":
+        lintCommandsDetector = true;
         return;
       case "monorepo":
         monorepoDetector = true;
@@ -408,6 +442,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "testing":
         testingDetector = true;
+        return;
+      case "test-commands":
+        testCommandsDetector = true;
         return;
       case "todo":
         todo = true;
@@ -674,6 +711,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--env-include-tests":
         envIncludeTests = true;
         break;
+      case "--solid":
+        solid = true;
+        break;
       case "--solid-threshold":
         solidThreshold = parseRequiredPositiveIntegerOption(
           args[++i],
@@ -845,8 +885,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
     codeDuplication,
     complexityHotspots,
     languageDetector,
+    languageStatsDetector,
+    codebaseSizeDetector,
     frameworkDetector,
     monorepoDetector,
+    componentsDetector,
     dependencyManagerDetector,
     ciDetector,
     containerizationDetector,
@@ -855,8 +898,14 @@ export const parseArgs = (argv: string[]): CliOptions => {
     datastoreDetector,
     lintingDetector,
     buildDetector,
+    buildCommandsDetector,
+    testCommandsDetector,
+    lintCommandsDetector,
     repoToolsDetector,
     crossPackageDepsDetector,
+    circularDepsDetector,
+    layerViolationsDetector,
+    highImpactComponentsDetector,
     codeQualityDetector,
     deploymentPlatformDetector,
     externalServicesDetector,

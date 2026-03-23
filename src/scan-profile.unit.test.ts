@@ -55,6 +55,7 @@ describe("resolveScanProfile", () => {
     expect(fromAllDetectors).toEqual({
       allDetectors: true,
       selectedSections: [],
+      explicitDetectorOutputIds: [],
     });
     expect(fromFullScan).toEqual(fromAllDetectors);
   });
@@ -102,6 +103,17 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("call-graph");
   });
 
+  it("runs topology-only profiles without default section detector execution", () => {
+    const profile = resolveScanProfile(
+      parseArgs(["bun", "repo-scanner", "--topology-diagrams", "erd"]),
+    );
+
+    expect(profile.allDetectors).toBeFalse();
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.enabledDetectorIds).toEqual(["db-schema"]);
+    expect(profile.explicitDetectorOutputIds).toEqual([]);
+  });
+
   it("adds env detector when --diff-env-check is used", () => {
     const profile = resolveScanProfile(
       parseArgs(["bun", "repo-scanner", "--diff", "HEAD", "--diff-env-check"]),
@@ -119,6 +131,7 @@ describe("resolveScanProfile", () => {
     expect(profile.allDetectors).toBeFalse();
     expect(profile.selectedSections).toEqual([]);
     expect(profile.enabledDetectorIds).toEqual(["env"]);
+    expect(profile.explicitDetectorOutputIds).toEqual(["env"]);
   });
 
   it("runs explicit detector-only mode via --detectors list", () => {
@@ -134,6 +147,9 @@ describe("resolveScanProfile", () => {
     expect(profile.allDetectors).toBeFalse();
     expect(profile.selectedSections).toEqual([]);
     expect(profile.enabledDetectorIds).toEqual(
+      expect.arrayContaining(["runtime", "todo", "code-duplication"]),
+    );
+    expect(profile.explicitDetectorOutputIds).toEqual(
       expect.arrayContaining(["runtime", "todo", "code-duplication"]),
     );
   });
@@ -224,5 +240,76 @@ describe("resolveScanProfile", () => {
     const profile = resolveScanProfile(parseArgs(["bun", "repo-scanner"]));
 
     expect(profile.enabledDetectorIds).not.toContain("env");
+  });
+
+  it("maps components selector to monorepo execution detector", () => {
+    const profile = resolveScanProfile(
+      parseArgs(["bun", "repo-scanner", "--detectors", "components"]),
+    );
+
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.explicitDetectorOutputIds).toEqual(["components"]);
+    expect(profile.enabledDetectorIds).toEqual(["monorepo"]);
+  });
+
+  it("maps language-stats and codebase-size selectors to language detector", () => {
+    const profile = resolveScanProfile(
+      parseArgs([
+        "bun",
+        "repo-scanner",
+        "--detectors",
+        "language-stats,codebase-size",
+      ]),
+    );
+
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.explicitDetectorOutputIds).toEqual(
+      expect.arrayContaining(["language-stats", "codebase-size"]),
+    );
+    expect(profile.enabledDetectorIds).toEqual(["language"]);
+  });
+
+  it("maps build command selectors to build detector", () => {
+    const profile = resolveScanProfile(
+      parseArgs([
+        "bun",
+        "repo-scanner",
+        "--detectors",
+        "build-commands,test-commands,lint-commands",
+      ]),
+    );
+
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.enabledDetectorIds).toEqual(["build"]);
+    expect(profile.explicitDetectorOutputIds).toEqual(
+      expect.arrayContaining([
+        "build-commands",
+        "test-commands",
+        "lint-commands",
+      ]),
+    );
+  });
+
+  it("maps architecture derived selectors to monorepo + cross-package-deps", () => {
+    const profile = resolveScanProfile(
+      parseArgs([
+        "bun",
+        "repo-scanner",
+        "--detectors",
+        "circular-deps,layer-violations,high-impact-components",
+      ]),
+    );
+
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.enabledDetectorIds).toEqual(
+      expect.arrayContaining(["monorepo", "cross-package-deps"]),
+    );
+    expect(profile.explicitDetectorOutputIds).toEqual(
+      expect.arrayContaining([
+        "circular-deps",
+        "layer-violations",
+        "high-impact-components",
+      ]),
+    );
   });
 });

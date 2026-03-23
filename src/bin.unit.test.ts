@@ -70,6 +70,20 @@ const createCoreProfileFixtureRepo = async (): Promise<string> => {
   return repoPath;
 };
 
+const createAllDetectorsFixtureRepo = async (): Promise<string> => {
+  const repoPath = await createCoreProfileFixtureRepo();
+  await mkdir(path.join(repoPath, "db"), { recursive: true });
+  await writeFile(
+    path.join(repoPath, "db", "schema.sql"),
+    "CREATE TABLE users (id INT PRIMARY KEY, email TEXT);\n",
+  );
+  await writeFile(
+    path.join(repoPath, "solid.ts"),
+    "export class Service { run(): number { return 1; } }\n",
+  );
+  return repoPath;
+};
+
 const createEnvFixtureRepo = async (): Promise<string> => {
   const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-env-"));
   await writeFile(path.join(repoPath, "README.md"), "# env fixture\n");
@@ -93,6 +107,14 @@ const runRepoScanner = (
       env: { ...process.env, ...envOverrides },
     },
   );
+
+const expectTopLevelKeys = (
+  payload: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): void => {
+  const keys = Object.keys(payload).sort();
+  expect(keys).toEqual([...expectedKeys].sort());
+};
 
 describe("repo-scanner bin", () => {
   it("returns dependency section for --deps json scan", async () => {
@@ -303,6 +325,44 @@ describe("repo-scanner bin", () => {
     expect(result.exitCode).toBe(0);
     expect(stdout).toContain("complete -F _repo_scanner repo-scanner");
     expect(stdout).toContain("--detectors");
+  });
+
+  it("prints zsh completion script without eager invocation", () => {
+    const result = runRepoScanner(["completion", "zsh"]);
+    const stdout = decode(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(stdout).toContain("#compdef repo-scanner");
+    expect(stdout).toContain("compdef _repo_scanner repo-scanner");
+    expect(stdout).not.toContain('_repo_scanner "$@"');
+  });
+
+  it("installs bash completion script in the user bash-completion path", async () => {
+    const homePath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-home-"),
+    );
+    const xdgDataHome = path.join(homePath, ".xdg-data");
+
+    try {
+      const result = runRepoScanner(["completion", "install", "bash"], {
+        HOME: homePath,
+        XDG_DATA_HOME: xdgDataHome,
+      });
+      const stdout = decode(result.stdout);
+      const completionFile = path.join(
+        xdgDataHome,
+        "bash-completion",
+        "completions",
+        "repo-scanner",
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Installed bash completion:");
+      const content = await Bun.file(completionFile).text();
+      expect(content).toContain("# bash completion for repo-scanner");
+    } finally {
+      await rm(homePath, { recursive: true, force: true });
+    }
   });
 
   it("installs completion script for completion install subcommand", async () => {
@@ -553,7 +613,7 @@ describe("repo-scanner bin", () => {
     }
   });
 
-  it("shows env-only output in table mode for --detectors env", async () => {
+  it("shows detector-scoped output in table mode for explicit detector-only flags", async () => {
     const repoPath = await createEnvFixtureRepo();
 
     try {
@@ -561,17 +621,17 @@ describe("repo-scanner bin", () => {
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("Environment Variables");
+      expect(stdout).toContain("envVars");
       expect(stdout).toContain("OPENAI_API_KEY");
-      expect(stdout).not.toContain("Architecture");
       expect(stdout).not.toContain("Inventory");
+      expect(stdout).not.toContain("Architecture");
       expect(stdout).not.toContain("Build & Test");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("returns detector-projected json in explicit detector-only mode", async () => {
+  it("outputs only requested detector field in json mode for explicit detector-only flags", async () => {
     const repoPath = await createEnvFixtureRepo();
 
     try {
@@ -587,21 +647,242 @@ describe("repo-scanner bin", () => {
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
 
-      expect(payload.scanPath).toBeString();
-      expect(payload.timestamp).toBeString();
-      expect(payload.durationMs).toBeNumber();
-      expect(payload.detectors).toBeDefined();
-      expect(payload.detectors.env).toBeArray();
-      expect(payload.detectors.env[0].name).toBe("OPENAI_API_KEY");
-      expect(payload.inventory).toBeUndefined();
-      expect(payload.architecture).toBeUndefined();
-      expect(payload.buildAndTest).toBeUndefined();
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "envVars",
+      ]);
+      expect(payload.envVars).toBeArray();
+      expect(payload.envVars[0].name).toBe("OPENAI_API_KEY");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("projects each requested detector in detector-only json mode", async () => {
+  it("splits monorepo and components outputs into separate selectors", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const monorepoOnly = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "monorepo",
+        "--format",
+        "json",
+      ]);
+      expect(monorepoOnly.exitCode).toBe(0);
+      const monorepoPayload = JSON.parse(decode(monorepoOnly.stdout));
+      expectTopLevelKeys(monorepoPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "monorepo",
+      ]);
+      expect(typeof monorepoPayload.monorepo).toBe("boolean");
+
+      const componentsOnly = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "components",
+        "--format",
+        "json",
+      ]);
+      expect(componentsOnly.exitCode).toBe(0);
+      const componentsPayload = JSON.parse(decode(componentsOnly.stdout));
+      expectTopLevelKeys(componentsPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "components",
+      ]);
+      expect(componentsPayload.components).toBeArray();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("splits language outputs into language, language-stats, and codebase-size selectors", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const language = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "language",
+        "--format",
+        "json",
+      ]);
+      expect(language.exitCode).toBe(0);
+      const languagePayload = JSON.parse(decode(language.stdout));
+      expectTopLevelKeys(languagePayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "languages",
+      ]);
+
+      const languageStats = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "language-stats",
+        "--format",
+        "json",
+      ]);
+      expect(languageStats.exitCode).toBe(0);
+      const statsPayload = JSON.parse(decode(languageStats.stdout));
+      expectTopLevelKeys(statsPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "languageStats",
+      ]);
+
+      const codebaseSize = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "codebase-size",
+        "--format",
+        "json",
+      ]);
+      expect(codebaseSize.exitCode).toBe(0);
+      const sizePayload = JSON.parse(decode(codebaseSize.stdout));
+      expectTopLevelKeys(sizePayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "codebaseSize",
+      ]);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to language-stats names when confidence-filtered language list is empty", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-lang-"),
+    );
+
+    try {
+      await writeFile(path.join(repoPath, "index.ts"), "export const x = 1;\n");
+
+      const language = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "language",
+        "--format",
+        "json",
+      ]);
+
+      expect(language.exitCode).toBe(0);
+      const payload = JSON.parse(decode(language.stdout));
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "languages",
+      ]);
+      expect(payload.languages).toContain("TypeScript");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("splits build outputs into tools and command selectors", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const build = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "build",
+        "--format",
+        "json",
+      ]);
+      expect(build.exitCode).toBe(0);
+      const buildPayload = JSON.parse(decode(build.stdout));
+      expectTopLevelKeys(buildPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "buildTools",
+      ]);
+
+      const commandSelectors = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "build-commands,test-commands,lint-commands",
+        "--format",
+        "json",
+      ]);
+      expect(commandSelectors.exitCode).toBe(0);
+      const commandsPayload = JSON.parse(decode(commandSelectors.stdout));
+      expectTopLevelKeys(commandsPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "buildCommands",
+        "testCommands",
+        "lintCommands",
+      ]);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("splits architecture graph and derived analysis selectors", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const graph = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "cross-package-deps",
+        "--format",
+        "json",
+      ]);
+      expect(graph.exitCode).toBe(0);
+      const graphPayload = JSON.parse(decode(graph.stdout));
+      expectTopLevelKeys(graphPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "crossPackageDeps",
+      ]);
+
+      const derived = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "circular-deps,layer-violations,high-impact-components",
+        "--format",
+        "json",
+      ]);
+      expect(derived.exitCode).toBe(0);
+      const derivedPayload = JSON.parse(decode(derived.stdout));
+      expectTopLevelKeys(derivedPayload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "circularDeps",
+        "layerViolations",
+        "highImpactComponents",
+      ]);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("composes vcs with other detector outputs", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -609,31 +890,53 @@ describe("repo-scanner bin", () => {
         "--path",
         repoPath,
         "--detectors",
-        "language,build,ci",
+        "vcs,language",
+        "--format",
+        "json",
+      ]);
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "vcs",
+        "languages",
+      ]);
+      expect(payload.languages).toBeArray();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("emits explicit union for mixed section and detector selectors", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--inventory",
+        "--detectors",
+        "monorepo",
         "--format",
         "json",
       ]);
 
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
-
-      expect(payload.detectors).toBeDefined();
-      expect(payload.detectors.language).toBeDefined();
-      expect(payload.detectors.language.languages).toBeArray();
-      expect(payload.detectors.build).toBeDefined();
-      expect(payload.detectors.build.buildCommands).toBeArray();
-      expect(payload.detectors.ci).toBeDefined();
-      expect(payload.detectors.ci.ciSystems).toBeArray();
-      expect(payload.detectors.env).toBeUndefined();
+      expect(payload.inventory).toBeDefined();
+      expect(payload.monorepo).toBeDefined();
       expect(payload.architecture).toBeUndefined();
-      expect(payload.inventory).toBeUndefined();
+      expect(payload.buildAndTest).toBeUndefined();
+      expect(payload.externalServices).toBeUndefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
   it("treats --full-scan as an alias for --all-detectors", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
+    const repoPath = await createAllDetectorsFixtureRepo();
 
     try {
       const allDetectors = runRepoScanner([
@@ -664,6 +967,10 @@ describe("repo-scanner bin", () => {
       });
 
       expect(normalize(fullPayload)).toEqual(normalize(allPayload));
+      expect(allPayload.inventory.solidHealth).toBeDefined();
+      expect(fullPayload.inventory.solidHealth).toBeDefined();
+      expect(allPayload.inventory.databaseSchema).toBeDefined();
+      expect(fullPayload.inventory.databaseSchema).toBeDefined();
       expect(decode(allDetectors.stdout)).toContain('"signals"');
       expect(decode(fullScan.stdout)).toContain('"signals"');
     } finally {

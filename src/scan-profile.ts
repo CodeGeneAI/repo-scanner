@@ -1,3 +1,4 @@
+import { DETECTOR_IDS, type DetectorId } from "./detectors/catalog";
 import { ALL_DIAGRAM_KINDS, type DiagramKind } from "./output/topology/types";
 import type { CliOptions } from "./types";
 
@@ -10,9 +11,14 @@ export const SCAN_SECTIONS = [
 
 export type ScanSection = (typeof SCAN_SECTIONS)[number];
 
+type ExecutionDetectorId = string;
+
 const DEFAULT_CORE_SECTIONS: readonly ScanSection[] = SCAN_SECTIONS;
 
-const SECTION_DETECTOR_IDS: Record<ScanSection, readonly string[]> = {
+const SECTION_DETECTOR_IDS: Record<
+  ScanSection,
+  readonly ExecutionDetectorId[]
+> = {
   architecture: ["monorepo", "cross-package-deps"],
   inventory: [
     "language",
@@ -32,7 +38,10 @@ const SECTION_DETECTOR_IDS: Record<ScanSection, readonly string[]> = {
   "build-and-test": ["build", "ci"],
 };
 
-const TOPOLOGY_DETECTOR_IDS: Record<DiagramKind, readonly string[]> = {
+const TOPOLOGY_DETECTOR_IDS: Record<
+  DiagramKind,
+  readonly ExecutionDetectorId[]
+> = {
   architecture: ["monorepo", "cross-package-deps"],
   dependency: ["monorepo", "cross-package-deps"],
   dataflow: ["monorepo", "external-services"],
@@ -41,10 +50,55 @@ const TOPOLOGY_DETECTOR_IDS: Record<DiagramKind, readonly string[]> = {
   "call-graph": ["call-graph"],
 };
 
+const SELECTOR_DETECTOR_REQUIREMENTS: Record<
+  DetectorId,
+  readonly ExecutionDetectorId[]
+> = {
+  "api-surface": ["api-surface"],
+  build: ["build"],
+  "build-commands": ["build"],
+  "call-graph": ["call-graph"],
+  ci: ["ci"],
+  "codebase-size": ["language"],
+  "code-duplication": ["code-duplication"],
+  "code-quality": ["code-quality"],
+  "complexity-hotspots": ["complexity-hotspots"],
+  components: ["monorepo"],
+  containerization: ["containerization"],
+  "circular-deps": ["monorepo", "cross-package-deps"],
+  "cross-package-deps": ["cross-package-deps"],
+  datastore: ["datastore"],
+  "db-schema": ["db-schema"],
+  "dead-export": ["dead-export"],
+  "dependency-manager": ["dependency-manager"],
+  "deployment-platform": ["deployment-platform"],
+  env: ["env"],
+  "external-services": ["external-services"],
+  framework: ["framework"],
+  "high-impact-components": ["monorepo", "cross-package-deps"],
+  iac: ["iac"],
+  language: ["language"],
+  "language-stats": ["language"],
+  "large-file": ["large-file"],
+  "layer-violations": ["monorepo", "cross-package-deps"],
+  "lint-commands": ["build"],
+  linting: ["linting"],
+  monorepo: ["monorepo"],
+  "naming-convention": ["naming-convention"],
+  "repo-tools": ["repo-tools"],
+  runtime: ["runtime"],
+  "solid-health": ["solid-health"],
+  "test-commands": ["build"],
+  testing: ["testing"],
+  todo: ["todo"],
+  vcs: ["vcs"],
+};
+
 export interface ResolvedScanProfile {
   readonly allDetectors: boolean;
   readonly selectedSections: readonly ScanSection[];
-  readonly enabledDetectorIds?: readonly string[];
+  readonly enabledDetectorIds?: readonly ExecutionDetectorId[];
+  readonly explicitDetectorOutputIds: readonly DetectorId[];
 }
 
 const resolveRequestedTopologyKinds = (
@@ -70,17 +124,36 @@ const hasExplicitSectionFlags = (
   options.scanExternalServices ||
   options.scanBuildAndTest;
 
-const resolveExplicitDetectorIds = (
+const hasExplicitDependencyOutputFlags = (
+  options: Pick<CliOptions, "deps">,
+): boolean => options.deps;
+
+const hasExplicitPolicyOutputFlags = (
+  options: Pick<
+    CliOptions,
+    | "failOnVulns"
+    | "failOnVulnsCount"
+    | "failOnOutdated"
+    | "failOnOutdatedCount"
+    | "failOnDeadDeps"
+    | "failOnDeadDepsCount"
+  >,
+): boolean =>
+  options.failOnVulns ||
+  options.failOnVulnsCount !== undefined ||
+  options.failOnOutdated ||
+  options.failOnOutdatedCount !== undefined ||
+  options.failOnDeadDeps ||
+  options.failOnDeadDepsCount !== undefined;
+
+const resolveExplicitDetectorOutputIds = (
   options: Pick<
     CliOptions,
     | "env"
     | "vcs"
     | "solid"
     | "callGraph"
-    | "diffEnvCheck"
     | "dbSchema"
-    | "topology"
-    | "topologyDiagrams"
     | "namingConvention"
     | "runtime"
     | "largeFile"
@@ -89,8 +162,11 @@ const resolveExplicitDetectorIds = (
     | "codeDuplication"
     | "complexityHotspots"
     | "languageDetector"
+    | "languageStatsDetector"
+    | "codebaseSizeDetector"
     | "frameworkDetector"
     | "monorepoDetector"
+    | "componentsDetector"
     | "dependencyManagerDetector"
     | "ciDetector"
     | "containerizationDetector"
@@ -99,68 +175,62 @@ const resolveExplicitDetectorIds = (
     | "datastoreDetector"
     | "lintingDetector"
     | "buildDetector"
+    | "buildCommandsDetector"
+    | "testCommandsDetector"
+    | "lintCommandsDetector"
     | "repoToolsDetector"
     | "crossPackageDepsDetector"
+    | "circularDepsDetector"
+    | "layerViolationsDetector"
+    | "highImpactComponentsDetector"
     | "codeQualityDetector"
     | "deploymentPlatformDetector"
     | "externalServicesDetector"
     | "apiSurfaceDetector"
   >,
-): string[] => {
-  const explicitDetectorIds = new Set<string>();
-  if (options.env) explicitDetectorIds.add("env");
-  if (options.vcs) explicitDetectorIds.add("vcs");
-  if (options.solid) explicitDetectorIds.add("solid-health");
-  if (options.callGraph) explicitDetectorIds.add("call-graph");
-  if (options.diffEnvCheck) explicitDetectorIds.add("env");
-  if (options.namingConvention) explicitDetectorIds.add("naming-convention");
-  if (options.runtime) explicitDetectorIds.add("runtime");
-  if (options.largeFile) explicitDetectorIds.add("large-file");
-  if (options.todo) explicitDetectorIds.add("todo");
-  if (options.deadExport) explicitDetectorIds.add("dead-export");
-  if (options.codeDuplication) explicitDetectorIds.add("code-duplication");
-  if (options.complexityHotspots)
-    explicitDetectorIds.add("complexity-hotspots");
-  if (options.languageDetector) explicitDetectorIds.add("language");
-  if (options.frameworkDetector) explicitDetectorIds.add("framework");
-  if (options.monorepoDetector) explicitDetectorIds.add("monorepo");
-  if (options.dependencyManagerDetector)
-    explicitDetectorIds.add("dependency-manager");
-  if (options.ciDetector) explicitDetectorIds.add("ci");
-  if (options.containerizationDetector)
-    explicitDetectorIds.add("containerization");
-  if (options.iacDetector) explicitDetectorIds.add("iac");
-  if (options.testingDetector) explicitDetectorIds.add("testing");
-  if (options.datastoreDetector) explicitDetectorIds.add("datastore");
-  if (options.lintingDetector) explicitDetectorIds.add("linting");
-  if (options.buildDetector) explicitDetectorIds.add("build");
-  if (options.repoToolsDetector) explicitDetectorIds.add("repo-tools");
-  if (options.crossPackageDepsDetector)
-    explicitDetectorIds.add("cross-package-deps");
-  if (options.codeQualityDetector) explicitDetectorIds.add("code-quality");
-  if (options.deploymentPlatformDetector)
-    explicitDetectorIds.add("deployment-platform");
-  if (options.externalServicesDetector)
-    explicitDetectorIds.add("external-services");
-  if (options.apiSurfaceDetector) explicitDetectorIds.add("api-surface");
+): DetectorId[] => {
+  const ids = new Set<DetectorId>();
 
-  // Enable db-schema detector when explicitly requested or when ERD topology diagram is requested.
-  const erdRequested =
-    options.topology &&
-    (!options.topologyDiagrams || options.topologyDiagrams.includes("erd"));
-  if (options.dbSchema || erdRequested) {
-    explicitDetectorIds.add("db-schema");
-  }
+  if (options.env) ids.add("env");
+  if (options.vcs) ids.add("vcs");
+  if (options.solid) ids.add("solid-health");
+  if (options.callGraph) ids.add("call-graph");
+  if (options.dbSchema) ids.add("db-schema");
+  if (options.namingConvention) ids.add("naming-convention");
+  if (options.runtime) ids.add("runtime");
+  if (options.largeFile) ids.add("large-file");
+  if (options.todo) ids.add("todo");
+  if (options.deadExport) ids.add("dead-export");
+  if (options.codeDuplication) ids.add("code-duplication");
+  if (options.complexityHotspots) ids.add("complexity-hotspots");
+  if (options.languageDetector) ids.add("language");
+  if (options.languageStatsDetector) ids.add("language-stats");
+  if (options.codebaseSizeDetector) ids.add("codebase-size");
+  if (options.frameworkDetector) ids.add("framework");
+  if (options.monorepoDetector) ids.add("monorepo");
+  if (options.componentsDetector) ids.add("components");
+  if (options.dependencyManagerDetector) ids.add("dependency-manager");
+  if (options.ciDetector) ids.add("ci");
+  if (options.containerizationDetector) ids.add("containerization");
+  if (options.iacDetector) ids.add("iac");
+  if (options.testingDetector) ids.add("testing");
+  if (options.datastoreDetector) ids.add("datastore");
+  if (options.lintingDetector) ids.add("linting");
+  if (options.buildDetector) ids.add("build");
+  if (options.buildCommandsDetector) ids.add("build-commands");
+  if (options.testCommandsDetector) ids.add("test-commands");
+  if (options.lintCommandsDetector) ids.add("lint-commands");
+  if (options.repoToolsDetector) ids.add("repo-tools");
+  if (options.crossPackageDepsDetector) ids.add("cross-package-deps");
+  if (options.circularDepsDetector) ids.add("circular-deps");
+  if (options.layerViolationsDetector) ids.add("layer-violations");
+  if (options.highImpactComponentsDetector) ids.add("high-impact-components");
+  if (options.codeQualityDetector) ids.add("code-quality");
+  if (options.deploymentPlatformDetector) ids.add("deployment-platform");
+  if (options.externalServicesDetector) ids.add("external-services");
+  if (options.apiSurfaceDetector) ids.add("api-surface");
 
-  if (
-    options.topology &&
-    (!options.topologyDiagrams ||
-      options.topologyDiagrams.includes("call-graph"))
-  ) {
-    explicitDetectorIds.add("call-graph");
-  }
-
-  return [...explicitDetectorIds];
+  return [...ids];
 };
 
 const resolveSelectedSections = (
@@ -184,47 +254,121 @@ const resolveSelectedSections = (
   return sections;
 };
 
+const resolveRequiredExecutionDetectors = (
+  selectorIds: readonly DetectorId[],
+): Set<ExecutionDetectorId> => {
+  const executionDetectorIds = new Set<ExecutionDetectorId>();
+  for (const selectorId of selectorIds) {
+    const required = SELECTOR_DETECTOR_REQUIREMENTS[selectorId] ?? [];
+    for (const detectorId of required) {
+      executionDetectorIds.add(detectorId);
+    }
+  }
+  return executionDetectorIds;
+};
+
+const validateSelectorMappings = (): void => {
+  for (const id of DETECTOR_IDS) {
+    if (!SELECTOR_DETECTOR_REQUIREMENTS[id]) {
+      throw new Error(`Missing selector mapping for detector id "${id}"`);
+    }
+  }
+};
+
+validateSelectorMappings();
+
 export const resolveScanProfile = (
   options: CliOptions,
 ): ResolvedScanProfile => {
-  const explicitDetectorIds = resolveExplicitDetectorIds(options);
+  const explicitDetectorOutputIds = resolveExplicitDetectorOutputIds(options);
+  const topologyKinds = resolveRequestedTopologyKinds(options);
+  const topologyOnlyOutputMode =
+    options.topology &&
+    !hasExplicitSectionFlags(options) &&
+    explicitDetectorOutputIds.length === 0 &&
+    !hasExplicitDependencyOutputFlags(options) &&
+    !hasExplicitPolicyOutputFlags(options);
 
   if (options.allDetectors) {
     return {
       allDetectors: true,
       selectedSections: [],
+      explicitDetectorOutputIds: [],
     };
   }
 
+  const explicitExecutionDetectors = resolveRequiredExecutionDetectors(
+    explicitDetectorOutputIds,
+  );
+
   // Explicit detector-only mode: skip all section detectors and run only
-  // explicitly requested detector flags when no section flags are provided.
-  if (explicitDetectorIds.length > 0 && !hasExplicitSectionFlags(options)) {
+  // explicitly requested detector selectors when no section flags are provided.
+  if (
+    explicitDetectorOutputIds.length > 0 &&
+    !hasExplicitSectionFlags(options)
+  ) {
+    for (const kind of topologyKinds) {
+      const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
+      for (const detectorId of required) {
+        explicitExecutionDetectors.add(detectorId);
+      }
+    }
+
+    if (options.diffEnvCheck) {
+      explicitExecutionDetectors.add("env");
+    }
+
     return {
       allDetectors: false,
       selectedSections: [],
-      enabledDetectorIds: explicitDetectorIds,
+      enabledDetectorIds: [...explicitExecutionDetectors],
+      explicitDetectorOutputIds,
+    };
+  }
+
+  if (topologyOnlyOutputMode) {
+    const topologyExecutionDetectors = new Set<ExecutionDetectorId>();
+    for (const kind of topologyKinds) {
+      const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
+      for (const detectorId of required) {
+        topologyExecutionDetectors.add(detectorId);
+      }
+    }
+
+    if (options.diffEnvCheck) {
+      topologyExecutionDetectors.add("env");
+    }
+
+    return {
+      allDetectors: false,
+      selectedSections: [],
+      enabledDetectorIds: [...topologyExecutionDetectors],
+      explicitDetectorOutputIds: [],
     };
   }
 
   const selectedSections = resolveSelectedSections(options);
-  const enabledDetectorIds = new Set<string>();
+  const enabledDetectorIds = new Set<ExecutionDetectorId>();
   for (const section of selectedSections) {
     for (const detectorId of SECTION_DETECTOR_IDS[section]) {
       enabledDetectorIds.add(detectorId);
     }
   }
 
-  // VCS detection is always enabled — it provides fundamental repo metadata.
+  // VCS detection is always enabled for section/default report modes.
   enabledDetectorIds.add("vcs");
 
-  // Preserve explicit opt-in behavior for optional detectors.
-  for (const detectorId of explicitDetectorIds) {
+  for (const detectorId of explicitExecutionDetectors) {
     enabledDetectorIds.add(detectorId);
+  }
+
+  if (options.diffEnvCheck) {
+    enabledDetectorIds.add("env");
   }
 
   // Ensure requested topology diagrams have required detector data even when
   // section flags narrow report output.
-  for (const kind of resolveRequestedTopologyKinds(options)) {
+  for (const kind of topologyKinds) {
     const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
     for (const detectorId of required) {
       enabledDetectorIds.add(detectorId);
@@ -235,5 +379,6 @@ export const resolveScanProfile = (
     allDetectors: false,
     selectedSections,
     enabledDetectorIds: [...enabledDetectorIds],
+    explicitDetectorOutputIds,
   };
 };

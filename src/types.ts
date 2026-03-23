@@ -466,8 +466,11 @@ export interface CliOptions {
   readonly codeDuplication: boolean;
   readonly complexityHotspots: boolean;
   readonly languageDetector: boolean;
+  readonly languageStatsDetector: boolean;
+  readonly codebaseSizeDetector: boolean;
   readonly frameworkDetector: boolean;
   readonly monorepoDetector: boolean;
+  readonly componentsDetector: boolean;
   readonly dependencyManagerDetector: boolean;
   readonly ciDetector: boolean;
   readonly containerizationDetector: boolean;
@@ -476,8 +479,14 @@ export interface CliOptions {
   readonly datastoreDetector: boolean;
   readonly lintingDetector: boolean;
   readonly buildDetector: boolean;
+  readonly buildCommandsDetector: boolean;
+  readonly testCommandsDetector: boolean;
+  readonly lintCommandsDetector: boolean;
   readonly repoToolsDetector: boolean;
   readonly crossPackageDepsDetector: boolean;
+  readonly circularDepsDetector: boolean;
+  readonly layerViolationsDetector: boolean;
+  readonly highImpactComponentsDetector: boolean;
   readonly codeQualityDetector: boolean;
   readonly deploymentPlatformDetector: boolean;
   readonly externalServicesDetector: boolean;

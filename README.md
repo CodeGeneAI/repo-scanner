@@ -128,7 +128,7 @@ bun packages/repo-scanner/src/bin.ts --version
 ## Features
 
 - Single filesystem walk → in-memory index → all detectors query without disk I/O
-- 20 independent detectors covering structure, code health, and dependency intelligence
+- 38 independent detectors covering structure, code health, and dependency intelligence
 - Component discovery with multi-label classification (primary kind + secondary kinds from content signals)
 - Categorized tooling output (containers, IaC, testing, build tools, linting, deploy, etc.)
 - `.scanignore` file support with gitignore syntax and scoped rules per detector
@@ -159,29 +159,44 @@ Schema changelog: `packages/repo-scanner/schemas/CHANGELOG.md`.
 
 | Detector | Description |
 |----------|-------------|
-| language | Language detection with LOC stats |
-| framework | Framework & library detection |
-| monorepo | Monorepo structure & component discovery |
-| cross-package-deps | Internal dependency graph between packages |
-| dependency-manager | Package manager detection |
-| ci | CI/CD provider detection |
-| containerization | Docker & PaaS detection |
+| api-surface | API endpoint and protocol detection |
+| build | Build systems and commands |
+| build-commands | Build command extraction |
+| call-graph | Static call graph extraction |
+| ci | CI provider and workflow detection |
+| codebase-size | Total file and LOC summary |
+| code-duplication | Token-level duplication analysis |
+| code-quality | Quality gate and scanner detection |
+| complexity-hotspots | Complexity hotspot detection |
+| components | Repository component inventory |
+| containerization | Docker and container tooling detection |
+| circular-deps | Circular dependency analysis between components |
+| cross-package-deps | Cross-package dependency graph |
+| datastore | Datastore and cache detection |
+| db-schema | Database schema extraction |
+| dead-export | Potentially unused export detection |
+| dependency-manager | Dependency manager detection |
+| deployment-platform | Deployment platform detection |
+| env | Environment variable usage and inference |
+| external-services | External service integration detection |
+| framework | Framework and library detection |
+| high-impact-components | High blast-radius component analysis |
 | iac | Infrastructure-as-code detection |
-| testing | Test framework detection |
-| datastore | Database & cache detection |
-| linting | Linter & formatter detection |
-| build | Build system & command extraction |
-| repo-tools | Git hooks, changesets, AI config |
-| deployment-platform | Hosting/deployment platform detection |
-| env | Environment variable extraction |
-| naming-convention | Code naming pattern analysis |
+| language | Language and LOC detection (names selector) |
+| language-stats | Language percentage and LOC stats |
+| large-file | Large source file detection |
+| layer-violations | Architecture layer violation analysis |
+| lint-commands | Lint command extraction |
+| linting | Linter and formatter detection |
+| monorepo | Monorepo structure and components |
+| naming-convention | Naming convention analysis |
+| repo-tools | Repository tooling and config detection |
 | runtime | Runtime version detection |
-| api-surface | API endpoint detection (REST, GraphQL, gRPC, WebSocket) |
-| large-file | LOC-heavy source file detection |
-| todo | TODO/FIXME/HACK/BUG/XXX annotation scanning |
-| dead-export | Unused export detection (heuristic) |
-| code-duplication | Token-based code duplication detection |
-| solid-health | SOLID principles violation analysis |
+| solid-health | SOLID principle analysis |
+| test-commands | Test command extraction |
+| testing | Test framework detection |
+| todo | TODO/FIXME annotation detection |
+| vcs | VCS metadata detection |
 
 ## Detector × Language Coverage Matrix
 
