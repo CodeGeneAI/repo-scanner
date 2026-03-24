@@ -11,6 +11,7 @@ import type {
   DependencyComponentSummary,
   DependencyReport,
   DependencyScanOptions,
+  DependencySummary,
   DepScannerResult,
   OutdatedDependencySummaryItem,
   ScanResult,
@@ -106,6 +107,9 @@ const classifyComponent = (
   return segments[0] ?? "root";
 };
 
+const buildPackageKey = (ecosystem: string, name: string): string =>
+  `${ecosystem}:${name}`;
+
 const normalizeScanResult = (
   scanPath: string,
   scan: ScanResult,
@@ -143,7 +147,11 @@ const buildSummary = (
   componentGrouping: DependencyComponentGroupingMode,
   includeDevDeadDeps: boolean,
   skipUsage: boolean,
-) => {
+): {
+  readonly summary: DependencySummary;
+  readonly totalDependencies: number;
+  readonly totalVulnerabilities: number;
+} => {
   const flattened = scans.flatMap((scan) =>
     scan.reports.map((report) => ({
       ecosystem: scan.ecosystem,
@@ -151,86 +159,264 @@ const buildSummary = (
     })),
   );
 
-  const outdated = flattened
-    .filter(
-      ({ report }) =>
-        report.version !== undefined &&
-        report.version.updateType !== "unknown" &&
-        report.version.updateType !== "up-to-date",
-    )
-    .sort((left, right) => {
-      const leftType = left.report.version?.updateType ?? "unknown";
-      const rightType = right.report.version?.updateType ?? "unknown";
-
-      if (leftType !== rightType) {
-        return updateRank[rightType] - updateRank[leftType];
-      }
-      if (left.ecosystem !== right.ecosystem) {
-        return left.ecosystem.localeCompare(right.ecosystem);
-      }
-      return left.report.dependency.name.localeCompare(
-        right.report.dependency.name,
-      );
-    });
-
-  const vulnerable = flattened
-    .filter(({ report }) => report.vulnerabilities.length > 0)
-    .sort((left, right) => {
-      const leftHighest = Math.max(
-        ...left.report.vulnerabilities.map(
-          (vuln) => severityRank[vuln.severity],
-        ),
-      );
-      const rightHighest = Math.max(
-        ...right.report.vulnerabilities.map(
-          (vuln) => severityRank[vuln.severity],
-        ),
-      );
-
-      if (leftHighest !== rightHighest) {
-        return rightHighest - leftHighest;
-      }
-
-      if (
-        left.report.vulnerabilities.length !==
-        right.report.vulnerabilities.length
-      ) {
-        return (
-          right.report.vulnerabilities.length -
-          left.report.vulnerabilities.length
-        );
-      }
-
-      if (left.ecosystem !== right.ecosystem) {
-        return left.ecosystem.localeCompare(right.ecosystem);
-      }
-
-      return left.report.dependency.name.localeCompare(
-        right.report.dependency.name,
-      );
-    });
-
   // Dead dependency detection: deps with zero import usages that aren't excluded.
   // Only compute when usage scanning was not skipped (otherwise all deps would look dead).
-  // Cache exclusion results to avoid duplicate classification in the byComponent loop.
+  // Cache exclusion results to avoid duplicate classification when aggregating package state.
   type FlatEntry = (typeof flattened)[number];
   const deadSet = new Set<FlatEntry>();
-  const dead: FlatEntry[] = [];
+  const deadEligibleSet = new Set<FlatEntry>();
 
   if (!skipUsage) {
     for (const entry of flattened) {
-      if (entry.report.usages.length > 0) continue;
+      if (entry.report.usages.length > 0) {
+        deadEligibleSet.add(entry);
+        continue;
+      }
       const exclusion = classifyExclusion(
         entry.report.dependency,
         entry.ecosystem,
         includeDevDeadDeps,
       );
       if (!exclusion.excluded) {
-        dead.push(entry);
+        deadEligibleSet.add(entry);
         deadSet.add(entry);
       }
     }
   }
+
+  interface AggregatedPackage {
+    readonly ecosystem: ScanResult["ecosystem"];
+    readonly name: string;
+    readonly manifestPath: string;
+    readonly currentVersion: string;
+    readonly latestVersion?: string;
+    readonly updateType: UpdateType;
+    readonly vulnerabilitiesById: Map<string, Vulnerability>;
+    readonly componentAggregates: ReadonlyMap<
+      string,
+      {
+        readonly updateType: UpdateType;
+        readonly vulnerabilitiesById: ReadonlyMap<string, Vulnerability>;
+        readonly eligibleReportCount: number;
+        readonly deadReportCount: number;
+      }
+    >;
+    readonly allDev: boolean;
+    readonly eligibleReportCount: number;
+    readonly deadReportCount: number;
+  }
+
+  const packageMap = new Map<string, AggregatedPackage>();
+
+  for (const entry of flattened) {
+    const manifestPath = entry.report.dependency.manifestPath;
+    const component = classifyComponent(manifestPath, componentGrouping);
+    const key = buildPackageKey(entry.ecosystem, entry.report.dependency.name);
+    const updateType = entry.report.version?.updateType ?? "unknown";
+    const isDeadReport = deadSet.has(entry);
+    const isDeadEligible = deadEligibleSet.has(entry);
+    const hasUsageInComponent = entry.report.usages.some(
+      (usage) =>
+        classifyComponent(usage.filePath, componentGrouping) === component,
+    );
+    let isDeadEligibleInComponent = false;
+    let isDeadReportInComponent = false;
+    if (!skipUsage) {
+      if (hasUsageInComponent) {
+        isDeadEligibleInComponent = true;
+      } else {
+        const exclusion = classifyExclusion(
+          entry.report.dependency,
+          entry.ecosystem,
+          includeDevDeadDeps,
+        );
+        if (!exclusion.excluded) {
+          isDeadEligibleInComponent = true;
+          isDeadReportInComponent = true;
+        }
+      }
+    }
+
+    const initialComponentAggregate = new Map<
+      string,
+      {
+        readonly updateType: UpdateType;
+        readonly vulnerabilitiesById: ReadonlyMap<string, Vulnerability>;
+        readonly eligibleReportCount: number;
+        readonly deadReportCount: number;
+      }
+    >();
+    const componentVulnerabilitiesById = new Map<string, Vulnerability>();
+    for (const vulnerability of entry.report.vulnerabilities) {
+      componentVulnerabilitiesById.set(vulnerability.id, vulnerability);
+    }
+    initialComponentAggregate.set(component, {
+      updateType,
+      vulnerabilitiesById: componentVulnerabilitiesById,
+      eligibleReportCount: isDeadEligibleInComponent ? 1 : 0,
+      deadReportCount: isDeadReportInComponent ? 1 : 0,
+    });
+
+    const existing = packageMap.get(key);
+    if (!existing) {
+      const vulnerabilitiesById = new Map<string, Vulnerability>();
+      for (const vulnerability of entry.report.vulnerabilities) {
+        vulnerabilitiesById.set(vulnerability.id, vulnerability);
+      }
+
+      packageMap.set(key, {
+        ecosystem: entry.ecosystem,
+        name: entry.report.dependency.name,
+        manifestPath,
+        currentVersion: entry.report.dependency.currentVersion,
+        latestVersion: entry.report.version?.latestVersion,
+        updateType,
+        vulnerabilitiesById,
+        componentAggregates: initialComponentAggregate,
+        allDev: entry.report.dependency.isDev,
+        eligibleReportCount: isDeadEligible ? 1 : 0,
+        deadReportCount: isDeadReport ? 1 : 0,
+      });
+      continue;
+    }
+
+    const vulnerabilitiesById = new Map(existing.vulnerabilitiesById);
+    for (const vulnerability of entry.report.vulnerabilities) {
+      const prior = vulnerabilitiesById.get(vulnerability.id);
+      if (
+        !prior ||
+        severityRank[vulnerability.severity] > severityRank[prior.severity]
+      ) {
+        vulnerabilitiesById.set(vulnerability.id, vulnerability);
+      }
+    }
+
+    const shouldPromoteVersion =
+      updateRank[updateType] > updateRank[existing.updateType] ||
+      (updateRank[updateType] === updateRank[existing.updateType] &&
+        manifestPath.localeCompare(existing.manifestPath) < 0);
+    const promotedManifestPath = shouldPromoteVersion
+      ? manifestPath
+      : existing.manifestPath;
+
+    const existingComponent = existing.componentAggregates.get(component);
+    const componentVulnerabilities = new Map(
+      existingComponent?.vulnerabilitiesById ??
+        new Map<string, Vulnerability>(),
+    );
+    for (const vulnerability of entry.report.vulnerabilities) {
+      const prior = componentVulnerabilities.get(vulnerability.id);
+      if (
+        !prior ||
+        severityRank[vulnerability.severity] > severityRank[prior.severity]
+      ) {
+        componentVulnerabilities.set(vulnerability.id, vulnerability);
+      }
+    }
+    const shouldPromoteComponentUpdateType =
+      updateRank[updateType] >
+      updateRank[existingComponent?.updateType ?? "unknown"];
+
+    const componentAggregates = new Map(existing.componentAggregates);
+    componentAggregates.set(component, {
+      updateType: shouldPromoteComponentUpdateType
+        ? updateType
+        : (existingComponent?.updateType ?? "unknown"),
+      vulnerabilitiesById: componentVulnerabilities,
+      eligibleReportCount:
+        (existingComponent?.eligibleReportCount ?? 0) +
+        (isDeadEligibleInComponent ? 1 : 0),
+      deadReportCount:
+        (existingComponent?.deadReportCount ?? 0) +
+        (isDeadReportInComponent ? 1 : 0),
+    });
+
+    packageMap.set(key, {
+      ecosystem: existing.ecosystem,
+      name: existing.name,
+      manifestPath: promotedManifestPath,
+      currentVersion: shouldPromoteVersion
+        ? entry.report.dependency.currentVersion
+        : existing.currentVersion,
+      latestVersion: shouldPromoteVersion
+        ? entry.report.version?.latestVersion
+        : existing.latestVersion,
+      updateType: shouldPromoteVersion ? updateType : existing.updateType,
+      vulnerabilitiesById,
+      componentAggregates,
+      allDev: existing.allDev && entry.report.dependency.isDev,
+      eligibleReportCount:
+        existing.eligibleReportCount + (isDeadEligible ? 1 : 0),
+      deadReportCount: existing.deadReportCount + (isDeadReport ? 1 : 0),
+    });
+  }
+
+  interface ComponentSummaryEntry {
+    readonly component: string;
+    readonly updateType: UpdateType;
+    readonly vulnerabilityCount: number;
+    readonly isDead: boolean;
+  }
+
+  interface PackageSummaryEntry {
+    readonly ecosystem: ScanResult["ecosystem"];
+    readonly name: string;
+    readonly manifestPath: string;
+    readonly currentVersion: string;
+    readonly latestVersion?: string;
+    readonly updateType: UpdateType;
+    readonly vulnerabilityCount: number;
+    readonly highestSeverity: VulnerabilitySeverity;
+    readonly componentSummaries: readonly ComponentSummaryEntry[];
+    readonly isDead: boolean;
+    readonly isDev: boolean;
+  }
+
+  const packages: PackageSummaryEntry[] = Array.from(packageMap.values())
+    .map((pkg) => {
+      const vulnerabilities = [...pkg.vulnerabilitiesById.values()];
+      const highestSeverity =
+        vulnerabilities.length > 0
+          ? vulnerabilities
+              .slice()
+              .sort(
+                (left, right) =>
+                  severityRank[right.severity] - severityRank[left.severity],
+              )[0]!.severity
+          : "UNKNOWN";
+
+      return {
+        ecosystem: pkg.ecosystem,
+        name: pkg.name,
+        manifestPath: pkg.manifestPath,
+        currentVersion: pkg.currentVersion,
+        latestVersion: pkg.latestVersion,
+        updateType: pkg.updateType,
+        vulnerabilityCount: vulnerabilities.length,
+        highestSeverity,
+        componentSummaries: [...pkg.componentAggregates.entries()]
+          .map(([component, aggregate]) => ({
+            component,
+            updateType: aggregate.updateType,
+            vulnerabilityCount: aggregate.vulnerabilitiesById.size,
+            isDead:
+              aggregate.eligibleReportCount > 0 &&
+              aggregate.deadReportCount === aggregate.eligibleReportCount,
+          }))
+          .sort((left, right) => left.component.localeCompare(right.component)),
+        isDead:
+          !skipUsage &&
+          pkg.eligibleReportCount > 0 &&
+          pkg.deadReportCount === pkg.eligibleReportCount,
+        isDev: pkg.allDev,
+      };
+    })
+    .sort((left, right) => {
+      if (left.ecosystem !== right.ecosystem) {
+        return left.ecosystem.localeCompare(right.ecosystem);
+      }
+      return left.name.localeCompare(right.name);
+    });
 
   const byComponentMap = new Map<
     string,
@@ -242,33 +428,28 @@ const buildSummary = (
     }
   >();
 
-  for (const entry of flattened) {
-    const component = classifyComponent(
-      entry.report.dependency.manifestPath,
-      componentGrouping,
-    );
-    const existing = byComponentMap.get(component) ?? {
-      totalDependencies: 0,
-      outdatedDependencies: 0,
-      vulnerabilityCount: 0,
-      deadDependencies: 0,
-    };
+  for (const pkg of packages) {
+    for (const componentSummary of pkg.componentSummaries) {
+      const existing = byComponentMap.get(componentSummary.component) ?? {
+        totalDependencies: 0,
+        outdatedDependencies: 0,
+        vulnerabilityCount: 0,
+        deadDependencies: 0,
+      };
 
-    existing.totalDependencies += 1;
-    if (
-      entry.report.version &&
-      entry.report.version.updateType !== "unknown" &&
-      entry.report.version.updateType !== "up-to-date"
-    ) {
-      existing.outdatedDependencies += 1;
+      existing.totalDependencies += 1;
+      if (
+        componentSummary.updateType !== "unknown" &&
+        componentSummary.updateType !== "up-to-date"
+      ) {
+        existing.outdatedDependencies += 1;
+      }
+      existing.vulnerabilityCount += componentSummary.vulnerabilityCount;
+      if (componentSummary.isDead) {
+        existing.deadDependencies += 1;
+      }
+      byComponentMap.set(componentSummary.component, existing);
     }
-    existing.vulnerabilityCount += entry.report.vulnerabilities.length;
-
-    if (deadSet.has(entry)) {
-      existing.deadDependencies += 1;
-    }
-
-    byComponentMap.set(component, existing);
   }
 
   const byComponent: DependencyComponentSummary[] = Array.from(byComponentMap)
@@ -278,64 +459,96 @@ const buildSummary = (
     }))
     .sort((left, right) => left.component.localeCompare(right.component));
 
-  const topOutdated: OutdatedDependencySummaryItem[] = outdated
+  const topOutdated: OutdatedDependencySummaryItem[] = packages
+    .filter(
+      (pkg) => pkg.updateType !== "unknown" && pkg.updateType !== "up-to-date",
+    )
+    .sort((left, right) => {
+      if (left.updateType !== right.updateType) {
+        return updateRank[right.updateType] - updateRank[left.updateType];
+      }
+      if (left.ecosystem !== right.ecosystem) {
+        return left.ecosystem.localeCompare(right.ecosystem);
+      }
+      return left.name.localeCompare(right.name);
+    })
     .slice(0, TOP_LIST_LIMIT)
-    .map(({ ecosystem, report }) => ({
-      name: report.dependency.name,
-      ecosystem,
-      updateType: report.version!
-        .updateType as OutdatedDependencySummaryItem["updateType"],
-      currentVersion: report.dependency.currentVersion,
-      latestVersion: report.version?.latestVersion,
-      manifestPath: report.dependency.manifestPath,
+    .map((pkg) => ({
+      name: pkg.name,
+      ecosystem: pkg.ecosystem,
+      updateType: pkg.updateType as OutdatedDependencySummaryItem["updateType"],
+      currentVersion: pkg.currentVersion,
+      latestVersion: pkg.latestVersion,
+      manifestPath: pkg.manifestPath,
     }));
 
-  const topVulnerable: VulnerableDependencySummaryItem[] = vulnerable
+  const topVulnerable: VulnerableDependencySummaryItem[] = packages
+    .filter((pkg) => pkg.vulnerabilityCount > 0)
+    .sort((left, right) => {
+      if (left.highestSeverity !== right.highestSeverity) {
+        return (
+          severityRank[right.highestSeverity] -
+          severityRank[left.highestSeverity]
+        );
+      }
+      if (left.vulnerabilityCount !== right.vulnerabilityCount) {
+        return right.vulnerabilityCount - left.vulnerabilityCount;
+      }
+      if (left.ecosystem !== right.ecosystem) {
+        return left.ecosystem.localeCompare(right.ecosystem);
+      }
+      return left.name.localeCompare(right.name);
+    })
     .slice(0, TOP_LIST_LIMIT)
-    .map(({ ecosystem, report }) => {
-      const highestSeverity = [...report.vulnerabilities].sort(
-        (left, right) =>
-          severityRank[right.severity] - severityRank[left.severity],
-      )[0]!.severity;
+    .map((pkg) => ({
+      name: pkg.name,
+      ecosystem: pkg.ecosystem,
+      vulnerabilityCount: pkg.vulnerabilityCount,
+      highestSeverity: pkg.highestSeverity,
+      manifestPath: pkg.manifestPath,
+    }));
 
-      return {
-        name: report.dependency.name,
-        ecosystem,
-        vulnerabilityCount: report.vulnerabilities.length,
-        highestSeverity,
-        manifestPath: report.dependency.manifestPath,
-      };
-    });
-
-  const ecosystems = [...new Set(scans.map((scan) => scan.ecosystem))].sort(
-    (a, b) => a.localeCompare(b),
-  );
-
-  const topDead: DeadDependencySummaryItem[] = dead
+  const topDead: DeadDependencySummaryItem[] = packages
+    .filter((pkg) => pkg.isDead)
     .sort((left, right) => {
       if (left.ecosystem !== right.ecosystem) {
         return left.ecosystem.localeCompare(right.ecosystem);
       }
-      return left.report.dependency.name.localeCompare(
-        right.report.dependency.name,
-      );
+      return left.name.localeCompare(right.name);
     })
     .slice(0, TOP_LIST_LIMIT)
-    .map(({ ecosystem, report }) => ({
-      name: report.dependency.name,
-      ecosystem,
-      isDev: report.dependency.isDev,
-      manifestPath: report.dependency.manifestPath,
+    .map((pkg) => ({
+      name: pkg.name,
+      ecosystem: pkg.ecosystem,
+      isDev: pkg.isDev,
+      manifestPath: pkg.manifestPath,
     }));
 
+  const ecosystems = [...new Set(packages.map((pkg) => pkg.ecosystem))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+  const outdatedDependencies = packages.filter(
+    (pkg) => pkg.updateType !== "unknown" && pkg.updateType !== "up-to-date",
+  ).length;
+  const deadDependencies = packages.filter((pkg) => pkg.isDead).length;
+  const totalDependencies = packages.length;
+  const totalVulnerabilities = packages.reduce(
+    (sum, pkg) => sum + pkg.vulnerabilityCount,
+    0,
+  );
+
   return {
-    ecosystems,
-    outdatedDependencies: outdated.length,
-    deadDependencies: dead.length,
-    topOutdated,
-    topVulnerable,
-    topDead,
-    byComponent,
+    totalDependencies,
+    totalVulnerabilities,
+    summary: {
+      ecosystems,
+      outdatedDependencies,
+      deadDependencies,
+      topOutdated,
+      topVulnerable,
+      topDead,
+      byComponent,
+    },
   };
 };
 
@@ -428,32 +641,18 @@ export const scanDependencySubsystem = async (
   const sortedScans = scans.sort((left, right) =>
     left.ecosystem.localeCompare(right.ecosystem),
   );
-
-  const totalDependencies = sortedScans.reduce(
-    (sum, scan) => sum + scan.reports.length,
-    0,
-  );
-  const totalVulnerabilities = sortedScans.reduce(
-    (sum, scan) =>
-      sum +
-      scan.reports.reduce(
-        (vulnerabilityCount, report) =>
-          vulnerabilityCount + report.vulnerabilities.length,
-        0,
-      ),
-    0,
+  const summaryResult = buildSummary(
+    sortedScans,
+    options.componentGrouping ?? "default",
+    options.includeDevDeadDeps ?? false,
+    options.skipUsage,
   );
 
   return {
     scans: sortedScans,
-    totalDependencies,
-    totalVulnerabilities,
-    summary: buildSummary(
-      sortedScans,
-      options.componentGrouping ?? "default",
-      options.includeDevDeadDeps ?? false,
-      options.skipUsage,
-    ),
+    totalDependencies: summaryResult.totalDependencies,
+    totalVulnerabilities: summaryResult.totalVulnerabilities,
+    summary: summaryResult.summary,
     debug: options.debugVulnerabilityKeys
       ? {
           vulnerabilityKeyStats: {

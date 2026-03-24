@@ -126,6 +126,11 @@ const SERVICE_REGISTRY: readonly ServiceEntry[] = [
     category: "Infrastructure",
   },
   {
+    packages: ["@supabase/supabase-js", "@supabase/ssr"],
+    name: "Supabase",
+    category: "Infrastructure",
+  },
+  {
     packages: ["@vercel/sdk", "@vercel/sandbox"],
     name: "Vercel",
     category: "Infrastructure",
@@ -165,6 +170,7 @@ const PREFIX_REGISTRY: readonly {
   },
   { prefix: "@flydotio/", name: "Fly.io", category: "Infrastructure" },
   { prefix: "@fly/", name: "Fly.io", category: "Infrastructure" },
+  { prefix: "@supabase/", name: "Supabase", category: "Infrastructure" },
 ];
 
 // Build a fast lookup map for exact matches
@@ -194,6 +200,7 @@ const PYTHON_SERVICES = new Map<string, { name: string; category: string }>([
   ["pika", { name: "RabbitMQ", category: "Messaging" }],
   ["elasticsearch", { name: "Elasticsearch", category: "Search" }],
   ["prometheus-client", { name: "Prometheus", category: "Observability" }],
+  ["supabase", { name: "Supabase", category: "Infrastructure" }],
 ]);
 
 const GO_SERVICES = new Map<string, { name: string; category: string }>([
@@ -214,6 +221,10 @@ const GO_SERVICES = new Map<string, { name: string; category: string }>([
     { name: "OpenTelemetry", category: "Observability" },
   ],
   ["github.com/olivere/elastic", { name: "Elasticsearch", category: "Search" }],
+  [
+    "github.com/supabase-community/supabase-go",
+    { name: "Supabase", category: "Infrastructure" },
+  ],
 ]);
 
 const RUBY_SERVICES = new Map<string, { name: string; category: string }>([

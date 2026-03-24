@@ -71,23 +71,36 @@ const updateTypeRank = {
   major: 3,
 } as const;
 
+const buildPackageKey = (ecosystem: string, name: string): string =>
+  `${ecosystem}:${name}`;
+
 export const countVulnerabilitiesAtOrAboveThreshold = (
   result: DepScannerResult,
   threshold: VulnerabilitySeverity,
 ): number => {
   const thresholdValue = severityRank[threshold];
-  let count = 0;
+  const vulnerabilitySeverities = new Map<string, number>();
 
   for (const scan of result.scans) {
     for (const report of scan.reports) {
-      count += report.vulnerabilities.filter(
-        (vulnerability) =>
-          severityRank[vulnerability.severity] >= thresholdValue,
-      ).length;
+      const packageKey = buildPackageKey(
+        scan.ecosystem,
+        report.dependency.name,
+      );
+      for (const vulnerability of report.vulnerabilities) {
+        const key = `${packageKey}:${vulnerability.id}`;
+        const rank = severityRank[vulnerability.severity];
+        const priorRank = vulnerabilitySeverities.get(key);
+        if (priorRank === undefined || rank > priorRank) {
+          vulnerabilitySeverities.set(key, rank);
+        }
+      }
     }
   }
 
-  return count;
+  return [...vulnerabilitySeverities.values()].filter(
+    (rank) => rank >= thresholdValue,
+  ).length;
 };
 
 export const countOutdatedAtOrAboveThreshold = (
@@ -95,18 +108,26 @@ export const countOutdatedAtOrAboveThreshold = (
   threshold: OutdatedThreshold,
 ): number => {
   const thresholdValue = updateRank[threshold];
-  let count = 0;
+  const outdatedRankByPackage = new Map<string, number>();
 
   for (const scan of result.scans) {
     for (const report of scan.reports) {
+      const packageKey = buildPackageKey(
+        scan.ecosystem,
+        report.dependency.name,
+      );
       const updateType = report.version?.updateType ?? "unknown";
-      if (updateTypeRank[updateType] >= thresholdValue) {
-        count += 1;
+      const rank = updateTypeRank[updateType];
+      const priorRank = outdatedRankByPackage.get(packageKey) ?? 0;
+      if (rank > priorRank) {
+        outdatedRankByPackage.set(packageKey, rank);
       }
     }
   }
 
-  return count;
+  return [...outdatedRankByPackage.values()].filter(
+    (rank) => rank >= thresholdValue,
+  ).length;
 };
 
 export const evaluateDependencyPolicy = (

@@ -116,4 +116,34 @@ describe("datastore detector", () => {
     const { values } = await runDatastoreDetector(tmpDir);
     expect(values).toContain("DynamoDB");
   });
+
+  it("labels PostgreSQL as Supabase when Supabase is detected", async () => {
+    await writeFile(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          pg: "^8.0.0",
+          "@supabase/supabase-js": "^2.0.0",
+        },
+      }),
+    );
+
+    const { values } = await runDatastoreDetector(tmpDir);
+    expect(values).toContain("PostgreSQL (Supabase)");
+    expect(values).not.toContain("PostgreSQL");
+  });
+
+  it("does not emit PostgreSQL (Supabase) without PostgreSQL detection", async () => {
+    await writeFile(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          "@supabase/supabase-js": "^2.0.0",
+        },
+      }),
+    );
+
+    const { values } = await runDatastoreDetector(tmpDir);
+    expect(values).not.toContain("PostgreSQL (Supabase)");
+  });
 });

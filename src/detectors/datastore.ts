@@ -260,6 +260,7 @@ registerDetector({
   id: "datastore",
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
     const { findings, addFinding } = createFindingAdder();
+    let supabaseEvidence: string | undefined;
 
     // Scan primary package.json files for datastore dependencies
     for (const pkgFile of index.getByNamePrimary("package.json")) {
@@ -268,6 +269,9 @@ registerDetector({
 
       const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
       for (const depName of Object.keys(allDeps)) {
+        if (!supabaseEvidence && depName.startsWith("@supabase/")) {
+          supabaseEvidence = `npm dependency: ${depName} in ${pkgFile.relativePath}`;
+        }
         const datastore = NPM_DATASTORE_MAP.get(depName);
         if (datastore) {
           addFinding(
@@ -275,6 +279,19 @@ registerDetector({
             0.95,
             `npm dependency: ${depName} in ${pkgFile.relativePath}`,
           );
+        }
+      }
+    }
+
+    if (!supabaseEvidence) {
+      for (const file of index.getByNamePrimary("config.toml")) {
+        const pathValue = file.relativePath;
+        if (
+          pathValue === "supabase/config.toml" ||
+          pathValue.includes("/supabase/config.toml")
+        ) {
+          supabaseEvidence = `supabase config: ${pathValue}`;
+          break;
         }
       }
     }
@@ -415,6 +432,24 @@ registerDetector({
       }
     }
 
-    return { detectorId: "datastore", findings };
+    const normalizedFindings = supabaseEvidence
+      ? findings.map((finding) => {
+          if (finding.value !== "PostgreSQL") {
+            return finding;
+          }
+
+          const evidence = finding.evidence.includes(supabaseEvidence)
+            ? finding.evidence
+            : [...finding.evidence, supabaseEvidence];
+
+          return {
+            ...finding,
+            value: "PostgreSQL (Supabase)",
+            evidence,
+          };
+        })
+      : findings;
+
+    return { detectorId: "datastore", findings: normalizedFindings };
   },
 });

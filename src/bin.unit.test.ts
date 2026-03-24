@@ -1,7 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
+import { DETECTOR_IDS } from "./detectors/catalog";
 
 const repoRootPath = path.resolve(import.meta.dir, "../../..");
 const textDecoder = new TextDecoder();
@@ -31,6 +32,36 @@ const createCliFixtureRepo = async (): Promise<string> => {
     "import lodash from 'lodash';\n",
   );
 
+  return repoPath;
+};
+
+const createDuplicateDependencyFixtureRepo = async (): Promise<string> => {
+  const repoPath = await mkdtemp(
+    path.join(os.tmpdir(), "repo-scanner-dup-deps-"),
+  );
+  const appDir = path.join(repoPath, "apps", "web");
+  const serviceDir = path.join(repoPath, "services", "api");
+  await mkdir(appDir, { recursive: true });
+  await mkdir(serviceDir, { recursive: true });
+  await writeFile(
+    path.join(repoPath, "README.md"),
+    "# duplicate deps fixture\n",
+  );
+
+  const manifest = JSON.stringify(
+    {
+      name: "fixture",
+      version: "1.0.0",
+      dependencies: {
+        lodash: "^4.17.21",
+      },
+    },
+    null,
+    2,
+  );
+
+  await writeFile(path.join(appDir, "package.json"), manifest);
+  await writeFile(path.join(serviceDir, "package.json"), manifest);
   return repoPath;
 };
 
@@ -108,6 +139,48 @@ const runRepoScanner = (
     },
   );
 
+const runGit = (repoPath: string, args: readonly string[]): void => {
+  const result = Bun.spawnSync(["git", ...args], {
+    cwd: repoPath,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `git ${args.join(" ")} failed: ${decode(result.stderr).trim()}`,
+    );
+  }
+};
+
+const createGitDiffFixtureRepo = async (): Promise<string> => {
+  const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-diff-"));
+  await writeFile(path.join(repoPath, "README.md"), "# diff fixture\n");
+  await writeFile(
+    path.join(repoPath, "package.json"),
+    JSON.stringify({ name: "diff-fixture", version: "1.0.0" }, null, 2),
+  );
+  await mkdir(path.join(repoPath, "src"), { recursive: true });
+  await writeFile(
+    path.join(repoPath, "src", "index.ts"),
+    "export const x = 1;\n",
+  );
+
+  runGit(repoPath, ["init"]);
+  runGit(repoPath, ["config", "user.email", "repo-scanner-tests@example.com"]);
+  runGit(repoPath, ["config", "user.name", "Repo Scanner Tests"]);
+  runGit(repoPath, ["add", "."]);
+  runGit(repoPath, ["commit", "-m", "base"]);
+
+  await writeFile(
+    path.join(repoPath, "src", "index.ts"),
+    "export const x = 2;\n",
+  );
+  runGit(repoPath, ["add", "."]);
+  runGit(repoPath, ["commit", "-m", "change"]);
+
+  return repoPath;
+};
+
 const expectTopLevelKeys = (
   payload: Record<string, unknown>,
   expectedKeys: readonly string[],
@@ -135,8 +208,14 @@ describe("repo-scanner bin", () => {
       expect(result.exitCode).toBe(0);
 
       const payload = JSON.parse(new TextDecoder().decode(result.stdout));
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "dependencies",
+      ]);
       expect(payload.dependencies).toBeDefined();
-      expect(payload.policyEvaluation).toBeDefined();
+      expect(payload.policyEvaluation).toBeUndefined();
       expect(payload.dependencies.totalDependencies).toBeGreaterThanOrEqual(1);
       expect(
         Array.isArray(payload.dependencies.summary.topOutdated),
@@ -144,6 +223,30 @@ describe("repo-scanner bin", () => {
       expect(
         Array.isArray(payload.dependencies.summary.topVulnerable),
       ).toBeTrue();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("deduplicates --deps summary counts by package key", async () => {
+    const repoPath = await createDuplicateDependencyFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--deps",
+        "--no-security",
+        "--no-usage",
+        "--no-version-lookup",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+
+      const payload = JSON.parse(new TextDecoder().decode(result.stdout));
+      expect(payload.dependencies.totalDependencies).toBe(1);
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -192,8 +295,19 @@ describe("repo-scanner bin", () => {
 
       const output = new TextDecoder().decode(result.stdout);
       const payload = JSON.parse(output);
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "dependencies",
+        "policyEvaluation",
+      ]);
       expect(payload.dependencies).toBeDefined();
       expect(payload.policyEvaluation).toBeDefined();
+      expect(payload.architecture).toBeUndefined();
+      expect(payload.inventory).toBeUndefined();
+      expect(payload.externalServices).toBeUndefined();
+      expect(payload.buildAndTest).toBeUndefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -217,7 +331,13 @@ describe("repo-scanner bin", () => {
       expect(result.exitCode).toBe(0);
 
       const payload = JSON.parse(new TextDecoder().decode(result.stdout));
-      expect(payload.dependencies).toBeDefined();
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "policyEvaluation",
+      ]);
+      expect(payload.dependencies).toBeUndefined();
       expect(payload.policyEvaluation).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
@@ -334,7 +454,7 @@ describe("repo-scanner bin", () => {
     expect(result.exitCode).toBe(0);
     expect(stdout).toContain("#compdef repo-scanner");
     expect(stdout).toContain("compdef _repo_scanner repo-scanner");
-    expect(stdout).not.toContain('_repo_scanner "$@"');
+    expect(stdout).toContain('_repo_scanner "$@"');
   });
 
   it("installs bash completion script in the user bash-completion path", async () => {
@@ -387,6 +507,37 @@ describe("repo-scanner bin", () => {
       expect(stdout).toContain("Installed fish completion:");
       const content = await Bun.file(completionFile).text();
       expect(content).toContain("# fish completion for repo-scanner");
+    } finally {
+      await rm(homePath, { recursive: true, force: true });
+    }
+  });
+
+  it("installs zsh completion into Homebrew site-functions when available", async () => {
+    const homePath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-homebrew-home-"),
+    );
+    const homebrewPrefix = path.join(homePath, "homebrew");
+    const siteFunctionsDir = path.join(
+      homebrewPrefix,
+      "share",
+      "zsh",
+      "site-functions",
+    );
+    await mkdir(siteFunctionsDir, { recursive: true });
+
+    try {
+      const result = runRepoScanner(["completion", "install", "zsh"], {
+        HOME: homePath,
+        HOMEBREW_PREFIX: homebrewPrefix,
+      });
+      const stdout = decode(result.stdout);
+      const completionFile = path.join(siteFunctionsDir, "_repo-scanner");
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Installed zsh completion:");
+      const content = await Bun.file(completionFile).text();
+      expect(content).toContain("#compdef repo-scanner");
+      expect(content).toContain('_repo_scanner "$@"');
     } finally {
       await rm(homePath, { recursive: true, force: true });
     }
@@ -464,7 +615,7 @@ describe("repo-scanner bin", () => {
       expect([0, 1]).toContain(result.exitCode);
 
       const payload = JSON.parse(new TextDecoder().decode(result.stdout));
-      expect(payload.dependencies).toBeDefined();
+      expect(payload.dependencies).toBeUndefined();
       expect(payload.policyEvaluation).toBeDefined();
       expect(payload.policyEvaluation.deadDeps).toBeDefined();
       expect(typeof payload.policyEvaluation.deadDeps.count).toBe("number");
@@ -504,7 +655,8 @@ describe("repo-scanner bin", () => {
       expect(result.exitCode).toBe(1);
 
       const payload = JSON.parse(new TextDecoder().decode(result.stdout));
-      expect(payload.dependencies.summary.deadDependencies).toBe(1);
+      expect(payload.dependencies).toBeUndefined();
+      expect(payload.policyEvaluation.deadDeps.count).toBe(1);
       expect(payload.policyEvaluation.deadDeps.failed).toBeTrue();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
@@ -549,7 +701,7 @@ describe("repo-scanner bin", () => {
     }
   });
 
-  it("defaults to core profile sections and omits signals in table output", async () => {
+  it("prints help output when no scan selectors are provided", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -557,12 +709,9 @@ describe("repo-scanner bin", () => {
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("Architecture");
-      expect(stdout).toContain("Inventory");
-      expect(stdout).toContain("External Services");
-      expect(stdout).toContain("Build & Test");
-      expect(stdout).not.toContain("Signals");
-      expect(stdout).not.toContain("API Surface");
+      expect(stdout).toContain("Usage: repo-scanner [command] [options]");
+      expect(stdout).toContain("Core output profile:");
+      expect(stdout).not.toContain("repo-scanner — scanned");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -608,6 +757,57 @@ describe("repo-scanner bin", () => {
       expect(stdout).not.toContain("Inventory");
       expect(stdout).not.toContain("External Services");
       expect(stdout).not.toContain("Signals");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("scopes table output to Dependencies section for --deps", async () => {
+    const repoPath = await createCliFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--deps",
+        "--no-security",
+        "--no-usage",
+        "--no-version-lookup",
+      ]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("Dependencies");
+      expect(stdout).not.toContain("Architecture");
+      expect(stdout).not.toContain("Inventory");
+      expect(stdout).not.toContain("External Services");
+      expect(stdout).not.toContain("Build & Test");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("scopes table output to policyEvaluation payload for policy-only flags", async () => {
+    const repoPath = await createCliFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--no-security",
+        "--no-usage",
+        "--no-version-lookup",
+        "--fail-on-vulns",
+      ]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("policyEvaluation");
+      expect(stdout).not.toContain("Architecture");
+      expect(stdout).not.toContain("Inventory");
+      expect(stdout).not.toContain("External Services");
+      expect(stdout).not.toContain("Build & Test");
+      expect(stdout).not.toContain("Dependencies");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -909,6 +1109,54 @@ describe("repo-scanner bin", () => {
     }
   });
 
+  describe("detector selector scoping", () => {
+    const metadataKeys = new Set(["scanPath", "timestamp", "durationMs"]);
+    let repoPath = "";
+
+    beforeAll(async () => {
+      repoPath = await createCoreProfileFixtureRepo();
+    });
+
+    afterAll(async () => {
+      if (repoPath.length > 0) {
+        await rm(repoPath, { recursive: true, force: true });
+      }
+    });
+
+    for (const detectorId of DETECTOR_IDS) {
+      it(`scopes detector selector "${detectorId}" to one payload key`, () => {
+        const result = runRepoScanner([
+          "--path",
+          repoPath,
+          "--detectors",
+          detectorId,
+          "--format",
+          "json",
+        ]);
+
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `detector ${detectorId} failed: ${decode(result.stderr)}`,
+          );
+        }
+
+        const payload = JSON.parse(decode(result.stdout)) as Record<
+          string,
+          unknown
+        >;
+        const nonMetadataKeys = Object.keys(payload).filter(
+          (key) => !metadataKeys.has(key),
+        );
+
+        if (nonMetadataKeys.length !== 1) {
+          throw new Error(
+            `detector ${detectorId} produced unexpected keys: ${Object.keys(payload).join(",")}`,
+          );
+        }
+      });
+    }
+  });
+
   it("emits explicit union for mixed section and detector selectors", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
@@ -1118,7 +1366,7 @@ CREATE TABLE orders (
       const payload = JSON.parse(decode(result.stdout));
       expect(payload.topology).toBeDefined();
       expect(payload.dependencies).toBeDefined();
-      expect(payload.policyEvaluation).toBeDefined();
+      expect(payload.policyEvaluation).toBeUndefined();
       expect(payload.architecture).toBeUndefined();
       expect(payload.inventory).toBeUndefined();
       expect(payload.buildAndTest).toBeUndefined();
@@ -1173,13 +1421,17 @@ CREATE TABLE orders (
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
 
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "externalServices",
+      ]);
       expect(payload.externalServices).toBeDefined();
       expect(payload.architecture).toBeUndefined();
       expect(payload.inventory).toBeUndefined();
       expect(payload.buildAndTest).toBeUndefined();
-      expect(payload.scanPath).toBeDefined();
-      expect(payload.timestamp).toBeDefined();
-      expect(payload.durationMs).toBeDefined();
+      expect(payload.vcs).toBeUndefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -1252,14 +1504,96 @@ CREATE TABLE orders (
       expect(result.exitCode).toBe(0);
 
       const payload = JSON.parse(decode(result.stdout));
-      expect(payload.scanPath).toBeDefined();
-      expect(payload.timestamp).toBeDefined();
-      expect(payload.durationMs).toBeDefined();
+      expectTopLevelKeys(payload, [
+        "scanPath",
+        "timestamp",
+        "durationMs",
+        "inventory",
+        "topology",
+      ]);
       expect(payload.inventory).toBeDefined();
       expect(payload.topology).toBeDefined();
       expect(payload.architecture).toBeUndefined();
       expect(payload.externalServices).toBeUndefined();
       expect(payload.buildAndTest).toBeUndefined();
+      expect(payload.vcs).toBeUndefined();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("scopes --diff json output to diffScan payload", async () => {
+    const result = runRepoScanner(["--diff", "HEAD~1", "--format", "json"]);
+
+    expect(result.exitCode).toBe(0);
+    const payload = JSON.parse(decode(result.stdout));
+    expectTopLevelKeys(payload, [
+      "scanPath",
+      "timestamp",
+      "durationMs",
+      "diffScan",
+    ]);
+    expect(payload.diffScan).toBeDefined();
+    expect(payload.architecture).toBeUndefined();
+    expect(payload.inventory).toBeUndefined();
+    expect(payload.buildAndTest).toBeUndefined();
+    expect(payload.externalServices).toBeUndefined();
+  });
+
+  it("scopes --diff table output to diffScan payload", async () => {
+    const result = runRepoScanner(["--diff", "HEAD~1"]);
+    const stdout = decode(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(stdout).toContain("diffScan");
+    expect(stdout).not.toContain("Architecture");
+    expect(stdout).not.toContain("Inventory");
+    expect(stdout).not.toContain("External Services");
+    expect(stdout).not.toContain("Build & Test");
+  });
+
+  it("enables diff dry-check when --fail-on-new-duplication-pct is provided", async () => {
+    const repoPath = await createGitDiffFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--diff",
+        "HEAD~1",
+        "--fail-on-new-duplication-pct",
+        "100",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+      expect(payload.diffScan).toBeDefined();
+      expect(payload.diffScan.newDuplication).toBeDefined();
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("enables diff env-check when --fail-on-new-env-vars is provided", async () => {
+    const repoPath = await createGitDiffFixtureRepo();
+
+    try {
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--diff",
+        "HEAD~1",
+        "--fail-on-new-env-vars",
+        "--format",
+        "json",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+      expect(payload.diffScan).toBeDefined();
+      expect(Array.isArray(payload.diffScan.newEnvVars)).toBeTrue();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

@@ -91,6 +91,151 @@ const fixtureResult: DepScannerResult = {
   durationMs: 10,
 };
 
+const duplicatedPackageFixtureResult: DepScannerResult = {
+  scans: [
+    {
+      ecosystem: "npm",
+      manifestPaths: ["apps/web/package.json", "services/api/package.json"],
+      scanDurationMs: 5,
+      reports: [
+        {
+          dependency: {
+            name: "shared-dep",
+            ecosystem: "npm",
+            currentVersion: "1.0.0",
+            manifestPath: "apps/web/package.json",
+            isDev: false,
+            isOptional: false,
+          },
+          version: {
+            latestVersion: "2.0.0",
+            updateType: "major",
+          },
+          vulnerabilities: [
+            {
+              id: "OSV-SHARED-1",
+              summary: "critical issue",
+              severity: "CRITICAL",
+              affectedVersions: "<2.0.0",
+            },
+          ],
+          usages: [],
+        },
+        {
+          dependency: {
+            name: "shared-dep",
+            ecosystem: "npm",
+            currentVersion: "1.0.0",
+            manifestPath: "services/api/package.json",
+            isDev: false,
+            isOptional: false,
+          },
+          version: {
+            latestVersion: "2.0.0",
+            updateType: "major",
+          },
+          vulnerabilities: [
+            {
+              id: "OSV-SHARED-1",
+              summary: "critical issue",
+              severity: "CRITICAL",
+              affectedVersions: "<2.0.0",
+            },
+          ],
+          usages: [],
+        },
+      ],
+    },
+  ],
+  totalDependencies: 1,
+  totalVulnerabilities: 1,
+  summary: {
+    ecosystems: ["npm"],
+    outdatedDependencies: 1,
+    deadDependencies: 1,
+    topOutdated: [],
+    topVulnerable: [],
+    topDead: [
+      {
+        name: "shared-dep",
+        ecosystem: "npm",
+        isDev: false,
+        manifestPath: "apps/web/package.json",
+      },
+    ],
+    byComponent: [],
+  },
+  scanPath: ".",
+  timestamp: new Date(0).toISOString(),
+  durationMs: 10,
+};
+
+const unknownSeverityFixtureResult: DepScannerResult = {
+  scans: [
+    {
+      ecosystem: "npm",
+      manifestPaths: ["apps/web/package.json", "services/api/package.json"],
+      scanDurationMs: 5,
+      reports: [
+        {
+          dependency: {
+            name: "mystery-pkg",
+            ecosystem: "npm",
+            currentVersion: "1.0.0",
+            manifestPath: "apps/web/package.json",
+            isDev: false,
+            isOptional: false,
+          },
+          version: undefined,
+          vulnerabilities: [
+            {
+              id: "OSV-MYSTERY-1",
+              summary: "unknown severity issue",
+              severity: "UNKNOWN",
+              affectedVersions: "*",
+            },
+          ],
+          usages: [],
+        },
+        {
+          dependency: {
+            name: "mystery-pkg",
+            ecosystem: "npm",
+            currentVersion: "1.0.0",
+            manifestPath: "services/api/package.json",
+            isDev: false,
+            isOptional: false,
+          },
+          version: undefined,
+          vulnerabilities: [
+            {
+              id: "OSV-MYSTERY-1",
+              summary: "unknown severity issue",
+              severity: "UNKNOWN",
+              affectedVersions: "*",
+            },
+          ],
+          usages: [],
+        },
+      ],
+    },
+  ],
+  totalDependencies: 1,
+  totalVulnerabilities: 1,
+  summary: {
+    ecosystems: ["npm"],
+    outdatedDependencies: 0,
+    deadDependencies: 0,
+    topOutdated: [],
+    topVulnerable: [],
+    topDead: [],
+    byComponent: [],
+  },
+  scanPath: ".",
+  timestamp: new Date(0).toISOString(),
+  durationMs: 10,
+};
+
 describe("dependency policy counters", () => {
   it("counts vulnerabilities by threshold", () => {
     expect(countVulnerabilitiesAtOrAboveThreshold(fixtureResult, "LOW")).toBe(
@@ -108,6 +253,30 @@ describe("dependency policy counters", () => {
     expect(countOutdatedAtOrAboveThreshold(fixtureResult, "patch")).toBe(2);
     expect(countOutdatedAtOrAboveThreshold(fixtureResult, "minor")).toBe(2);
     expect(countOutdatedAtOrAboveThreshold(fixtureResult, "major")).toBe(1);
+  });
+
+  it("deduplicates outdated threshold counts by package key", () => {
+    expect(
+      countOutdatedAtOrAboveThreshold(duplicatedPackageFixtureResult, "major"),
+    ).toBe(1);
+  });
+
+  it("deduplicates vulnerability threshold counts by package key", () => {
+    expect(
+      countVulnerabilitiesAtOrAboveThreshold(
+        duplicatedPackageFixtureResult,
+        "HIGH",
+      ),
+    ).toBe(1);
+  });
+
+  it("counts unknown-severity vulnerabilities when threshold is unknown", () => {
+    expect(
+      countVulnerabilitiesAtOrAboveThreshold(
+        unknownSeverityFixtureResult,
+        "UNKNOWN",
+      ),
+    ).toBe(1);
   });
 
   it("evaluates threshold and count policy triggers", () => {

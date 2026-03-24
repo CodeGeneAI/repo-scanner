@@ -3,23 +3,13 @@ import { parseArgs } from "./cli";
 import { resolveScanProfile } from "./scan-profile";
 
 describe("resolveScanProfile", () => {
-  it("defaults to core sections and core detector set", () => {
+  it("defaults to no selected sections or detectors", () => {
     const options = parseArgs(["bun", "repo-scanner"]);
     const profile = resolveScanProfile(options);
 
     expect(profile.allDetectors).toBeFalse();
-    expect(profile.selectedSections).toEqual([
-      "architecture",
-      "inventory",
-      "external-services",
-      "build-and-test",
-    ]);
-    expect(profile.enabledDetectorIds).toBeDefined();
-    expect(profile.enabledDetectorIds).toContain("monorepo");
-    expect(profile.enabledDetectorIds).toContain("language");
-    expect(profile.enabledDetectorIds).toContain("external-services");
-    expect(profile.enabledDetectorIds).toContain("ci");
-    expect(profile.enabledDetectorIds).not.toContain("api-surface");
+    expect(profile.selectedSections).toEqual([]);
+    expect(profile.enabledDetectorIds).toEqual([]);
   });
 
   it("uses explicit section flags when provided", () => {

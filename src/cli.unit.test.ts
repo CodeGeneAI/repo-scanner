@@ -308,6 +308,52 @@ describe("parseArgs", () => {
     expect(result.ecosystems).toEqual(["npm", "pypi", "go"]);
   });
 
+  it("allows dependency-analysis modifiers when dependency output is requested via policy flags", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--no-security",
+      "--no-usage",
+      "--no-version-lookup",
+      "--fail-on-vulns",
+      "--fail-on-vulns-count",
+      "1",
+    ]);
+
+    expect(result.failOnVulns).toBeTrue();
+    expect(result.failOnVulnsCount).toBe(1);
+    expect(result.skipSecurity).toBeTrue();
+    expect(result.skipUsage).toBeTrue();
+    expect(result.skipVersionLookup).toBeTrue();
+  });
+
+  it("throws CliParseError for dependency-analysis flags without --deps or policy flags", () => {
+    expect(() => parseArgs(["bun", "repo-scanner", "--deps-debug"])).toThrow(
+      CliParseError,
+    );
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--ecosystems", "npm"]),
+    ).toThrow(CliParseError);
+    expect(() => parseArgs(["bun", "repo-scanner", "--no-usage"])).toThrow(
+      CliParseError,
+    );
+    expect(() => parseArgs(["bun", "repo-scanner", "--no-security"])).toThrow(
+      CliParseError,
+    );
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--no-version-lookup"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--concurrency", "4"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--component-grouping", "apps-only"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--include-dev-dead-deps"]),
+    ).toThrow(CliParseError);
+  });
+
   it("parses topology defaults", () => {
     const result = parseArgs(["bun", "repo-scanner"]);
     expect(result.topology).toBeFalse();
@@ -432,10 +478,11 @@ describe("parseArgs", () => {
     expect(result.failOnDeadDepsCount).toBe(10);
   });
 
-  it("parses --include-dev-dead-deps independently without other dead deps flags", () => {
+  it("parses --include-dev-dead-deps with --deps", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
+      "--deps",
       "--include-dev-dead-deps",
     ]);
     expect(result.includeDevDeadDeps).toBeTrue();
@@ -504,30 +551,39 @@ describe("parseArgs", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
+      "--diff",
+      "HEAD",
       "--fail-on-new-duplication-pct",
       "15",
     ]);
     expect(result.failOnNewDuplicationPct).toBe(15);
+    expect(result.diffDryCheck).toBeTrue();
   });
 
   it("parses --fail-on-new-duplication-pct with zero", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
+      "--diff",
+      "HEAD",
       "--fail-on-new-duplication-pct",
       "0",
     ]);
     expect(result.failOnNewDuplicationPct).toBe(0);
+    expect(result.diffDryCheck).toBeTrue();
   });
 
   it("parses --fail-on-new-duplication-pct with decimal value", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
+      "--diff",
+      "HEAD",
       "--fail-on-new-duplication-pct",
       "5.5",
     ]);
     expect(result.failOnNewDuplicationPct).toBe(5.5);
+    expect(result.diffDryCheck).toBeTrue();
   });
 
   it("throws CliParseError for --fail-on-new-duplication-pct without value", () => {
@@ -554,14 +610,45 @@ describe("parseArgs", () => {
   });
 
   it("parses --fail-on-new-env-vars flag", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--fail-on-new-env-vars"]);
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--diff",
+      "HEAD",
+      "--fail-on-new-env-vars",
+    ]);
     expect(result.failOnNewEnvVars).toBeTrue();
+    expect(result.diffEnvCheck).toBeTrue();
   });
 
-  it("parses --diff-dry-check without --diff (no-op scenario)", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--diff-dry-check"]);
-    expect(result.diffDryCheck).toBeTrue();
-    expect(result.diff).toBeUndefined();
+  it("throws CliParseError for diff-only flags without --diff", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--diff-dry-check"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--diff-dry-include-tests"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--diff-env-check"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--fail-on-new-duplication-pct", "1"]),
+    ).toThrow(CliParseError);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--fail-on-new-env-vars"]),
+    ).toThrow(CliParseError);
+  });
+
+  it("throws CliParseError for --diff-dry-include-tests without --diff-dry-check", () => {
+    expect(() =>
+      parseArgs([
+        "bun",
+        "repo-scanner",
+        "--diff",
+        "HEAD",
+        "--diff-dry-include-tests",
+      ]),
+    ).toThrow(CliParseError);
   });
 
   it("parses all diff pre-commit flags together", () => {

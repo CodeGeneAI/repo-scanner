@@ -153,6 +153,11 @@ _repo_scanner() {
 if (( $+functions[compdef] )); then
   compdef _repo_scanner repo-scanner
 fi
+# Autoloaded completion files are invoked as the filename-derived function
+# (e.g. _repo-scanner). Dispatch to the actual implementation function.
+if [[ "\${funcstack[1]}" == "_repo-scanner" ]]; then
+  _repo_scanner "$@"
+fi
 `;
   }
   return `# fish completion for repo-scanner
@@ -177,11 +182,74 @@ const installCompletionScript = (
   return targetPath;
 };
 
+const isWritableDirectory = (dirPath: string): boolean => {
+  if (!fs.existsSync(dirPath)) return false;
+  try {
+    fs.accessSync(dirPath, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const resolveHomebrewPrefixes = (): readonly string[] => {
+  const prefixes = new Set<string>();
+  const envPrefix = process.env.HOMEBREW_PREFIX;
+  if (envPrefix && envPrefix.length > 0) {
+    prefixes.add(envPrefix);
+  }
+  prefixes.add("/opt/homebrew");
+  prefixes.add("/usr/local");
+  return [...prefixes];
+};
+
+const resolveFirstWritableCandidate = (
+  candidates: readonly string[],
+): string | undefined => {
+  for (const candidate of candidates) {
+    if (isWritableDirectory(path.dirname(candidate))) {
+      return candidate;
+    }
+  }
+  return undefined;
+};
+
+const resolveZshFpathCompletionCandidates = (): readonly string[] => {
+  try {
+    const zshProcess = Bun.spawnSync(["zsh", "-ic", "print -l -- $fpath"], {
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    if (zshProcess.exitCode !== 0) return [];
+
+    const output = new TextDecoder().decode(zshProcess.stdout);
+    const directories = output
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+    const uniqueDirectories = [...new Set(directories)];
+    return uniqueDirectories.map((dirPath) =>
+      path.join(dirPath, "_repo-scanner"),
+    );
+  } catch {
+    return [];
+  }
+};
+
 const resolveCompletionInstallPath = (
   shell: "bash" | "zsh" | "fish",
 ): string => {
   const homeDir = process.env.HOME ?? process.cwd();
   if (shell === "bash") {
+    const homebrewCandidate = resolveFirstWritableCandidate(
+      resolveHomebrewPrefixes().map((prefix) =>
+        path.join(prefix, "etc", "bash_completion.d", "repo-scanner"),
+      ),
+    );
+    if (homebrewCandidate) {
+      return homebrewCandidate;
+    }
+
     const xdgDataHome =
       process.env.XDG_DATA_HOME && process.env.XDG_DATA_HOME.length > 0
         ? process.env.XDG_DATA_HOME
@@ -194,6 +262,22 @@ const resolveCompletionInstallPath = (
     );
   }
   if (shell === "zsh") {
+    const zshFpathCandidate = resolveFirstWritableCandidate(
+      resolveZshFpathCompletionCandidates(),
+    );
+    if (zshFpathCandidate) {
+      return zshFpathCandidate;
+    }
+
+    const homebrewCandidate = resolveFirstWritableCandidate(
+      resolveHomebrewPrefixes().map((prefix) =>
+        path.join(prefix, "share", "zsh", "site-functions", "_repo-scanner"),
+      ),
+    );
+    if (homebrewCandidate) {
+      return homebrewCandidate;
+    }
+
     return path.join(homeDir, ".zfunc", "_repo-scanner");
   }
   return path.join(
@@ -214,7 +298,6 @@ const buildSectionJsonPayload = (
     scanPath: result.scanPath,
     timestamp: result.timestamp,
     durationMs: result.durationMs,
-    ...(result.vcs ? { vcs: result.vcs } : {}),
   };
 
   if (sectionSet.has("architecture")) {
@@ -442,6 +525,32 @@ const renderDetectorTablePayload = (
   }
 };
 
+const renderNamedTablePayload = (
+  result: RepoScanResult,
+  key: string,
+  value: unknown,
+  stream: NodeJS.WritableStream,
+  includeHeader: boolean,
+): void => {
+  if (includeHeader) {
+    stream.write(
+      `repo-scanner — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
+    );
+  }
+
+  stream.write(`\n${key}\n`);
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
+    stream.write(`  ${String(value)}\n`);
+    return;
+  }
+  stream.write(`${JSON.stringify(value, null, 2)}\n`);
+};
+
 const hasExplicitSectionOutputFlags = (
   options: ReturnType<typeof parseArgs>,
 ): boolean =>
@@ -463,6 +572,23 @@ const hasExplicitPolicyOutputFlags = (
   options.failOnOutdatedCount !== undefined ||
   options.failOnDeadDeps ||
   options.failOnDeadDepsCount !== undefined;
+
+const hasExplicitDiffOutputFlags = (
+  options: ReturnType<typeof parseArgs>,
+): boolean => !!options.diff && options.diff.length > 0;
+
+const hasAnyScanOutputSelectors = (
+  options: ReturnType<typeof parseArgs>,
+  scanProfile: ReturnType<typeof resolveScanProfile>,
+): boolean =>
+  options.allDetectors ||
+  options.dryCheck ||
+  options.topology ||
+  hasExplicitSectionOutputFlags(options) ||
+  hasExplicitDependencyOutputFlags(options) ||
+  hasExplicitPolicyOutputFlags(options) ||
+  hasExplicitDiffOutputFlags(options) ||
+  scanProfile.explicitDetectorOutputIds.length > 0;
 
 const main = async () => {
   const options = parseArgs(process.argv);
@@ -535,6 +661,24 @@ const main = async () => {
       process.stdout.write(
         `Installed ${options.completionShell} completion: ${installedPath}\n`,
       );
+      if (
+        options.completionShell === "zsh" &&
+        installedPath ===
+          path.join(
+            process.env.HOME ?? process.cwd(),
+            ".zfunc",
+            "_repo-scanner",
+          )
+      ) {
+        process.stdout.write(
+          [
+            "If completion is not loading, add this to ~/.zshrc:",
+            '  fpath=("$HOME/.zfunc" $fpath)',
+            "  autoload -Uz compinit && compinit",
+            "",
+          ].join("\n"),
+        );
+      }
       process.exit(0);
     }
     if (options.completionUninstall) {
@@ -552,6 +696,12 @@ const main = async () => {
       process.exit(0);
     }
     process.stdout.write(script);
+    process.exit(0);
+  }
+
+  const scanProfile = resolveScanProfile(options);
+  if (!hasAnyScanOutputSelectors(options, scanProfile)) {
+    process.stdout.write(getHelpText());
     process.exit(0);
   }
 
@@ -594,7 +744,6 @@ const main = async () => {
   const dependenciesEnabled = shouldEnableDependencyScan(options);
   const deadDepsActive =
     options.failOnDeadDeps || options.failOnDeadDepsCount !== undefined;
-  const scanProfile = resolveScanProfile(options);
 
   const result = await scanRepo(options.path, {
     enabledDetectorIds: scanProfile.enabledDetectorIds,
@@ -690,27 +839,28 @@ const main = async () => {
   const dependencyOutputExplicitlyRequested =
     hasExplicitDependencyOutputFlags(options);
   const policyOutputExplicitlyRequested = hasExplicitPolicyOutputFlags(options);
-  const nonTopologyOutputExplicitlyRequested =
-    sectionOutputExplicitlyRequested ||
+  const diffOutputExplicitlyRequested = hasExplicitDiffOutputFlags(options);
+  const nonSectionOutputExplicitlyRequested =
     detectorOutputExplicitlyRequested ||
     dependencyOutputExplicitlyRequested ||
-    policyOutputExplicitlyRequested;
+    policyOutputExplicitlyRequested ||
+    diffOutputExplicitlyRequested;
+  const nonTopologyOutputExplicitlyRequested =
+    sectionOutputExplicitlyRequested || nonSectionOutputExplicitlyRequested;
   const topologyOnlyOutput =
     options.topology && !nonTopologyOutputExplicitlyRequested;
   const includeReportOutput = !topologyOnlyOutput;
   const includeSectionOutput =
-    (scanProfile.allDetectors || scanProfile.selectedSections.length > 0) &&
-    (!options.topology || sectionOutputExplicitlyRequested);
+    scanProfile.allDetectors || sectionOutputExplicitlyRequested;
   const includeDependencyOutput =
-    !!result.dependencies &&
-    (!options.topology ||
-      dependencyOutputExplicitlyRequested ||
-      policyOutputExplicitlyRequested);
+    !!result.dependencies && dependencyOutputExplicitlyRequested;
   const includePolicyOutput =
-    !!policyEvaluation &&
-    (!options.topology ||
-      dependencyOutputExplicitlyRequested ||
-      policyOutputExplicitlyRequested);
+    !!policyEvaluation && policyOutputExplicitlyRequested;
+  const includeMetadataEnvelope =
+    !scanProfile.allDetectors &&
+    !includeSectionOutput &&
+    nonSectionOutputExplicitlyRequested &&
+    !topologyOnlyOutput;
 
   if (options.format === "json") {
     const renderedSections = resolveRenderedSections(
@@ -724,7 +874,7 @@ const main = async () => {
         ? ({ ...result } as Record<string, unknown>)
         : includeSectionOutput
           ? buildSectionJsonPayload(result, renderedSections)
-          : detectorOutputExplicitlyRequested
+          : includeMetadataEnvelope
             ? {
                 scanPath: result.scanPath,
                 timestamp: result.timestamp,
@@ -747,7 +897,7 @@ const main = async () => {
     if (topology) {
       jsonPayload.topology = topology;
     }
-    if (diffScan) {
+    if (diffOutputExplicitlyRequested && diffScan) {
       jsonPayload.diffScan = diffScan;
     }
     renderJson(jsonPayload, process.stdout);
@@ -777,6 +927,28 @@ const main = async () => {
       renderDetectorTablePayload(
         result,
         scanProfile.explicitDetectorOutputIds,
+        process.stdout,
+        !renderedMainTable,
+      );
+      renderedMainTable = true;
+    }
+
+    if (includePolicyOutput) {
+      renderNamedTablePayload(
+        result,
+        "policyEvaluation",
+        policyEvaluation,
+        process.stdout,
+        !renderedMainTable,
+      );
+      renderedMainTable = true;
+    }
+
+    if (diffOutputExplicitlyRequested && diffScan) {
+      renderNamedTablePayload(
+        result,
+        "diffScan",
+        diffScan,
         process.stdout,
         !renderedMainTable,
       );

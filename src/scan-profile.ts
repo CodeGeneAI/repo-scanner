@@ -13,8 +13,6 @@ export type ScanSection = (typeof SCAN_SECTIONS)[number];
 
 type ExecutionDetectorId = string;
 
-const DEFAULT_CORE_SECTIONS: readonly ScanSection[] = SCAN_SECTIONS;
-
 const SECTION_DETECTOR_IDS: Record<
   ScanSection,
   readonly ExecutionDetectorId[]
@@ -243,7 +241,7 @@ const resolveSelectedSections = (
   >,
 ): readonly ScanSection[] => {
   if (!hasExplicitSectionFlags(options)) {
-    return DEFAULT_CORE_SECTIONS;
+    return [];
   }
 
   const sections: ScanSection[] = [];
@@ -355,8 +353,10 @@ export const resolveScanProfile = (
     }
   }
 
-  // VCS detection is always enabled for section/default report modes.
-  enabledDetectorIds.add("vcs");
+  // VCS detection is enabled for section report modes.
+  if (selectedSections.length > 0) {
+    enabledDetectorIds.add("vcs");
+  }
 
   for (const detectorId of explicitExecutionDetectors) {
     enabledDetectorIds.add(detectorId);

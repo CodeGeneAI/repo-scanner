@@ -132,7 +132,53 @@ describe("scanDependencySubsystem", () => {
 
       expect(componentNames).toContain("apps/web");
       expect(componentNames).toContain("services/api");
-      expect(result.totalDependencies).toBe(2);
+      expect(result.totalDependencies).toBe(1);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("deduplicates package counts within a component when manifests repeat the same dependency", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-component-dedupe-"),
+    );
+
+    try {
+      const appDir = path.join(repoPath, "apps", "web");
+      const featureDir = path.join(appDir, "feature");
+      await mkdir(featureDir, { recursive: true });
+
+      const manifest = {
+        name: "fixture",
+        version: "1.0.0",
+        dependencies: {
+          axios: "^1.0.0",
+        },
+      };
+
+      await writeFile(
+        path.join(appDir, "package.json"),
+        JSON.stringify(manifest, null, 2),
+      );
+      await writeFile(
+        path.join(featureDir, "package.json"),
+        JSON.stringify(manifest, null, 2),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: true,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      expect(result.totalDependencies).toBe(1);
+      const webComponent = result.summary.byComponent.find(
+        (component) => component.component === "apps/web",
+      );
+      expect(webComponent?.totalDependencies).toBe(1);
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -403,6 +449,167 @@ describe("scanDependencySubsystem", () => {
 
       expect(webComponent?.deadDependencies).toBe(1);
       expect(apiComponent?.deadDependencies).toBe(2);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("deduplicates dead summary entries by package key", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-dedupe-"),
+    );
+
+    try {
+      const appDir = path.join(repoPath, "apps", "web");
+      const serviceDir = path.join(repoPath, "services", "api");
+      await mkdir(appDir, { recursive: true });
+      await mkdir(serviceDir, { recursive: true });
+
+      const manifest = {
+        name: "fixture",
+        version: "1.0.0",
+        dependencies: {
+          "unused-pkg": "^1.0.0",
+        },
+      };
+
+      await writeFile(
+        path.join(appDir, "package.json"),
+        JSON.stringify(manifest, null, 2),
+      );
+      await writeFile(
+        path.join(serviceDir, "package.json"),
+        JSON.stringify(manifest, null, 2),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      expect(result.summary.deadDependencies).toBe(1);
+      expect(result.summary.topDead).toHaveLength(1);
+      expect(result.summary.topDead[0]?.name).toBe("unused-pkg");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("tracks dead dependency status per component for shared package names", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-component-status-"),
+    );
+
+    try {
+      const appDir = path.join(repoPath, "apps", "web");
+      const serviceDir = path.join(repoPath, "services", "api");
+      await mkdir(appDir, { recursive: true });
+      await mkdir(serviceDir, { recursive: true });
+
+      const manifest = {
+        name: "fixture",
+        version: "1.0.0",
+        dependencies: {
+          "shared-pkg": "^1.0.0",
+        },
+      };
+
+      await writeFile(
+        path.join(appDir, "package.json"),
+        JSON.stringify(manifest, null, 2),
+      );
+      await writeFile(
+        path.join(serviceDir, "package.json"),
+        JSON.stringify(manifest, null, 2),
+      );
+      await writeFile(
+        path.join(appDir, "index.ts"),
+        'import shared from "shared-pkg";\nconsole.log(shared);\n',
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      // Package-level dead summary remains deduped and false when any eligible instance is used.
+      expect(result.summary.deadDependencies).toBe(0);
+
+      const webComponent = result.summary.byComponent.find(
+        (component) => component.component === "apps/web",
+      );
+      const apiComponent = result.summary.byComponent.find(
+        (component) => component.component === "services/api",
+      );
+
+      expect(webComponent?.deadDependencies).toBe(0);
+      expect(apiComponent?.deadDependencies).toBe(1);
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps dead dependency eligible when same package is excluded in another manifest", async () => {
+    const repoPath = await mkdtemp(
+      path.join(os.tmpdir(), "repo-scanner-deps-dead-eligibility-"),
+    );
+
+    try {
+      const appDir = path.join(repoPath, "apps", "web");
+      const serviceDir = path.join(repoPath, "services", "api");
+      await mkdir(appDir, { recursive: true });
+      await mkdir(serviceDir, { recursive: true });
+
+      await writeFile(
+        path.join(appDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture-web",
+            version: "1.0.0",
+            dependencies: {
+              typescript: "^5.9.3",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      await writeFile(
+        path.join(serviceDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "fixture-api",
+            version: "1.0.0",
+            devDependencies: {
+              typescript: "^5.9.3",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = await scanDependencySubsystem({
+        path: repoPath,
+        ecosystems: ["npm"],
+        skipSecurity: true,
+        skipUsage: false,
+        skipVersionLookup: true,
+        concurrency: 1,
+      });
+
+      expect(result.summary.deadDependencies).toBe(1);
+      expect(result.summary.topDead).toHaveLength(1);
+      expect(result.summary.topDead[0]?.name).toBe("typescript");
+      expect(result.summary.topDead[0]?.isDev).toBeFalse();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

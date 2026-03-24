@@ -270,7 +270,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let skipSecurity = false;
   let skipVersionLookup = false;
   let concurrency = os.cpus().length;
+  let concurrencyExplicit = false;
   let componentGrouping: DependencyComponentGroupingMode = "default";
+  let componentGroupingExplicit = false;
   let failOnVulns = false;
   let failOnVulnsCount: number | undefined;
   let severityThreshold: VulnerabilitySeverity = "LOW";
@@ -614,6 +616,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
           args[++i],
           "--concurrency",
         );
+        concurrencyExplicit = true;
         break;
       case "--component-grouping": {
         const raw = args[++i] ?? "";
@@ -623,6 +626,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
             `Error: invalid component grouping mode "${raw}". Use one of default,apps-only,services-only,workspace-package.`,
           );
         componentGrouping = parsed;
+        componentGroupingExplicit = true;
         break;
       }
       case "--fail-on-vulns":
@@ -789,10 +793,14 @@ export const parseArgs = (argv: string[]): CliOptions => {
           );
         }
         failOnNewDuplicationPct = parsed;
+        // Threshold checks require diff dry-check payload generation.
+        diffDryCheck = true;
         break;
       }
       case "--fail-on-new-env-vars":
         failOnNewEnvVars = true;
+        // Env-var failure checks require diff env-check payload generation.
+        diffEnvCheck = true;
         break;
       case "--fail-on-dead-deps":
         failOnDeadDeps = true;
@@ -817,6 +825,44 @@ export const parseArgs = (argv: string[]): CliOptions => {
           `Error: unexpected argument "${arg}". Use --help for usage.`,
         );
     }
+  }
+
+  const usesDiffOnlyFlags =
+    diffDryCheck ||
+    diffDryIncludeTests ||
+    diffEnvCheck ||
+    failOnNewDuplicationPct !== undefined ||
+    failOnNewEnvVars;
+  if (usesDiffOnlyFlags && !diff) {
+    failCliParse(
+      "Error: --diff is required when using diff-only flags (--diff-dry-check, --diff-dry-include-tests, --diff-env-check, --fail-on-new-duplication-pct, --fail-on-new-env-vars).",
+    );
+  }
+  if (diffDryIncludeTests && !diffDryCheck) {
+    failCliParse("Error: --diff-dry-include-tests requires --diff-dry-check.");
+  }
+
+  const dependencyOutputRequested =
+    deps ||
+    failOnVulns ||
+    failOnVulnsCount !== undefined ||
+    failOnOutdated ||
+    failOnOutdatedCount !== undefined ||
+    failOnDeadDeps ||
+    failOnDeadDepsCount !== undefined;
+  const usesDependencyOnlyFlags =
+    depsDebug ||
+    ecosystems !== undefined ||
+    skipUsage ||
+    skipSecurity ||
+    skipVersionLookup ||
+    concurrencyExplicit ||
+    componentGroupingExplicit ||
+    includeDevDeadDeps;
+  if (usesDependencyOnlyFlags && !dependencyOutputRequested) {
+    failCliParse(
+      "Error: dependency-analysis flags (--ecosystems, --no-usage, --no-security, --no-version-lookup, --concurrency, --component-grouping, --deps-debug, --include-dev-dead-deps) require --deps or a dependency policy flag.",
+    );
   }
 
   return {
