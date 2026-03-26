@@ -304,7 +304,7 @@ describe("detectAvx2", () => {
       value: "linux",
       configurable: true,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint: @typescript-eslint/no-explicit-any
     const spy = spyOn(fs, "readFileSync").mockImplementation(
       (() => "flags : fpu avx2 sse4_2\n") as any,
     );
@@ -322,7 +322,7 @@ describe("detectAvx2", () => {
       value: "linux",
       configurable: true,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint: @typescript-eslint/no-explicit-any
     const spy = spyOn(fs, "readFileSync").mockImplementation(
       (() => "flags : fpu sse4_2\n") as any,
     );
@@ -357,7 +357,7 @@ describe("detectAvx2", () => {
       value: "darwin",
       configurable: true,
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // biome-ignore lint: @typescript-eslint/no-explicit-any
     const spy = spyOn(Bun, "spawnSync").mockReturnValue({
       success: true,
       stdout: Buffer.from("1\n"),
