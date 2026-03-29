@@ -25,9 +25,8 @@
   },
   "devDependencies": {
     "@codegeneai/typescript-config": "workspace:*",
-    "@types/bun": "catalog:tooling",
+    "@types/bun": "catalog:types",
     "tree-sitter-wasms": "catalog:tooling",
-    "typescript": "catalog:tooling",
     "vitest": "catalog:testing"
   }
 }
