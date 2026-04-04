@@ -445,6 +445,156 @@ describe("computeNetNewEnvVars", () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.name).toBe("MULTI_USE");
   });
+
+  it("with addedLines: flags var when usage is on an added line", () => {
+    const envVars = [
+      {
+        name: "NEW_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 10,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const addedLines = new Map([
+      ["packages/a/src/service.ts", new Set([10, 11, 12])],
+    ]);
+    const result = computeNetNewEnvVars(
+      envVars,
+      ["packages/a/src/service.ts"],
+      addedLines,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("NEW_VAR");
+  });
+
+  it("with addedLines: excludes var when usage is NOT on an added line", () => {
+    const envVars = [
+      {
+        name: "EXISTING_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 50,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const addedLines = new Map([
+      ["packages/a/src/service.ts", new Set([10, 11, 12])],
+    ]);
+    const result = computeNetNewEnvVars(
+      envVars,
+      ["packages/a/src/service.ts"],
+      addedLines,
+    );
+    expect(result).toHaveLength(0);
+  });
+
+  it("with addedLines: flags var when at least one usage is on an added line", () => {
+    const envVars = [
+      {
+        name: "MIXED_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 5,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+          {
+            file: "packages/a/src/service.ts",
+            line: 20,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const addedLines = new Map([
+      ["packages/a/src/service.ts", new Set([20, 21])],
+    ]);
+    const result = computeNetNewEnvVars(
+      envVars,
+      ["packages/a/src/service.ts"],
+      addedLines,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]!.name).toBe("MIXED_VAR");
+  });
+
+  it("with addedLines: still excludes var with usages in non-changed files", () => {
+    const envVars = [
+      {
+        name: "SPREAD_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 10,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+          {
+            file: "packages/b/src/other.ts",
+            line: 5,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const addedLines = new Map([["packages/a/src/service.ts", new Set([10])]]);
+    const result = computeNetNewEnvVars(
+      envVars,
+      ["packages/a/src/service.ts"],
+      addedLines,
+    );
+    expect(result).toHaveLength(0);
+  });
+
+  it("with empty addedLines map: excludes all vars", () => {
+    const envVars = [
+      {
+        name: "SOME_VAR",
+        usages: [
+          {
+            file: "packages/a/src/service.ts",
+            line: 1,
+            pattern: "process.env",
+            accessType: "read" as const,
+          },
+        ],
+        inferredType: "string" as const,
+        required: false,
+        definedInConfig: false,
+      },
+    ];
+    const addedLines = new Map<string, Set<number>>();
+    const result = computeNetNewEnvVars(
+      envVars,
+      ["packages/a/src/service.ts"],
+      addedLines,
+    );
+    expect(result).toHaveLength(0);
+  });
 });
 
 describe("buildDiffScanResult with dryCheck and envCheck", () => {

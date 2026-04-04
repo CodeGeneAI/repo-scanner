@@ -219,6 +219,10 @@ const parseCommaSeparatedValues = (
 const isFlagToken = (raw: string | undefined): boolean =>
   raw?.startsWith("--") ?? false;
 
+const KNOWN_GIT_DIFF_FLAGS = new Set(["--cached", "--staged"]);
+const isKnownGitDiffFlag = (raw: string): boolean =>
+  KNOWN_GIT_DIFF_FLAGS.has(raw);
+
 const failCliParse = (message: string): never => {
   throw new CliParseError(message);
 };
@@ -759,9 +763,13 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--diff": {
         const value =
           args[++i] ??
-          failCliParse("Error: --diff requires a git range value.");
-        if (isFlagToken(value)) {
-          failCliParse("Error: --diff requires a git range value.");
+          failCliParse(
+            "Error: --diff requires a git range (e.g. HEAD~1, main...feature) or --cached/--staged.",
+          );
+        if (isFlagToken(value) && !isKnownGitDiffFlag(value)) {
+          failCliParse(
+            "Error: --diff requires a git range (e.g. HEAD~1, main...feature) or --cached/--staged.",
+          );
         }
         diff = value;
         break;

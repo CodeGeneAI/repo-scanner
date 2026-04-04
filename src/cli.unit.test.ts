@@ -423,6 +423,49 @@ describe("parseArgs", () => {
     expect(result.diff).toBe("HEAD~1");
   });
 
+  it("parses --diff --cached for staged files", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--diff", "--cached"]);
+    expect(result.diff).toBe("--cached");
+  });
+
+  it("parses --diff --staged for staged files", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--diff", "--staged"]);
+    expect(result.diff).toBe("--staged");
+  });
+
+  it("rejects unknown flags as --diff value", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--diff", "--unknown-flag"]),
+    ).toThrow(CliParseError);
+  });
+
+  it("parses --diff --cached with --diff-dry-check and threshold", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--diff",
+      "--cached",
+      "--diff-dry-check",
+      "--fail-on-new-duplication-pct",
+      "20",
+    ]);
+    expect(result.diff).toBe("--cached");
+    expect(result.diffDryCheck).toBeTrue();
+    expect(result.failOnNewDuplicationPct).toBe(20);
+  });
+
+  it("parses --diff --staged with --diff-env-check", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--diff",
+      "--staged",
+      "--diff-env-check",
+    ]);
+    expect(result.diff).toBe("--staged");
+    expect(result.diffEnvCheck).toBeTrue();
+  });
+
   it("parses dead dependency flags", () => {
     const result = parseArgs([
       "bun",

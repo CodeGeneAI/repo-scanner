@@ -254,17 +254,34 @@ const buildConventionViolations = (
 
 /**
  * Identify env vars that are net-new to the codebase.
- * A var is "net-new" if ALL its usages are exclusively in changed files
- * (meaning it didn't exist anywhere else in the baseline repo).
+ *
+ * When `addedLines` is provided (from `git diff -U0`), a var is "net-new" if
+ * all its usages are in changed files AND at least one usage falls on an
+ * actually-added line. This prevents false positives when a file is edited
+ * for unrelated reasons but already contained env var references.
+ *
+ * Without `addedLines`, falls back to the file-level heuristic: a var is
+ * "net-new" if all its usages are exclusively in changed files.
  */
 export const computeNetNewEnvVars = (
   allEnvVars: readonly EnvVarInfo[],
   changedFiles: readonly string[],
+  addedLines?: ReadonlyMap<string, ReadonlySet<number>>,
 ): EnvVarInfo[] => {
   const changedSet = new Set(changedFiles);
-  return allEnvVars.filter(
-    (v) => v.usages.length > 0 && v.usages.every((u) => changedSet.has(u.file)),
-  );
+  return allEnvVars.filter((v) => {
+    if (v.usages.length === 0) return false;
+    if (!v.usages.every((u) => changedSet.has(u.file))) return false;
+
+    if (addedLines) {
+      return v.usages.some((u) => {
+        const lines = addedLines.get(u.file);
+        return lines !== undefined && lines.has(u.line);
+      });
+    }
+
+    return true;
+  });
 };
 
 export const buildDiffScanResult = (
@@ -276,6 +293,7 @@ export const buildDiffScanResult = (
     >;
     readonly dryCheck?: DryCheckResult;
     readonly envCheck?: boolean;
+    readonly addedLines?: ReadonlyMap<string, ReadonlySet<number>>;
   },
 ): DiffScanResult => {
   const dependencyGraph = result.architecture.crossPackageDeps;
@@ -345,7 +363,11 @@ export const buildDiffScanResult = (
 
   const newEnvVars =
     options?.envCheck && result.inventory.envVars
-      ? computeNetNewEnvVars(result.inventory.envVars, changedFiles)
+      ? computeNetNewEnvVars(
+          result.inventory.envVars,
+          changedFiles,
+          options.addedLines,
+        )
       : undefined;
 
   return {
