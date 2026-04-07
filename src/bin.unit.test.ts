@@ -144,6 +144,11 @@ const runGit = (repoPath: string, args: readonly string[]): void => {
     cwd: repoPath,
     stdout: "pipe",
     stderr: "pipe",
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_SYSTEM: "/dev/null",
+    },
   });
   if (result.exitCode !== 0) {
     throw new Error(
