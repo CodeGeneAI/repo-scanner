@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, it } from "bun:test";
 import { rm } from "fs/promises";
 import {
-  assertDetectorSelectorScopingBatch,
+  assertDetectorSelectorScoping,
   createCoreProfileFixtureRepo,
 } from "./bin.unit.test.helpers";
 import { DETECTOR_IDS } from "./detectors/catalog";
@@ -24,7 +24,9 @@ describe("repo-scanner bin detector selector scoping group 1", () => {
     }
   });
 
-  it("scopes detector selectors to one payload key", async () => {
-    await assertDetectorSelectorScopingBatch(repoPath, detectorIds);
-  });
+  for (const detectorId of detectorIds) {
+    it(`scopes selector for ${detectorId} to one payload key`, () => {
+      assertDetectorSelectorScoping(repoPath, detectorId);
+    });
+  }
 });
