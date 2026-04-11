@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { Component, PackageDependencyEdge } from "../../types";
 import {
   COLLAPSE_ALL_THRESHOLD,

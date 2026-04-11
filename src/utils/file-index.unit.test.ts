@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileIndex } from "./file-index";
 
 describe("FileIndex", () => {

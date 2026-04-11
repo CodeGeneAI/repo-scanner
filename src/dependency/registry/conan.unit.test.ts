@@ -1,5 +1,4 @@
-import { mock } from "bun:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 
 // Mock the http utils at the module level
 const mockFetchJson = mock();

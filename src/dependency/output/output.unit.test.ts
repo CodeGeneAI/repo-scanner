@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { DependencyReport, DepScannerResult, ScanResult } from "../types";
 import { renderJson } from "./json";
 import { renderTable } from "./table";

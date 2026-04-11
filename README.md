@@ -333,7 +333,7 @@ The scan output categorizes detected tooling into specific groups instead of a s
 | Dep Managers | Bun, npm, pip |
 | Containers | Docker, Docker Compose, Helm |
 | IaC | Terraform, Pulumi, AWS CDK |
-| Testing | Vitest, Playwright, Jest |
+| Testing | Vitest, Bun Test, Playwright, Jest |
 | Build Tools | Turborepo, Nx, Make |
 | Linting | Biome, ESLint, Prettier |
 | Code Quality | SonarQube, CodeClimate |

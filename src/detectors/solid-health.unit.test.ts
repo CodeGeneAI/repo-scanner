@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileIndex } from "../utils/file-index";
 import { setSolidOptions } from "./solid-health";
 import "./init";

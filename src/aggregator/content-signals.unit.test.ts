@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test";
 import path from "path";
-import { describe, expect, it } from "vitest";
 import type { FileIndex, IndexedFile } from "../utils/file-index";
 import { detectSecondaryKinds } from "./content-signals";
 

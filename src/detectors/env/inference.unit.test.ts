@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { detectFrameworkPrefix, inferType, isRequired } from "./inference";
 import type { ExtractorMatch } from "./types";
 

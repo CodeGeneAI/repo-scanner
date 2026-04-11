@@ -20,10 +20,7 @@ const PY_BRANCH_TYPES = new Set([
 
 const PY_FUNCTION_TYPES = new Set(["function_definition"]);
 
-export const extractAll = (
-  tree: Tree,
-  lang: InstanceType<typeof Language>,
-): FileAnalysis => {
+export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   const root = tree.rootNode;
   const classes: ClassInfo[] = [];
   const imports: ImportInfo[] = [];

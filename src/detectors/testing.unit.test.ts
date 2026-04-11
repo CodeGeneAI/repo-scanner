@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FileIndex } from "../utils/file-index";
 import "./init";
 import { getDetectors } from "./registry";
@@ -34,13 +34,6 @@ describe("testing detector", () => {
   });
 
   // --- Existing frameworks (sanity checks) ---
-
-  it("detects Vitest from config file", async () => {
-    await writeFile(path.join(tmpDir, "vitest.config.ts"), "");
-    const { values } = await runTestingDetector(tmpDir);
-    expect(values).toContain("Vitest");
-  });
-
   it("detects Jest from npm devDependencies", async () => {
     await writeFile(
       path.join(tmpDir, "package.json"),

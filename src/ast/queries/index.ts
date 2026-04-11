@@ -7,10 +7,7 @@ import { extractAll as extractRust } from "./rust";
 import type { FileAnalysis } from "./types";
 import { extractAll as extractTypeScript } from "./typescript";
 
-type Extractor = (
-  tree: Tree,
-  lang: InstanceType<typeof Language>,
-) => FileAnalysis;
+type Extractor = (tree: Tree, lang: Language) => FileAnalysis;
 
 const EXTRACTORS: ReadonlyMap<string, Extractor> = new Map([
   [".ts", extractTypeScript],
@@ -34,7 +31,7 @@ const EXTRACTORS: ReadonlyMap<string, Extractor> = new Map([
  */
 export const extractAll = (
   tree: Tree,
-  lang: InstanceType<typeof Language>,
+  lang: Language,
   ext: string,
 ): FileAnalysis | null => {
   const extractor = EXTRACTORS.get(ext);

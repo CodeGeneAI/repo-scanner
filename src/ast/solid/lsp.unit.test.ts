@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { FileAnalysis, MethodInfo } from "../queries/types";
 import { analyzeLsp } from "./lsp";
 

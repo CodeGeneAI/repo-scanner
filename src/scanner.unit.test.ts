@@ -29,7 +29,7 @@ const createBuildAndCiRepo = async (): Promise<string> => {
         version: "1.0.0",
         scripts: {
           build: "tsc -p tsconfig.json",
-          test: "vitest run",
+          test: "bun test",
           lint: "biome check .",
         },
       },

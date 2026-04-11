@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { RepoScanResult } from "../../types";
 import { generateCallGraphDiagram } from "./call-graph-diagram";
 

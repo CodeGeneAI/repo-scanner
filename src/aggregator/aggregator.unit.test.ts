@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { DetectorResult } from "../detectors/types";
 import { aggregate } from "./aggregator";
 
@@ -147,7 +147,7 @@ describe("aggregate", async () => {
         detectorId: "testing",
         findings: [],
         commands: {
-          test: ["vitest run"],
+          test: ["bun test"],
         },
       },
     ];
@@ -156,7 +156,7 @@ describe("aggregate", async () => {
 
     expect(result.buildAndTest.buildCommands).toContain("npm run build");
     expect(result.buildAndTest.testCommands).toContain("npm test");
-    expect(result.buildAndTest.testCommands).toContain("vitest run");
+    expect(result.buildAndTest.testCommands).toContain("bun test");
   });
 
   it("sets monorepo flag from monorepo detector findings", async () => {
@@ -280,7 +280,7 @@ describe("aggregate", async () => {
       {
         detectorId: "testing",
         findings: [
-          { value: "Vitest", confidence: 1.0, evidence: ["vitest.config"] },
+          { value: "Bun Test", confidence: 1.0, evidence: ["bunfig.toml"] },
         ],
         signals: { hasTests: true },
       },

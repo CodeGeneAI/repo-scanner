@@ -88,7 +88,7 @@ const createCoreProfileFixtureRepo = async (): Promise<string> => {
         },
         scripts: {
           build: "tsc -p tsconfig.json",
-          test: "vitest run",
+          test: "bun test",
           lint: "biome check --diagnostic-level=error",
         },
       },

@@ -264,7 +264,7 @@ describe("scanDependencySubsystem", () => {
         concurrency: 1,
       });
 
-      // Only unused-pkg should be dead; typescript and vitest are excluded
+      // Only unused-pkg should be dead; typescript and bun-types are excluded
       expect(result.summary.deadDependencies).toBe(1);
       expect(result.summary.topDead[0]?.name).toBe("unused-pkg");
     } finally {

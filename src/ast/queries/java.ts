@@ -26,10 +26,7 @@ const JAVA_FUNCTION_TYPES = new Set([
   "constructor_declaration",
 ]);
 
-export const extractAll = (
-  tree: Tree,
-  lang: InstanceType<typeof Language>,
-): FileAnalysis => {
+export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   const root = tree.rootNode;
   const classes: ClassInfo[] = [];
   const imports: ImportInfo[] = [];

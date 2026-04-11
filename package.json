@@ -18,7 +18,7 @@
     "perf:drift-report": "bun src/perf/drift-report.ts",
     "test:unit": "files=$(find . -type f \\( -name '*.unit.spec.ts' -o -name '*.unit.spec.tsx' -o -name '*.unit.test.ts' -o -name '*.unit.test.tsx' \\)); if [ -n \"$files\" ]; then bun test $files; else echo 'No unit tests found'; fi",
     "lint": "biome check --write --diagnostic-level=error",
-    "clean": "rm -rf dist .turbo coverage .vitest build lib out tmp temp .cache node_modules tsconfig.tsbuildinfo"
+    "clean": "rm -rf dist .turbo coverage build lib out tmp temp .cache node_modules tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "web-tree-sitter": "catalog:tooling"
@@ -26,7 +26,6 @@
   "devDependencies": {
     "@codegeneai/typescript-config": "workspace:*",
     "@types/bun": "catalog:types",
-    "tree-sitter-wasms": "catalog:tooling",
-    "vitest": "catalog:testing"
+    "tree-sitter-wasms": "catalog:tooling"
   }
 }

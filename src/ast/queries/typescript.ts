@@ -32,10 +32,7 @@ const TS_FUNCTION_TYPES = new Set([
   "arrow_function",
 ]);
 
-export const extractAll = (
-  tree: Tree,
-  lang: InstanceType<typeof Language>,
-): FileAnalysis => {
+export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   const root = tree.rootNode;
   const classes: ClassInfo[] = [];
   const imports: ImportInfo[] = [];

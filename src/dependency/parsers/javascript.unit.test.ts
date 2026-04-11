@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { javascriptParser } from "./javascript";
 
 let tmpDir: string;
@@ -48,7 +48,7 @@ describe("javascriptParser", () => {
     it("parses all dependency types", async () => {
       const pkg = {
         dependencies: { express: "^4.18.0" },
-        devDependencies: { vitest: "^1.0.0" },
+        devDependencies: { "bun-types": "^1.0.0" },
         optionalDependencies: { fsevents: "^2.3.0" },
         peerDependencies: { react: "^18.0.0" },
       };
@@ -63,8 +63,8 @@ describe("javascriptParser", () => {
       expect(express?.isOptional).toBe(false);
       expect(express?.currentVersion).toBe("^4.18.0");
 
-      const vitest = deps.find((d) => d.name === "vitest");
-      expect(vitest?.isDev).toBe(true);
+      const bunTypes = deps.find((d) => d.name === "bun-types");
+      expect(bunTypes?.isDev).toBe(true);
 
       const fsevents = deps.find((d) => d.name === "fsevents");
       expect(fsevents?.isOptional).toBe(true);
@@ -218,7 +218,7 @@ packages:
         workspaces: ["packages/*"],
         catalogs: {
           web: { react: "19.2.4", "react-dom": "19.2.4" },
-          testing: { vitest: "4.0.18" },
+          testing: { "bun-types": "4.0.18" },
         },
       };
       await writeFile(
@@ -231,7 +231,7 @@ packages:
       const childPkg = {
         name: "@test/app",
         dependencies: { react: "catalog:web", "react-dom": "catalog:web" },
-        devDependencies: { vitest: "catalog:testing" },
+        devDependencies: { "bun-types": "catalog:testing" },
       };
       const childPath = path.join(tmpDir, "packages", "app", "package.json");
       await writeFile(childPath, JSON.stringify(childPkg));
@@ -247,8 +247,8 @@ packages:
       const reactDom = deps.find((d) => d.name === "react-dom");
       expect(reactDom?.currentVersion).toBe("19.2.4");
 
-      const vitest = deps.find((d) => d.name === "vitest");
-      expect(vitest?.currentVersion).toBe("4.0.18");
+      const bunTypes = deps.find((d) => d.name === "bun-types");
+      expect(bunTypes?.currentVersion).toBe("4.0.18");
     });
 
     it("resolves workspace:* references to package versions", async () => {
