@@ -8,7 +8,12 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
-import { countBranches, findEnclosingFunction } from "./utils";
+import {
+  compileQuery,
+  countBranches,
+  findCapture,
+  findEnclosingFunction,
+} from "./utils";
 
 const CS_BRANCH_TYPES = new Set([
   "if_statement",
@@ -36,12 +41,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Classes ---
   try {
-    const classQuery = lang.query(
+    const classQuery = compileQuery(
+      lang,
       "(class_declaration name: (identifier) @class_name body: (declaration_list) @class_body)",
     );
     for (const match of classQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "class_name");
-      const bodyCapture = match.captures.find((c) => c.name === "class_body");
+      const nameCapture = findCapture(match, "class_name");
+      const bodyCapture = findCapture(match, "class_body");
       if (!nameCapture || !bodyCapture) continue;
 
       const bodyNode = bodyCapture.node;
@@ -115,7 +121,10 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Imports (using directives) ---
   try {
-    const usingQuery = lang.query("(using_directive (identifier) @name)");
+    const usingQuery = compileQuery(
+      lang,
+      "(using_directive (identifier) @name)",
+    );
     for (const capture of usingQuery.captures(root)) {
       if (capture.name !== "name") continue;
       imports.push({
@@ -131,12 +140,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Interfaces ---
   try {
-    const ifaceQuery = lang.query(
+    const ifaceQuery = compileQuery(
+      lang,
       "(interface_declaration name: (identifier) @name body: (declaration_list) @body)",
     );
     for (const match of ifaceQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const nameCapture = findCapture(match, "name");
+      const bodyCapture = findCapture(match, "body");
       if (!nameCapture || !bodyCapture) continue;
 
       const methodNames: string[] = [];
@@ -162,7 +172,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Instantiations (new X()) ---
   try {
-    const newQuery = lang.query(
+    const newQuery = compileQuery(
+      lang,
       "(object_creation_expression type: (identifier) @type)",
     );
     for (const capture of newQuery.captures(root)) {
@@ -179,7 +190,10 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Type checks (is pattern) ---
   try {
-    const isQuery = lang.query("(is_expression right: (identifier) @type)");
+    const isQuery = compileQuery(
+      lang,
+      "(is_expression right: (identifier) @type)",
+    );
     for (const capture of isQuery.captures(root)) {
       if (capture.name !== "type") continue;
       typeChecks.push({

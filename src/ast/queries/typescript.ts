@@ -10,7 +10,9 @@ import type {
 } from "./types";
 import {
   bodyThrowsNotImplemented,
+  compileQuery,
   countBranches,
+  findCapture,
   findEnclosingFunction,
   isEmptyBody,
 } from "./utils";
@@ -41,14 +43,15 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   const typeChecks: TypeCheckInfo[] = [];
 
   // --- Classes and Methods ---
-  const classQuery = lang.query(
+  const classQuery = compileQuery(
+    lang,
     "(class_declaration name: (type_identifier) @class_name body: (class_body) @class_body)",
   );
   const classMatches = classQuery.matches(root);
 
   for (const match of classMatches) {
-    const nameCapture = match.captures.find((c) => c.name === "class_name");
-    const bodyCapture = match.captures.find((c) => c.name === "class_body");
+    const nameCapture = findCapture(match, "class_name");
+    const bodyCapture = findCapture(match, "class_body");
     if (!nameCapture || !bodyCapture) continue;
 
     const className = nameCapture.node.text;
@@ -100,7 +103,9 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
           const implMatch = /implements\s+(.+)/.exec(text);
           if (implMatch) {
             implementsList.push(
-              ...implMatch[1]!.split(",").map((s) => s.trim().split("<")[0]!),
+              ...implMatch[1]!
+                .split(",")
+                .map((segment: string) => segment.trim().split("<")[0]!),
             );
           }
         }
@@ -119,7 +124,10 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   }
 
   // --- Imports ---
-  const importQuery = lang.query("(import_statement source: (string) @source)");
+  const importQuery = compileQuery(
+    lang,
+    "(import_statement source: (string) @source)",
+  );
   for (const capture of importQuery.captures(root)) {
     if (capture.name !== "source") continue;
     const importNode = capture.node.parent!;
@@ -135,8 +143,10 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
         names.push(
           ...namedImports
             .split(",")
-            .map((s) => s.trim().split(" as ")[0]!)
-            .filter((s) => s.length > 0 && s !== "type"),
+            .map((segment: string) => segment.trim().split(" as ")[0]!)
+            .filter(
+              (segment: string) => segment.length > 0 && segment !== "type",
+            ),
         );
       }
     }
@@ -151,12 +161,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Interfaces ---
   try {
-    const ifaceQuery = lang.query(
+    const ifaceQuery = compileQuery(
+      lang,
       "(interface_declaration name: (type_identifier) @iface_name body: (interface_body) @iface_body)",
     );
     for (const match of ifaceQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "iface_name");
-      const bodyCapture = match.captures.find((c) => c.name === "iface_body");
+      const nameCapture = findCapture(match, "iface_name");
+      const bodyCapture = findCapture(match, "iface_body");
       if (!nameCapture || !bodyCapture) continue;
 
       const methodNames: string[] = [];
@@ -184,7 +195,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   }
 
   // --- Instantiations (new X()) ---
-  const newQuery = lang.query(
+  const newQuery = compileQuery(
+    lang,
     "(new_expression constructor: [(identifier) @ctor (member_expression) @ctor])",
   );
   for (const capture of newQuery.captures(root)) {
@@ -199,7 +211,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Type Checks (instanceof) ---
   try {
-    const instanceofQuery = lang.query(
+    const instanceofQuery = compileQuery(
+      lang,
       '(binary_expression operator: "instanceof" right: (identifier) @type)',
     );
     for (const capture of instanceofQuery.captures(root)) {

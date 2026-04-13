@@ -8,7 +8,12 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
-import { countBranches, findEnclosingFunction } from "./utils";
+import {
+  compileQuery,
+  countBranches,
+  findCapture,
+  findEnclosingFunction,
+} from "./utils";
 
 const PY_BRANCH_TYPES = new Set([
   "if_statement",
@@ -29,12 +34,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   const typeChecks: TypeCheckInfo[] = [];
 
   // --- Classes ---
-  const classQuery = lang.query(
+  const classQuery = compileQuery(
+    lang,
     "(class_definition name: (identifier) @class_name body: (block) @class_body)",
   );
   for (const match of classQuery.matches(root)) {
-    const nameCapture = match.captures.find((c) => c.name === "class_name");
-    const bodyCapture = match.captures.find((c) => c.name === "class_body");
+    const nameCapture = findCapture(match, "class_name");
+    const bodyCapture = findCapture(match, "class_body");
     if (!nameCapture || !bodyCapture) continue;
 
     const className = nameCapture.node.text;
@@ -115,7 +121,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Imports ---
   try {
-    const importQuery = lang.query(
+    const importQuery = compileQuery(
+      lang,
       "[(import_from_statement module_name: (dotted_name) @source) (import_from_statement module_name: (relative_import) @source)]",
     );
     for (const capture of importQuery.captures(root)) {
@@ -144,7 +151,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- isinstance() calls ---
   try {
-    const isinstanceQuery = lang.query(
+    const isinstanceQuery = compileQuery(
+      lang,
       '(call function: (identifier) @fn (#eq? @fn "isinstance") arguments: (argument_list (_) (identifier) @type))',
     );
     for (const capture of isinstanceQuery.captures(root)) {
@@ -161,7 +169,7 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Instantiations (ClassName()) ---
   try {
-    const callQuery = lang.query("(call function: (identifier) @fn)");
+    const callQuery = compileQuery(lang, "(call function: (identifier) @fn)");
     for (const capture of callQuery.captures(root)) {
       if (capture.name !== "fn") continue;
       const name = capture.node.text;

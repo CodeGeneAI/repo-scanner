@@ -8,7 +8,12 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
-import { countBranches, findEnclosingFunction } from "./utils";
+import {
+  compileQuery,
+  countBranches,
+  findCapture,
+  findEnclosingFunction,
+} from "./utils";
 
 /** Estimated average lines per method body when exact LOC is unavailable. */
 const ESTIMATED_METHOD_LOC = 5;
@@ -45,12 +50,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   >();
 
   try {
-    const structQuery = lang.query(
+    const structQuery = compileQuery(
+      lang,
       "(type_declaration (type_spec name: (type_identifier) @name type: (struct_type) @body))",
     );
     for (const match of structQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const nameCapture = findCapture(match, "name");
+      const bodyCapture = findCapture(match, "body");
       if (!nameCapture || !bodyCapture) continue;
 
       const bodyNode = bodyCapture.node;
@@ -73,12 +79,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   const methodsByStruct = new Map<string, MethodInfo[]>();
 
   try {
-    const methodQuery = lang.query(
+    const methodQuery = compileQuery(
+      lang,
       "(method_declaration name: (field_identifier) @method_name body: (block) @body)",
     );
     for (const match of methodQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "method_name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const nameCapture = findCapture(match, "method_name");
+      const bodyCapture = findCapture(match, "body");
       if (!nameCapture) continue;
 
       // Find receiver type from parent method_declaration
@@ -125,7 +132,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Imports ---
   try {
-    const importQuery = lang.query(
+    const importQuery = compileQuery(
+      lang,
       "(import_declaration (import_spec path: (interpreted_string_literal) @source))",
     );
     for (const capture of importQuery.captures(root)) {
@@ -144,12 +152,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Interfaces ---
   try {
-    const ifaceQuery = lang.query(
+    const ifaceQuery = compileQuery(
+      lang,
       "(type_declaration (type_spec name: (type_identifier) @name type: (interface_type) @body))",
     );
     for (const match of ifaceQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const nameCapture = findCapture(match, "name");
+      const bodyCapture = findCapture(match, "body");
       if (!nameCapture || !bodyCapture) continue;
 
       const methodNames: string[] = [];
@@ -175,7 +184,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Type switches/assertions ---
   try {
-    const typeSwitchQuery = lang.query(
+    const typeSwitchQuery = compileQuery(
+      lang,
       "(type_case type: (type_identifier) @type)",
     );
     for (const capture of typeSwitchQuery.captures(root)) {
@@ -192,7 +202,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Composite literal instantiations ---
   try {
-    const litQuery = lang.query(
+    const litQuery = compileQuery(
+      lang,
       "(composite_literal type: (type_identifier) @type)",
     );
     for (const capture of litQuery.captures(root)) {

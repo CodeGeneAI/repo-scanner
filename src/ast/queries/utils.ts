@@ -1,4 +1,21 @@
-import type { Node as TSNode } from "web-tree-sitter";
+import {
+  type Language,
+  Query,
+  type QueryCapture,
+  type QueryMatch,
+  type Node as TSNode,
+} from "web-tree-sitter";
+
+/** Compile a query against the current Tree-sitter language instance. */
+export const compileQuery = (language: Language, source: string): Query =>
+  new Query(language, source);
+
+/** Look up a named capture from a query match. */
+export const findCapture = (
+  match: QueryMatch,
+  captureName: string,
+): QueryCapture | undefined =>
+  match.captures.find((capture: QueryCapture) => capture.name === captureName);
 
 /**
  * Count branching nodes within a subtree for cyclomatic complexity.

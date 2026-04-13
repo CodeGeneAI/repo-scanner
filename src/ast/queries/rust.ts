@@ -8,7 +8,12 @@ import type {
   MethodInfo,
   TypeCheckInfo,
 } from "./types";
-import { countBranches, findEnclosingFunction } from "./utils";
+import {
+  compileQuery,
+  countBranches,
+  findCapture,
+  findEnclosingFunction,
+} from "./utils";
 
 /** Estimated average lines per method body when exact LOC is unavailable. */
 const ESTIMATED_METHOD_LOC = 5;
@@ -40,12 +45,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   >();
 
   try {
-    const structQuery = lang.query(
+    const structQuery = compileQuery(
+      lang,
       "(struct_item name: (type_identifier) @name body: (field_declaration_list) @body)",
     );
     for (const match of structQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const nameCapture = findCapture(match, "name");
+      const bodyCapture = findCapture(match, "body");
       if (!nameCapture || !bodyCapture) continue;
       const bodyNode = bodyCapture.node;
       let fieldCount = 0;
@@ -65,13 +71,14 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
   // Impl methods
   const methodsByStruct = new Map<string, MethodInfo[]>();
   try {
-    const implQuery = lang.query(
+    const implQuery = compileQuery(
+      lang,
       "(impl_item type: (type_identifier) @impl_type body: (declaration_list (function_item name: (identifier) @method_name body: (block) @body)))",
     );
     for (const match of implQuery.matches(root)) {
-      const typeCapture = match.captures.find((c) => c.name === "impl_type");
-      const nameCapture = match.captures.find((c) => c.name === "method_name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const typeCapture = findCapture(match, "impl_type");
+      const nameCapture = findCapture(match, "method_name");
+      const bodyCapture = findCapture(match, "body");
       if (!typeCapture || !nameCapture) continue;
 
       const structName = typeCapture.node.text;
@@ -111,7 +118,10 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Imports (use declarations) ---
   try {
-    const useQuery = lang.query("(use_declaration argument: (_) @path)");
+    const useQuery = compileQuery(
+      lang,
+      "(use_declaration argument: (_) @path)",
+    );
     for (const capture of useQuery.captures(root)) {
       if (capture.name !== "path") continue;
       const source = capture.node.text;
@@ -121,7 +131,7 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
           .pop()
           ?.replace(/[{}]/g, "")
           .split(",")
-          .map((s) => s.trim())
+          .map((segment: string) => segment.trim())
           .filter(Boolean) ?? [];
       imports.push({
         source,
@@ -136,12 +146,13 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Traits (interfaces) ---
   try {
-    const traitQuery = lang.query(
+    const traitQuery = compileQuery(
+      lang,
       "(trait_item name: (type_identifier) @name body: (declaration_list) @body)",
     );
     for (const match of traitQuery.matches(root)) {
-      const nameCapture = match.captures.find((c) => c.name === "name");
-      const bodyCapture = match.captures.find((c) => c.name === "body");
+      const nameCapture = findCapture(match, "name");
+      const bodyCapture = findCapture(match, "body");
       if (!nameCapture || !bodyCapture) continue;
 
       const methodNames: string[] = [];
@@ -170,7 +181,10 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Match arms as type checks ---
   try {
-    const matchQuery = lang.query("(match_arm pattern: (identifier) @pattern)");
+    const matchQuery = compileQuery(
+      lang,
+      "(match_arm pattern: (identifier) @pattern)",
+    );
     for (const capture of matchQuery.captures(root)) {
       if (capture.name !== "pattern") continue;
       const name = capture.node.text;
@@ -188,7 +202,8 @@ export const extractAll = (tree: Tree, lang: Language): FileAnalysis => {
 
   // --- Struct instantiations ---
   try {
-    const instQuery = lang.query(
+    const instQuery = compileQuery(
+      lang,
       "(struct_expression name: (type_identifier) @type)",
     );
     for (const capture of instQuery.captures(root)) {

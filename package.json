@@ -26,6 +26,11 @@
   "devDependencies": {
     "@codegeneai/typescript-config": "workspace:*",
     "@types/bun": "catalog:types",
-    "tree-sitter-wasms": "catalog:tooling"
+    "tree-sitter-c-sharp": "catalog:tooling",
+    "tree-sitter-go": "catalog:tooling",
+    "tree-sitter-java": "catalog:tooling",
+    "tree-sitter-python": "catalog:tooling",
+    "tree-sitter-rust": "catalog:tooling",
+    "tree-sitter-typescript": "catalog:tooling"
   }
 }
