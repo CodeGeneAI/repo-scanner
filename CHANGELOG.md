@@ -1,5 +1,17 @@
 # @codegeneai/repo-scanner
 
+## 0.3.0
+
+### Minor Changes
+
+- [`416fd84`](https://github.com/CodeGeneAI/platform/commit/416fd843743dec5b847a7113df9fd671bbe8e964) Thanks [@rszemplinski](https://github.com/rszemplinski)! - Add duplication checks to pre-commit and pre-push hooks with fast path for diff-dry-check
+
+### Patch Changes
+
+- [#1030](https://github.com/CodeGeneAI/platform/pull/1030) [`fbecb44`](https://github.com/CodeGeneAI/platform/commit/fbecb44127008487fb0c3165f64b60467b06237e) Thanks [@rszemplinski](https://github.com/rszemplinski)! - Upgrade outdated editor and parser dependencies, align repo-scanner with the current web-tree-sitter query API, and replace ambient CodeMirror legacy mode declarations with local typed wrappers.
+
+- [#1020](https://github.com/CodeGeneAI/platform/pull/1020) [`3389c80`](https://github.com/CodeGeneAI/platform/commit/3389c809595323749038331b6b626ff76855da32) Thanks [@rszemplinski](https://github.com/rszemplinski)! - Stabilize detector-selector scoping unit coverage by splitting each detector check into individual test cases so CI does not hit per-test timeout limits.
+
 ## 0.2.0
 
 ### Minor Changes
