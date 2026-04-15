@@ -87,7 +87,7 @@ const renderDetectorsOutput = (
       renderJson(
         {
           $schema:
-            "https://assets.codegene.dev/binaries/repo-scanner/schemas/detectors-v1.schema.json",
+            "https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json",
           version: 1,
           detectors: DETECTOR_CATALOG,
           presets: DETECTOR_PRESETS,

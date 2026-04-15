@@ -42,7 +42,7 @@ describe("repo-scanner installer script", () => {
         "sh",
         installerScriptPath,
         "--bundle-url",
-        "https://assets.codegene.dev/binaries/scanner-tools-bundle.tar.gz",
+        "https://assets.codegene.ai/binaries/scanner-tools-bundle.tar.gz",
         "--bundle-sha256",
         "not-a-sha",
       ],

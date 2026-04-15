@@ -9,8 +9,8 @@ Universal repository structure scanner. Detects languages, frameworks, monorepo 
 Auto-detects your platform (OS + architecture) and installs the latest binary:
 
 ```bash
-curl -fsSL https://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
-  --version-url https://assets.codegene.dev/binaries/version.json
+curl -fsSL https://assets.codegene.ai/binaries/install-repo-scanner.sh | sh -s -- \
+  --version-url https://assets.codegene.ai/binaries/version.json
 ```
 
 Verify the installation:
@@ -24,12 +24,12 @@ repo-scanner --version
 For CI pipelines or when you need a specific version, pass the bundle URL and SHA-256 checksum directly:
 
 ```bash
-curl -fsSL https://assets.codegene.dev/binaries/install-repo-scanner.sh | sh -s -- \
+curl -fsSL https://assets.codegene.ai/binaries/install-repo-scanner.sh | sh -s -- \
   --bundle-url <BUNDLE_URL> \
   --bundle-sha256 <BUNDLE_SHA256>
 ```
 
-The bundle URL and checksum for each release are published in [`version.json`](https://assets.codegene.dev/binaries/version.json).
+The bundle URL and checksum for each release are published in [`version.json`](https://assets.codegene.ai/binaries/version.json).
 
 ### Supported platforms
 
@@ -49,7 +49,7 @@ The bundle URL and checksum for each release are published in [`version.json`](h
 The shell installer does not support Windows. Download the bundle archive directly from:
 
 ```
-https://assets.codegene.dev/binaries/scanner-tools-bundle-bun-windows-x64.tar.gz
+https://assets.codegene.ai/binaries/scanner-tools-bundle-bun-windows-x64.tar.gz
 ```
 
 Extract it and add the `bin/` directory to your `PATH`.
@@ -152,7 +152,7 @@ repo-scanner --inventory --detectors solid-health,db-schema
 ```
 
 See `repo-scanner detectors --format json --schema` for machine-readable detector metadata and preset mappings.
-Schema definition endpoint: `https://assets.codegene.dev/binaries/repo-scanner/schemas/detectors-v1.schema.json`.
+Schema definition endpoint: `https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json`.
 Schema changelog: `packages/repo-scanner/schemas/CHANGELOG.md`.
 
 ## Detectors
