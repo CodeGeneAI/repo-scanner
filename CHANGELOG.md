@@ -1,5 +1,11 @@
 # @codegeneai/repo-scanner
 
+## 0.3.1
+
+### Patch Changes
+
+- Publish with `bun publish` so Bun's `catalog:*` protocol in `dependencies` is resolved to literal semver versions in the published tarball. The 0.3.0 tarball shipped literal `"catalog:tooling"` strings for every `tree-sitter-*` grammar, which made the package impossible to install outside this monorepo. 0.3.1 is functionally identical otherwise.
+
 ## 0.3.0
 
 ### Minor Changes

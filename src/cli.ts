@@ -1,4 +1,7 @@
 import os from "os";
+import { version as PACKAGE_VERSION } from "../package.json" with {
+  type: "json",
+};
 import type {
   DependencyComponentGroupingMode,
   Ecosystem,
@@ -13,7 +16,6 @@ import {
 } from "./detectors/catalog";
 import { ALL_DIAGRAM_KINDS } from "./output/topology/types";
 import type { CliOptions, DiagramKind } from "./types";
-import { BUILD_SHA } from "./update/build-version";
 
 const VALID_DIAGRAM_KINDS = new Set<DiagramKind>(ALL_DIAGRAM_KINDS);
 
@@ -67,7 +69,6 @@ const HELP_TEXT = `repo-scanner — universal repository scanner
 Usage: repo-scanner [command] [options]
 
 Commands:
-  update                             Check for updates and install latest binary
   detectors                          List supported detector IDs
   completion <shell>                 Generate shell completion script (bash|zsh|fish)
   completion install <shell>         Install completion script for your shell
@@ -129,7 +130,6 @@ General:
   --no-barrel-filter                 Disable barrel re-export duplication filtering
   --solid                            Enable SOLID analysis detector
   --solid-threshold <n>              SOLID score threshold (default: 80)
-  --no-update-check                  Suppress background update check
   --version, -v                      Show version
   --help, -h                         Show help
   --schema                           JSON schema payload mode for detectors JSON output
@@ -253,14 +253,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let format: "table" | "json" = "table";
   let showHelp = false;
   let showVersion = false;
-  let showUpdate = false;
   let showDetectors = false;
   let completionShell: "bash" | "zsh" | "fish" | undefined;
   let completionInstall = false;
   let completionUninstall = false;
   let detectorsSchema = false;
   const detectorSelectionWarnings: string[] = [];
-  let noUpdateCheck = false;
   let scanArchitecture = false;
   let scanInventory = false;
   let scanExternalServices = false;
@@ -463,10 +461,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
 
   // Detect positional subcommand as the first non-flag argument.
   const command = args[0];
-  if (command === "update") {
-    showUpdate = true;
-    args.splice(0, 1);
-  } else if (command === "detectors") {
+  if (command === "detectors") {
     showDetectors = true;
     args.splice(0, 1);
   } else if (command === "completion") {
@@ -500,9 +495,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--help":
       case "-h":
         showHelp = true;
-        break;
-      case "--no-update-check":
-        noUpdateCheck = true;
         break;
       case "--architecture":
         scanArchitecture = true;
@@ -878,14 +870,12 @@ export const parseArgs = (argv: string[]): CliOptions => {
     format,
     showHelp,
     showVersion,
-    showUpdate,
     showDetectors,
     completionShell,
     completionInstall,
     completionUninstall,
     detectorsSchema,
     detectorSelectionWarnings,
-    noUpdateCheck,
     scanArchitecture,
     scanInventory,
     scanExternalServices,
@@ -970,4 +960,4 @@ export const parseArgs = (argv: string[]): CliOptions => {
 
 export const getHelpText = () => HELP_TEXT;
 
-export const getVersion = (): string => BUILD_SHA;
+export const getVersion = (): string => PACKAGE_VERSION;

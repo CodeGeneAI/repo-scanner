@@ -254,7 +254,7 @@ describe("repo-scanner bin dependencies and completion", () => {
     const payload = JSON.parse(decode(result.stdout));
 
     expect(result.exitCode).toBe(0);
-    expect(payload.$schema).toContain("detectors-v1.schema.json");
+    expect(payload.version).toBe(1);
     expect(payload.detectors.length).toBeGreaterThan(0);
     expect(payload.presets["@inventory"].length).toBeGreaterThan(0);
   });

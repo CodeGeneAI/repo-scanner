@@ -4,125 +4,87 @@ Universal repository structure scanner. Detects languages, frameworks, monorepo 
 
 ## Installation
 
-### Quick install (recommended)
+`repo-scanner` is published to the public npm registry as `@codegeneai/repo-scanner`. It requires [Bun](https://bun.sh) `>= 1.2` at runtime — the package ships TypeScript sources and relies on Bun-native APIs.
 
-Auto-detects your platform (OS + architecture) and installs the latest binary:
-
-```bash
-curl -fsSL https://assets.codegene.ai/binaries/install-repo-scanner.sh | sh -s -- \
-  --version-url https://assets.codegene.ai/binaries/version.json
-```
-
-Verify the installation:
+### Global install
 
 ```bash
+bun install -g @codegeneai/repo-scanner
 repo-scanner --version
 ```
 
-### Pinned install (CI / reproducible builds)
-
-For CI pipelines or when you need a specific version, pass the bundle URL and SHA-256 checksum directly:
+### One-off (no install)
 
 ```bash
-curl -fsSL https://assets.codegene.ai/binaries/install-repo-scanner.sh | sh -s -- \
-  --bundle-url <BUNDLE_URL> \
-  --bundle-sha256 <BUNDLE_SHA256>
+bunx @codegeneai/repo-scanner --path /path/to/repo
 ```
 
-The bundle URL and checksum for each release are published in [`version.json`](https://assets.codegene.ai/binaries/version.json).
+### In a project
 
-### Supported platforms
-
-| Platform | Key | Install method |
-|----------|-----|----------------|
-| Linux x64 | `bun-linux-x64` | Shell installer |
-| Linux x64 (no AVX2) | `bun-linux-x64-baseline` | Shell installer |
-| Linux ARM64 | `bun-linux-arm64` | Shell installer |
-| macOS x64 | `bun-darwin-x64` | Shell installer |
-| macOS x64 (no AVX2) | `bun-darwin-x64-baseline` | Shell installer |
-| macOS ARM64 (Apple Silicon) | `bun-darwin-arm64` | Shell installer |
-| Windows x64 | `bun-windows-x64` | Manual download |
-| Windows x64 (no AVX2) | `bun-windows-x64-baseline` | Manual download |
-
-#### Windows
-
-The shell installer does not support Windows. Download the bundle archive directly from:
-
-```
-https://assets.codegene.ai/binaries/scanner-tools-bundle-bun-windows-x64.tar.gz
+```bash
+bun add -d @codegeneai/repo-scanner
+bun x repo-scanner --path .
 ```
 
-Extract it and add the `bin/` directory to your `PATH`.
+### Upgrading
 
-### Prerequisites
-
-- `curl` and `tar`
-- `sha256sum` or `shasum` (checksum verification)
-- `python3` (only required for `--version-url` mode)
-
-### Install locations
-
-| Path | Purpose |
-|------|---------|
-| `~/.local/bin/repo-scanner` | Symlinked binary (ensure `~/.local/bin` is on your `PATH`) |
-| `~/.cache/codegene/scanner-tools/` | Downloaded archive cache |
-| `~/.local/share/codegene/scanner-tools/` | Extracted binary versions |
-
-These defaults can be overridden with `REPO_SCANNER_BIN_ROOT`, `REPO_SCANNER_CACHE_ROOT`, and `REPO_SCANNER_INSTALL_ROOT` environment variables.
+```bash
+bun install -g @codegeneai/repo-scanner@latest
+```
 
 ## Usage
 
 ```bash
 # basic scan
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo
+repo-scanner --path /path/to/repo
 
 # JSON output
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --format json
+repo-scanner --path /path/to/repo --format json
 
 # enable dependency intelligence
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps
+repo-scanner --path /path/to/repo --deps
 
 # detector-only scan (advanced)
-bun packages/repo-scanner/src/bin.ts --detectors @inventory,@quality
+repo-scanner --detectors @inventory,@quality
 
 # list available detector IDs and descriptions
-bun packages/repo-scanner/src/bin.ts detectors
+repo-scanner detectors
 
 # machine-readable detector schema
-bun packages/repo-scanner/src/bin.ts detectors --format json --schema
+repo-scanner detectors --format json --schema
 
 # generate completion script
-bun packages/repo-scanner/src/bin.ts completion zsh > _repo-scanner
+repo-scanner completion zsh > _repo-scanner
 
 # install completion script automatically
-bun packages/repo-scanner/src/bin.ts completion install fish
+repo-scanner completion install fish
 
 # uninstall completion script
-bun packages/repo-scanner/src/bin.ts completion uninstall fish
+repo-scanner completion uninstall fish
 
 # JSON + dependency scan controls
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --format json --deps --ecosystems npm,pypi --no-security
+repo-scanner --path /path/to/repo --format json --deps --ecosystems npm,pypi --no-security
 
 # CI-style failure when matching vulnerabilities are found
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps --fail-on-vulns --severity-threshold high
+repo-scanner --path /path/to/repo --deps --fail-on-vulns --severity-threshold high
 
 # quota-style failure gates
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --deps --fail-on-vulns-count 3 --fail-on-outdated-count 5
+repo-scanner --path /path/to/repo --deps --fail-on-vulns-count 3 --fail-on-outdated-count 5
 
 # adjust large-file LOC threshold
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --large-file-threshold 1000
+repo-scanner --path /path/to/repo --large-file-threshold 1000
 
 # code duplication detection (dry-check mode)
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --dry-check
+repo-scanner --path /path/to/repo --dry-check
 
 # SOLID principles analysis
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --solid
+repo-scanner --path /path/to/repo --solid
 
 # exclude test files from env var detection (default) or include them
-bun packages/repo-scanner/src/bin.ts --path /path/to/repo --env-include-tests
+repo-scanner --path /path/to/repo --env-include-tests
 
 # version
-bun packages/repo-scanner/src/bin.ts --version
+repo-scanner --version
 ```
 
 ## Features
@@ -152,8 +114,8 @@ repo-scanner --inventory --detectors solid-health,db-schema
 ```
 
 See `repo-scanner detectors --format json --schema` for machine-readable detector metadata and preset mappings.
-Schema definition endpoint: `https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json`.
-Schema changelog: `packages/repo-scanner/schemas/CHANGELOG.md`.
+Schema definition: `schemas/detectors-v1.schema.json` (shipped in the npm package).
+Schema changelog: `schemas/CHANGELOG.md`.
 
 ## Detectors
 

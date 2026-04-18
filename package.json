@@ -1,6 +1,6 @@
 {
   "name": "@codegeneai/repo-scanner",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Universal repository structure scanner for any codebase",
   "bin": {
@@ -9,28 +9,33 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
   "scripts": {
     "start": "bun src/bin.ts",
-    "build:version": "bun scripts/gen-build-version.ts",
-    "build:single": "bun run build:version && mkdir -p dist && bun build ./src/bin.ts --compile --bytecode --target=bun-linux-x64-baseline --outfile ./dist/repo-scanner",
-    "build:all": "bun run build:version && mkdir -p dist && for target in bun-linux-x64 bun-linux-x64-baseline bun-linux-arm64 bun-darwin-x64 bun-darwin-x64-baseline bun-darwin-arm64 bun-windows-x64 bun-windows-x64-baseline; do bun build ./src/bin.ts --compile --bytecode --target=$target --outfile ./dist/repo-scanner-$target || exit 1; done",
     "typecheck": "bun x tsgo --noEmit",
     "perf:drift-report": "bun src/perf/drift-report.ts",
     "test:unit": "files=$(find . -type f \\( -name '*.unit.spec.ts' -o -name '*.unit.spec.tsx' -o -name '*.unit.test.ts' -o -name '*.unit.test.tsx' \\)); if [ -n \"$files\" ]; then bun test $files; else echo 'No unit tests found'; fi",
     "lint": "biome check --write --diagnostic-level=error",
+    "prepublishOnly": "bun run typecheck && bun run test:unit",
     "clean": "rm -rf dist .turbo coverage build lib out tmp temp .cache node_modules tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "web-tree-sitter": "catalog:tooling"
-  },
-  "devDependencies": {
-    "@codegeneai/typescript-config": "workspace:*",
-    "@types/bun": "catalog:types",
     "tree-sitter-c-sharp": "catalog:tooling",
     "tree-sitter-go": "catalog:tooling",
     "tree-sitter-java": "catalog:tooling",
     "tree-sitter-python": "catalog:tooling",
     "tree-sitter-rust": "catalog:tooling",
-    "tree-sitter-typescript": "catalog:tooling"
+    "tree-sitter-typescript": "catalog:tooling",
+    "web-tree-sitter": "catalog:tooling"
+  },
+  "devDependencies": {
+    "@codegeneai/typescript-config": "workspace:*",
+    "@types/bun": "catalog:types"
   }
 }

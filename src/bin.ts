@@ -32,9 +32,6 @@ import {
 } from "./scan-profile";
 import { scanRepo } from "./scanner";
 import type { RepoScanResult } from "./types";
-import { BUILD_SHA, BUILD_UPDATE_URL } from "./update/build-version";
-import { formatUpdateNotice, startBackgroundUpdateCheck } from "./update/check";
-import { runUpdateCommand } from "./update/command";
 import { FileIndex } from "./utils/file-index";
 
 const flushWritable = async (stream: NodeJS.WritableStream): Promise<void> => {
@@ -66,17 +63,6 @@ const resolveValidDirectory = (rawPath: string): string => {
   return resolvedPath;
 };
 
-/**
- * Races a promise against a timeout, resolving to null if the timeout wins.
- * Used to give the background update check a short final wait window after
- * the main scan completes (it has already been running concurrently).
- */
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
-  Promise.race([
-    promise,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-  ]);
-
 const renderDetectorsOutput = (
   format: "table" | "json",
   schema: boolean,
@@ -86,8 +72,6 @@ const renderDetectorsOutput = (
     if (schema) {
       renderJson(
         {
-          $schema:
-            "https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json",
           version: 1,
           detectors: DETECTOR_CATALOG,
           presets: DETECTOR_PRESETS,
@@ -674,15 +658,6 @@ const main = async () => {
     process.exit(0);
   }
 
-  if (options.showUpdate) {
-    await runUpdateCommand({
-      currentSha: BUILD_SHA,
-      updateUrl: BUILD_UPDATE_URL,
-      stderr: process.stderr,
-    });
-    process.exit(0);
-  }
-
   if (options.showDetectors) {
     renderDetectorsOutput(
       options.format,
@@ -746,13 +721,6 @@ const main = async () => {
     process.exit(0);
   }
 
-  // Start background update check concurrently — does not block scan work.
-  const updateCheckPromise = startBackgroundUpdateCheck({
-    currentSha: BUILD_SHA,
-    updateUrl: BUILD_UPDATE_URL,
-    noUpdateCheck: options.noUpdateCheck,
-  });
-
   if (options.dryCheck) {
     const validScanPath = resolveValidDirectory(options.path);
     const index = await FileIndex.build(validScanPath);
@@ -774,11 +742,6 @@ const main = async () => {
       renderDryCheckTable(result, process.stdout);
     }
 
-    // Show update notice after output if applicable.
-    const updateInfo = await withTimeout(updateCheckPromise, 500);
-    if (updateInfo && process.stderr.isTTY) {
-      process.stderr.write(formatUpdateNotice(BUILD_SHA, updateInfo));
-    }
     return;
   }
 
@@ -793,10 +756,6 @@ const main = async () => {
     );
 
     if (!duplicationResult) {
-      const updateInfo = await withTimeout(updateCheckPromise, 500);
-      if (updateInfo && process.stderr.isTTY) {
-        process.stderr.write(formatUpdateNotice(BUILD_SHA, updateInfo));
-      }
       return;
     }
 
@@ -813,11 +772,6 @@ const main = async () => {
       process.stdout.write(JSON.stringify(jsonPayload, null, 2));
     } else {
       renderDryCheckTable(duplicationResult, process.stdout);
-    }
-
-    const updateInfo = await withTimeout(updateCheckPromise, 500);
-    if (updateInfo && process.stderr.isTTY) {
-      process.stderr.write(formatUpdateNotice(BUILD_SHA, updateInfo));
     }
 
     if (
@@ -1087,12 +1041,6 @@ const main = async () => {
     process.stderr.write(
       `[deps-debug] vulnerability keys: total=${stats.totalDependencies} unique=${stats.uniqueKeys} duplicate=${stats.duplicateKeys}\n`,
     );
-  }
-
-  // Show update notice after all scan output and debug info.
-  const updateInfo = await withTimeout(updateCheckPromise, 500);
-  if (updateInfo && process.stderr.isTTY) {
-    process.stderr.write(formatUpdateNotice(BUILD_SHA, updateInfo));
   }
 };
 

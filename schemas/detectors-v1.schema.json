@@ -1,15 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json",
   "title": "repo-scanner detector catalog schema (v1)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "version", "detectors", "presets"],
+  "required": ["version", "detectors", "presets"],
   "properties": {
-    "$schema": {
-      "type": "string",
-      "const": "https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json"
-    },
     "version": {
       "type": "integer",
       "const": 1

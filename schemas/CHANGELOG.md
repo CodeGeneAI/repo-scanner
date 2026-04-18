@@ -4,10 +4,9 @@ Tracks versioned JSON schema contracts published by `repo-scanner`.
 
 ## v1 — detectors catalog schema
 
-- **Schema ID:** `https://assets.codegene.ai/binaries/repo-scanner/schemas/detectors-v1.schema.json`
+- **Schema file:** `schemas/detectors-v1.schema.json` (shipped in the npm package)
 - **Command output:** `repo-scanner detectors --format json --schema`
 - **Payload fields:**
-  - `$schema` (const schema endpoint)
   - `version` (const `1`)
   - `detectors` (array of `{ id, description }`)
   - `presets` (preset alias map to detector-id arrays)

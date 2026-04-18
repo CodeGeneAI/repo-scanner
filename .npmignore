@@ -1,0 +1,31 @@
+# Test and fixture files (not needed at runtime)
+**/*.unit.test.ts
+**/*.unit.test.tsx
+**/*.unit.spec.ts
+**/*.unit.spec.tsx
+**/__fixtures__/
+**/__snapshots__/
+
+# Dev-only helpers
+src/perf/
+
+# Build artifacts and caches
+dist/
+tsconfig.json
+tsconfig.tsbuildinfo
+.turbo/
+node_modules/
+coverage/
+.cache/
+
+# Editor / OS cruft
+.DS_Store
+*.log
+
+# Agent / workspace guidance (not useful to consumers)
+AGENTS.md
+CLAUDE.md
+
+# Local scan/lint configs
+.scanignore
+biome.json
