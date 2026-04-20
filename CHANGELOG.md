@@ -1,5 +1,41 @@
 # @codegeneai/repo-scanner
 
+## 0.4.0
+
+### Minor Changes
+
+- [#1080](https://github.com/CodeGeneAI/platform/pull/1080) [`d3ba478`](https://github.com/CodeGeneAI/platform/commit/d3ba47850abd93a4acdadb7e3280e91c01d5bec0) Thanks [@rszemplinski](https://github.com/rszemplinski)! - Publish `@codegeneai/repo-scanner` to the public npm registry (`registry.npmjs.org`) instead of distributing prebuilt binaries via `assets.codegene.ai`.
+
+  Install with `bun install -g @codegeneai/repo-scanner` or run via `bunx @codegeneai/repo-scanner`. Bun `>= 1.2` is required at runtime.
+
+  Removed:
+
+  - The `src/update/` subsystem (in-process update check, `BUILD_SHA`-based version reporting, `update` subcommand, `--no-update-check` flag). Upgrades now happen through the package manager: `bun install -g @codegeneai/repo-scanner@latest`.
+  - The `build:single` / `build:all` / `build:version` scripts and the `scripts/gen-build-version.ts` / `scripts/install-repo-scanner.sh` bundle pipeline.
+  - The `$id` / `$schema` URL on `detectors-v1.schema.json` — the schema is now shipped inside the package (`schemas/detectors-v1.schema.json`).
+
+  The repo-scan CLI behavior is unchanged. `repo-scanner --version` now reports the npm package version.
+
+  **Release pipeline — one-time bootstrap (required before CI can publish this package).** npm's Trusted Publishing (OIDC) cannot be configured for a package that doesn't exist yet, so v0.3.0 must be published **once, manually**, from a clean checkout of the tagged commit:
+
+  1. Mint a short-lived (≤7-day) granular npm token scoped to `@codegeneai/repo-scanner` at https://www.npmjs.com/settings/<user>/tokens (type: Granular, Read & Write, single package).
+  2. From a clean checkout: `cd packages/repo-scanner && npm publish --access public` (with that token in `~/.npmrc`).
+  3. On npmjs.com → package settings → **Trusted Publisher**, add: org `CodeGeneAI`, repo `platform`, workflow filename `release.yml`, environment blank.
+  4. Revoke the bootstrap token.
+
+  All subsequent releases publish automatically via the `Release` workflow using GitHub Actions OIDC (no `NPM_TOKEN` secret required; provenance attached automatically).
+
+### Patch Changes
+
+- [#1053](https://github.com/CodeGeneAI/platform/pull/1053) [`e68b10e`](https://github.com/CodeGeneAI/platform/commit/e68b10e288954beb04c6b6f686d615dc0b5eb030) Thanks [@rszemplinski](https://github.com/rszemplinski)! - Remove the Hono+Railway `services/assets` service and every caller of its image
+  proxy. The `assets` public slug has been dropped from the non-production
+  Railway service contracts and Cloudflare Tunnel ingress plan. The codegene web
+  app's `ASSETS_DOMAIN`, `S3_*` envs, `src/config/s3.server.ts`, and the entire
+  `src/features/uploads/` surface have been removed; workspace / project / user
+  settings revert to their pre-upload state. The repo-scanner schema `$id` and
+  bundle/install URLs now point at `assets.codegene.ai`, matching the sole
+  public-bucket policy in `DOMAINS.md`.
+
 ## 0.3.1
 
 ### Patch Changes
