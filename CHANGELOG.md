@@ -1,5 +1,15 @@
 # @codegeneai/repo-scanner
 
+## 0.4.1
+
+### Patch Changes
+
+- [`f634b13`](https://github.com/CodeGeneAI/repo-scanner/commit/f634b1309db266ea6a5d7139a4bc769467c6d8f5) Thanks [@rszemplinski](https://github.com/rszemplinski)! - Initial release from the standalone CodeGeneAI/repo-scanner repository.
+
+  Functionally identical to the prior 0.4.0 release from
+  CodeGeneAI/platform; the version bump is purely a publishing-pipeline
+  validation step.
+
 ## 0.4.0
 
 ### Minor Changes
