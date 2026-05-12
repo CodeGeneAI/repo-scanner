@@ -3,7 +3,8 @@ import { mkdir, mkdtemp, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 
-const repoRootPath = path.resolve(import.meta.dir, "../../..");
+const repoRootPath = path.resolve(import.meta.dir, "..");
+const binPath = path.resolve(import.meta.dir, "bin.ts");
 const textDecoder = new TextDecoder();
 
 type RepoScannerResult = {
@@ -148,29 +149,23 @@ export const runRepoScanner = (
   args: readonly string[],
   envOverrides?: Record<string, string>,
 ) =>
-  Bun.spawnSync(
-    [process.execPath, "packages/repo-scanner/src/bin.ts", ...args],
-    {
-      cwd: repoRootPath,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: buildRepoScannerEnv(envOverrides),
-    },
-  );
+  Bun.spawnSync([process.execPath, binPath, ...args], {
+    cwd: repoRootPath,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: buildRepoScannerEnv(envOverrides),
+  });
 
 export const runRepoScannerAsync = async (
   args: readonly string[],
   envOverrides?: Record<string, string>,
 ): Promise<RepoScannerResult> => {
-  const processResult = Bun.spawn(
-    [process.execPath, "packages/repo-scanner/src/bin.ts", ...args],
-    {
-      cwd: repoRootPath,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: buildRepoScannerEnv(envOverrides),
-    },
-  );
+  const processResult = Bun.spawn([process.execPath, binPath, ...args], {
+    cwd: repoRootPath,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: buildRepoScannerEnv(envOverrides),
+  });
 
   const [stdoutBuffer, stderrBuffer, exitCode] = await Promise.all([
     new Response(processResult.stdout).arrayBuffer(),

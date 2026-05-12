@@ -1,6 +1,14 @@
 {
-  "extends": "@codegeneai/typescript-config/base",
   "compilerOptions": {
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "noImplicitOverride": false,
+    "noUncheckedIndexedAccess": false,
+    "incremental": true,
     "target": "ESNext",
     "module": "esnext",
     "moduleResolution": "bundler",

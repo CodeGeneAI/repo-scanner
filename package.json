@@ -2,12 +2,13 @@
   "name": "@codegeneai/repo-scanner",
   "version": "0.4.0",
   "type": "module",
+  "license": "MIT",
   "description": "Universal repository structure scanner for any codebase",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CodeGeneAI/platform.git",
-    "directory": "packages/repo-scanner"
+    "url": "https://github.com/CodeGeneAI/repo-scanner.git"
   },
+  "packageManager": "bun@1.3.13",
   "bin": {
     "repo-scanner": "./src/bin.ts"
   },
@@ -31,16 +32,27 @@
     "clean": "rm -rf dist .turbo coverage build lib out tmp temp .cache node_modules tsconfig.tsbuildinfo"
   },
   "dependencies": {
-    "tree-sitter-c-sharp": "catalog:tooling",
-    "tree-sitter-go": "catalog:tooling",
-    "tree-sitter-java": "catalog:tooling",
-    "tree-sitter-python": "catalog:tooling",
-    "tree-sitter-rust": "catalog:tooling",
-    "tree-sitter-typescript": "catalog:tooling",
-    "web-tree-sitter": "catalog:tooling"
+    "tree-sitter-c-sharp": "0.23.5",
+    "tree-sitter-go": "0.25.0",
+    "tree-sitter-java": "0.23.5",
+    "tree-sitter-python": "0.25.0",
+    "tree-sitter-rust": "0.24.0",
+    "tree-sitter-typescript": "0.23.2",
+    "web-tree-sitter": "0.26.8"
   },
   "devDependencies": {
-    "@codegeneai/typescript-config": "workspace:*",
-    "@types/bun": "catalog:types"
-  }
+    "@biomejs/biome": "2.4.15",
+    "@types/bun": "1.3.13",
+    "@typescript/native-preview": "7.0.0-dev.20260510.1"
+  },
+  "trustedDependencies": [
+    "tree-sitter-c-sharp",
+    "tree-sitter-go",
+    "tree-sitter-java",
+    "tree-sitter-javascript",
+    "tree-sitter-python",
+    "tree-sitter-rust",
+    "tree-sitter-typescript",
+    "web-tree-sitter"
+  ]
 }
