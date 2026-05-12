@@ -35,6 +35,17 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
       - run: bun install --frozen-lockfile
+      # Mint a short-lived installation token from the CodeGeneAI App so the
+      # version PR + published commit are authored by the App, NOT by
+      # GITHUB_TOKEN. GITHUB_TOKEN by design cannot trigger downstream
+      # workflows; an App token can — that's what lets CI fire on the
+      # changesets-generated "Version packages" PR.
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.CODEGENEAI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CODEGENEAI_APP_PRIVATE_KEY }}
       - name: Release with Changesets
         uses: changesets/action@v1
         with:
@@ -42,4 +53,4 @@ jobs:
           commit: "[Release] Version packages"
           publish: bun x changeset publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
