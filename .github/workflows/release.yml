@@ -47,6 +47,7 @@ jobs:
           client-id: ${{ vars.CODEGENEAI_APP_CLIENT_ID }}
           private-key: ${{ secrets.CODEGENEAI_APP_PRIVATE_KEY }}
       - name: Release with Changesets
+        id: changesets
         uses: changesets/action@v1
         with:
           title: "[Release] Version packages"
@@ -54,3 +55,28 @@ jobs:
           publish: bun x changeset publish
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      # When a publish actually happens, install the freshly-published
+      # version from npm in a clean directory and run a smoke scan against
+      # a known-shape external repo (p-map: small JS lib). This catches
+      # publish-pipeline regressions — wrong files in the tarball, broken
+      # tree-sitter resolution, etc. — before consumers do.
+      - name: Post-publish smoke test
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          set -euo pipefail
+          PUBLISHED_VERSION=$(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -r '.[0].version')
+          echo "Verifying published @codegeneai/repo-scanner@${PUBLISHED_VERSION}"
+          # Give npm a moment to propagate the publish across replicas.
+          sleep 5
+          mkdir -p /tmp/scanner-postpublish
+          cd /tmp/scanner-postpublish
+          bun add -g "@codegeneai/repo-scanner@${PUBLISHED_VERSION}"
+          repo-scanner --version
+          git clone --depth 1 https://github.com/sindresorhus/p-map.git
+          cd p-map
+          repo-scanner --all-detectors --path . --format json > /tmp/post-publish-scan.json
+          jq -e '.vcs.type == "git"' /tmp/post-publish-scan.json > /dev/null
+          jq -e '.inventory.languages | contains(["JavaScript"])' /tmp/post-publish-scan.json > /dev/null
+          jq -e '.inventory.namingConventions | length > 0' /tmp/post-publish-scan.json > /dev/null
+          echo "Post-publish smoke passed ($(stat -c %s /tmp/post-publish-scan.json) bytes of scan output)"
