@@ -1,5 +1,12 @@
 # @codegeneai/repo-scanner
 
+## [0.4.3](https://github.com/CodeGeneAI/repo-scanner/compare/v0.4.2...v0.4.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* **ci:** retry post-publish smoke against npm registry propagation lag ([e451324](https://github.com/CodeGeneAI/repo-scanner/commit/e4513247a4b4f16c2a5561924724595415853d2a))
+
 ## 0.4.2
 
 ### Patch Changes
