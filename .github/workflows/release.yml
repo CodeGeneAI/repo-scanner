@@ -30,6 +30,14 @@ jobs:
         with:
           app-id: 2479570
           private-key: ${{ secrets.CODEGENEAI_APP_PRIVATE_KEY }}
+          # Downscope: by default the minted token inherits ALL of the
+          # CodeGeneAI App's installation permissions. release-please needs
+          # only these three; everything else (actions:write,
+          # administration:write, secrets:read, workflows:write, ...) is
+          # dropped from the minted token by listing here explicitly.
+          permission-contents: write # release commits + tags + GitHub Releases
+          permission-pull-requests: write # release PR creation
+          permission-issues: write # release-please labels its PRs
 
       - name: Run release-please
         id: release-please
