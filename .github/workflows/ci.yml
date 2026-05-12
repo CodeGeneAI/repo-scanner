@@ -26,4 +26,8 @@ jobs:
       - name: Unit tests
         run: bun run test:unit
       - name: Self-scan smoke test
-        run: bun src/bin.ts --path . --format json > /tmp/self-scan.json && test -s /tmp/self-scan.json
+        run: |
+          bun src/bin.ts --all-detectors --path . --format json > /tmp/self-scan.json
+          jq -e '.vcs.type == "git"' /tmp/self-scan.json > /dev/null
+          jq -e '.inventory.languages | length > 0' /tmp/self-scan.json > /dev/null
+          jq -e '.inventory.totalFiles > 0' /tmp/self-scan.json > /dev/null
