@@ -1,5 +1,53 @@
 # @codegeneai/repo-scanner
 
+## [0.5.0](https://github.com/CodeGeneAI/repo-scanner/compare/repo-scanner-v0.4.2...repo-scanner-v0.5.0) (2026-05-12)
+
+
+### Features
+
+* add --topology flag for mermaid diagram generation ([#818](https://github.com/CodeGeneAI/repo-scanner/issues/818)) ([18b8359](https://github.com/CodeGeneAI/repo-scanner/commit/18b8359ea8e91c08fdc48f9921a98a6d33646707))
+* add diff-scoped duplication and env var detection for pre-commit ([#874](https://github.com/CodeGeneAI/repo-scanner/issues/874)) ([0151581](https://github.com/CodeGeneAI/repo-scanner/commit/015158197476c87a746407a70209bdf77ca1d79d))
+* add ERD diagram generation for database schema visualization ([#843](https://github.com/CodeGeneAI/repo-scanner/issues/843)) ([58110c2](https://github.com/CodeGeneAI/repo-scanner/commit/58110c2e797f7d9f391db374ebddcdb917cd3d51))
+* **e2e:** add live test-bench scenarios and scanner binary pipeline ([192a87b](https://github.com/CodeGeneAI/repo-scanner/commit/192a87bff6ea37411c63247cceb6cb245cfbd6a4))
+* **preview:** automate codegene.app ingress ([#1030](https://github.com/CodeGeneAI/repo-scanner/issues/1030)) ([94a189c](https://github.com/CodeGeneAI/repo-scanner/commit/94a189c2c1c799467d0668ac89992834f877ed57))
+* **repo-scanner:** add architecture violations, blast radius, complexity hotspots, and external services ([d16b9d8](https://github.com/CodeGeneAI/repo-scanner/commit/d16b9d89a425757838071f71845ff14653940854))
+* **repo-scanner:** add AST-based SOLID principles health detector ([9ed1d69](https://github.com/CodeGeneAI/repo-scanner/commit/9ed1d6978d41ab0d00e85e134ff171c5cfd2fea0))
+* **repo-scanner:** add built-in auto-updater CLI ([9f8c332](https://github.com/CodeGeneAI/repo-scanner/commit/9f8c332c6513cf24b118998063678a4cfb2e364f))
+* **repo-scanner:** add duplication checks to pre-commit and pre-push hooks ([#983](https://github.com/CodeGeneAI/repo-scanner/issues/983)) ([d1bf1a6](https://github.com/CodeGeneAI/repo-scanner/commit/d1bf1a6e992dca510a62272126487ec469176b3f))
+* **repo-scanner:** add duplication checks to pre-commit and pre-push hooks ([#983](https://github.com/CodeGeneAI/repo-scanner/issues/983)) ([04bdd54](https://github.com/CodeGeneAI/repo-scanner/commit/04bdd546c7a4e185a17d25185046f32aecb84819))
+* **repo-scanner:** add env var detector and naming convention detector ([a6ca4e3](https://github.com/CodeGeneAI/repo-scanner/commit/a6ca4e36aca0d58ea395747e044497b45876a7d8))
+* **repo-scanner:** add isPolyglot signal for multi-language repos ([daf2d2d](https://github.com/CodeGeneAI/repo-scanner/commit/daf2d2d3733874729b2303b0d5a86fdb77bca0cd))
+* **repo-scanner:** add large-file detector for LOC-heavy source files ([71ba6f5](https://github.com/CodeGeneAI/repo-scanner/commit/71ba6f5f198f829b92c2149e2386329b0ad252b7))
+* **repo-scanner:** add per-component metadata enrichment ([e13a032](https://github.com/CodeGeneAI/repo-scanner/commit/e13a03243decbae3f1b89b036ffd8bdad5b55a75))
+* **repo-scanner:** add Python, Java, and Kotlin monorepo detection ([76d142f](https://github.com/CodeGeneAI/repo-scanner/commit/76d142f461cca1e8e66a1ff74e55662ac4fb0136))
+* **repo-scanner:** add runtime version detector and API surface detector ([8948a78](https://github.com/CodeGeneAI/repo-scanner/commit/8948a7821d3fd17aec60f56c3dd56b8d18c024e8))
+* **repo-scanner:** add TODO scanner, cross-package deps, dead export detector, and broad language parity ([2c19947](https://github.com/CodeGeneAI/repo-scanner/commit/2c19947e7862854baa7465265656f4ac26f908d8))
+* **repo-scanner:** add universal repo structure scanner with 12 detectors ([f97d7e8](https://github.com/CodeGeneAI/repo-scanner/commit/f97d7e811b1a9e5c82c584883e4b23642135bcff))
+* **repo-scanner:** add vcs confidence and branch provenance ([#904](https://github.com/CodeGeneAI/repo-scanner/issues/904)) ([faed919](https://github.com/CodeGeneAI/repo-scanner/commit/faed919fcc77d56b8811a05f9498e06b4e95547c))
+* **repo-scanner:** add VCS detector for git/hg/svn detection ([#901](https://github.com/CodeGeneAI/repo-scanner/issues/901)) ([b4f00ac](https://github.com/CodeGeneAI/repo-scanner/commit/b4f00acb6389b6bc4f3bb055f41c179894986f58))
+* **repo-scanner:** expand language coverage across all detectors to near-universal support ([8bf21a4](https://github.com/CodeGeneAI/repo-scanner/commit/8bf21a4c7c2b9c7792ec90f5b529e756c99bad9f))
+* **repo-scanner:** integrate dry-check code duplication detector ([47b0ce8](https://github.com/CodeGeneAI/repo-scanner/commit/47b0ce88766a27ce091af74200e4a393d2a95519))
+* **repo-scanner:** publish to public npm registry ([#1080](https://github.com/CodeGeneAI/repo-scanner/issues/1080)) ([4e716a1](https://github.com/CodeGeneAI/repo-scanner/commit/4e716a173a962cb7215a847177e3148b9e5d1618))
+* **repo-scanner:** restore section flags and full-scan alias ([#838](https://github.com/CodeGeneAI/repo-scanner/issues/838)) ([20f1890](https://github.com/CodeGeneAI/repo-scanner/commit/20f1890c88a3b4248803fdf3864a76065e5bd7f8))
+* **repo-scanner:** tune SOLID thresholds for production-worthy results ([c324a28](https://github.com/CodeGeneAI/repo-scanner/commit/c324a28aab2f28f29fdad0b14fe8d19c699d07b3))
+* **scanner-baseline:** hard-cut scanner install to canonical installer ([0e0ce37](https://github.com/CodeGeneAI/repo-scanner/commit/0e0ce375f7c078a84ef8ca58e5963f99be6d919a))
+* **trigger-migration:** finalize preview and reconcile hard-cut ([#955](https://github.com/CodeGeneAI/repo-scanner/issues/955)) ([75edd90](https://github.com/CodeGeneAI/repo-scanner/commit/75edd90092897eb32e7699415c0441741e08816e))
+
+
+### Bug Fixes
+
+* **ci:** release workflow must auth git as the App bot ([6862192](https://github.com/CodeGeneAI/repo-scanner/commit/68621922f085670c478f90b8deb57bf4d9774a8b))
+* **ci:** retry post-publish smoke against npm registry propagation lag ([e451324](https://github.com/CodeGeneAI/repo-scanner/commit/e4513247a4b4f16c2a5561924724595415853d2a))
+* **ci:** self-scan smoke must run all detectors, not print help ([0ce4d50](https://github.com/CodeGeneAI/repo-scanner/commit/0ce4d5046e00b8e836743fcfa8e7ec266cbedeaa))
+* **e2e:** stabilize deployment protection cross-host tests ([#1020](https://github.com/CodeGeneAI/repo-scanner/issues/1020)) ([26996ef](https://github.com/CodeGeneAI/repo-scanner/commit/26996ef36f7ff861e47bb8927eca6deaf7fa2672))
+* **release:** publish public npm independently ([871f572](https://github.com/CodeGeneAI/repo-scanner/commit/871f5722291b9956f53b0c8f2647e3b59ea48fa4))
+* **repo-scanner:** detect literal workspace paths and expand quality gate signals ([f9e2386](https://github.com/CodeGeneAI/repo-scanner/commit/f9e23867da0e5148116b2f0009a6cacc526f7381))
+* **repo-scanner:** enforce explicit topology output and ERD fidelity ([7b08101](https://github.com/CodeGeneAI/repo-scanner/commit/7b08101e38776d90cf918f20f10502ccff426843))
+* **repo-scanner:** enforce selector-scoped and composable detector outputs ([#931](https://github.com/CodeGeneAI/repo-scanner/issues/931)) ([84bf742](https://github.com/CodeGeneAI/repo-scanner/commit/84bf7427ac0dc367951381e8aeb724827630a938))
+* **repo-scanner:** honor detector-only output for env scans ([#924](https://github.com/CodeGeneAI/repo-scanner/issues/924)) ([8eed92c](https://github.com/CodeGeneAI/repo-scanner/commit/8eed92c165de870f2c340ddd54ec54d5f24e33d7))
+* **repo-scanner:** improve Supabase detection and macOS completion ([#940](https://github.com/CodeGeneAI/repo-scanner/issues/940)) ([3517192](https://github.com/CodeGeneAI/repo-scanner/commit/3517192397377cda29848a86d02ea1048c190d95))
+* **repo-scanner:** repair installer version-url parsing ([#919](https://github.com/CodeGeneAI/repo-scanner/issues/919)) ([d764b45](https://github.com/CodeGeneAI/repo-scanner/commit/d764b45cd455a8cc025040070c8e4e55ef5fff22))
+
 ## 0.4.2
 
 ### Patch Changes
