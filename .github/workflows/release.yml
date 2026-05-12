@@ -80,11 +80,23 @@ jobs:
           set -euo pipefail
           PUBLISHED_VERSION=$(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -r '.[0].version')
           echo "Verifying published @codegeneai/repo-scanner@${PUBLISHED_VERSION}"
-          # Give npm a moment to propagate the publish across replicas.
-          sleep 5
           mkdir -p /tmp/scanner-postpublish
           cd /tmp/scanner-postpublish
-          bun add -g "@codegeneai/repo-scanner@${PUBLISHED_VERSION}"
+          # npm registry index propagation after a Trusted Publishing publish
+          # can lag by 5-30s — `bun add` queries the index before it's been
+          # updated. Retry with backoff up to ~90s before giving up.
+          for attempt in 1 2 3 4 5 6 7 8 9; do
+            if bun add -g "@codegeneai/repo-scanner@${PUBLISHED_VERSION}"; then
+              echo "install succeeded on attempt ${attempt}"
+              break
+            fi
+            if [ "${attempt}" = "9" ]; then
+              echo "::error::install failed after 9 attempts (~90s of retries)"
+              exit 1
+            fi
+            echo "registry index not ready yet, retrying in 10s (attempt ${attempt}/9)"
+            sleep 10
+          done
           repo-scanner --version
           git clone --depth 1 https://github.com/sindresorhus/p-map.git
           cd p-map
