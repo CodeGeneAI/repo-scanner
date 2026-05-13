@@ -11,7 +11,7 @@ import {
 } from "./shared";
 import type { DetectorResult } from "./types";
 
-/** npm package → framework name. Only actual frameworks/platforms, not libraries. */
+/** npm package → framework or notable library name. */
 const NPM_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["react", "React"],
   ["react-dom", "React"],
@@ -40,6 +40,17 @@ const NPM_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["storybook", "Storybook"],
   ["@storybook/react", "Storybook"],
   ["elysia", "Elysia"],
+  ["@trpc/server", "tRPC"],
+  ["@trpc/client", "tRPC"],
+  ["@trpc/react-query", "tRPC"],
+  ["@trpc/tanstack-react-query", "tRPC"],
+  ["drizzle-orm", "Drizzle"],
+  ["drizzle-kit", "Drizzle"],
+  ["drizzle-zod", "Drizzle"],
+  ["better-auth", "Better Auth"],
+  ["@tanstack/react-query", "TanStack Query"],
+  ["@tanstack/react-form", "TanStack Form"],
+  ["@tanstack/react-router", "TanStack Router"],
 ]);
 
 /** Config file → framework name (build tools excluded — those go in build detector). */
