@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
-import type { LanguageStats } from "../types";
 import { FileIndex } from "../utils/file-index";
 import "./init";
 import { getDetectors } from "./registry";
@@ -131,8 +130,15 @@ describe("language detector", () => {
   });
 
   describe("language stats", () => {
-    function getStats(result: DetectorResult): LanguageStats[] {
-      return (result.metadata?.languageStats as LanguageStats[]) ?? [];
+    interface PerLanguageEntry {
+      readonly language: string;
+      readonly files: number;
+      readonly lines: number;
+      readonly percentage: number;
+    }
+
+    function getStats(result: DetectorResult): PerLanguageEntry[] {
+      return (result.metadata?.perLanguage as PerLanguageEntry[]) ?? [];
     }
 
     it("includes correct file counts per language", async () => {
@@ -147,13 +153,13 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
       const stats = getStats(result);
 
-      const ts = stats.find((s) => s.name === "TypeScript");
-      const py = stats.find((s) => s.name === "Python");
+      const ts = stats.find((s) => s.language === "TypeScript");
+      const py = stats.find((s) => s.language === "Python");
 
       expect(ts).toBeDefined();
-      expect(ts!.fileCount).toBe(3);
+      expect(ts!.files).toBe(3);
       expect(py).toBeDefined();
-      expect(py!.fileCount).toBe(1);
+      expect(py!.files).toBe(1);
     });
 
     it("percentages sum to approximately 100", async () => {
@@ -208,9 +214,9 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
       const stats = getStats(result);
 
-      const ts = stats.find((s) => s.name === "TypeScript");
+      const ts = stats.find((s) => s.language === "TypeScript");
       expect(ts).toBeDefined();
-      expect(ts!.fileCount).toBe(2);
+      expect(ts!.files).toBe(2);
     });
 
     it("returns empty stats for empty repo", async () => {
@@ -234,8 +240,8 @@ describe("language detector", () => {
       const stats = getStats(result);
 
       expect(stats).toHaveLength(1);
-      expect(stats[0]!.name).toBe("TypeScript");
-      expect(stats[0]!.fileCount).toBe(1);
+      expect(stats[0]!.language).toBe("TypeScript");
+      expect(stats[0]!.files).toBe(1);
       expect(stats[0]!.percentage).toBe(100);
     });
 
@@ -251,16 +257,16 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
       const stats = getStats(result);
 
-      const ts = stats.find((s) => s.name === "TypeScript");
-      const py = stats.find((s) => s.name === "Python");
+      const ts = stats.find((s) => s.language === "TypeScript");
+      const py = stats.find((s) => s.language === "Python");
 
       expect(ts).toBeDefined();
-      expect(ts!.linesOfCode).toBe(3);
+      expect(ts!.lines).toBe(3);
       expect(py).toBeDefined();
-      expect(py!.linesOfCode).toBe(2);
+      expect(py!.lines).toBe(2);
     });
 
-    it("reports totalFiles and totalLinesOfCode in metadata", async () => {
+    it("reports totalFiles and totalLines in metadata", async () => {
       await writeFile(path.join(tmpDir, "a.ts"), "line1\nline2\n");
       await writeFile(path.join(tmpDir, "b.ts"), "line1\n");
       await writeFile(path.join(tmpDir, "c.py"), "line1\nline2\nline3\n");
@@ -270,7 +276,7 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
 
       expect(result.metadata?.totalFiles).toBe(3);
-      expect(result.metadata?.totalLinesOfCode).toBe(6);
+      expect(result.metadata?.totalLines).toBe(6);
     });
 
     it("counts lines correctly for files without trailing newline", async () => {
@@ -281,7 +287,7 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
       const stats = getStats(result);
 
-      expect(stats[0]!.linesOfCode).toBe(2);
+      expect(stats[0]!.lines).toBe(2);
     });
 
     it("reports 0 lines for empty files", async () => {
@@ -292,7 +298,7 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
       const stats = getStats(result);
 
-      expect(stats[0]!.linesOfCode).toBe(0);
+      expect(stats[0]!.lines).toBe(0);
     });
 
     it("sums LoC across multi-extension languages", async () => {
@@ -304,8 +310,8 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
       const stats = getStats(result);
 
-      const ts = stats.find((s) => s.name === "TypeScript");
-      expect(ts!.linesOfCode).toBe(5);
+      const ts = stats.find((s) => s.language === "TypeScript");
+      expect(ts!.lines).toBe(5);
     });
 
     it("returns 0 totals for empty repo", async () => {
@@ -314,7 +320,7 @@ describe("language detector", () => {
       const result = await detector.detect(tmpDir, index);
 
       expect(result.metadata?.totalFiles).toBe(0);
-      expect(result.metadata?.totalLinesOfCode).toBe(0);
+      expect(result.metadata?.totalLines).toBe(0);
     });
   });
 });

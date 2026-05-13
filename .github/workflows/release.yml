@@ -106,8 +106,7 @@ jobs:
           repo-scanner --version
           git clone --depth 1 https://github.com/sindresorhus/p-map.git
           cd p-map
-          repo-scanner --all-detectors --path . --format json > /tmp/post-publish-scan.json
-          jq -e '.vcs.type == "git"' /tmp/post-publish-scan.json > /dev/null
+          repo-scanner --path . --format json > /tmp/post-publish-scan.json
           jq -e '.inventory.languages | contains(["JavaScript"])' /tmp/post-publish-scan.json > /dev/null
-          jq -e '.inventory.namingConventions | length > 0' /tmp/post-publish-scan.json > /dev/null
+          jq -e '.languageStats.totalFiles > 0' /tmp/post-publish-scan.json > /dev/null
           echo "Post-publish smoke passed ($(stat -c %s /tmp/post-publish-scan.json) bytes of scan output)"

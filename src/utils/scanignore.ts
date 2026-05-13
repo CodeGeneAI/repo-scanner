@@ -10,12 +10,6 @@ export interface IgnoreRule {
   readonly dirOnly: boolean;
   /** True if the pattern is anchored (contains `/` other than trailing). */
   readonly anchored: boolean;
-  /**
-   * Optional detector scope (e.g. "env", "api").
-   * When set, the rule only applies when queried with a matching scope.
-   * Global rules (scope = undefined) apply to the file walk itself.
-   */
-  readonly scope?: string;
 }
 
 export interface IgnoreMatcher {
@@ -23,12 +17,8 @@ export interface IgnoreMatcher {
    * Returns true if the relative path should be ignored.
    * @param relativePath - path relative to the scan root
    * @param isDirectory  - whether the path is a directory
-   * @param scope        - optional detector scope (e.g. "env", "api").
-   *                       When provided, matches both global rules and rules
-   *                       scoped to that detector. When omitted, only global
-   *                       (unscoped) rules are checked.
    */
-  ignores(relativePath: string, isDirectory: boolean, scope?: string): boolean;
+  ignores(relativePath: string, isDirectory: boolean): boolean;
   /** Create a child matcher that inherits parent rules and adds new ones scoped to a subdirectory. */
   child(childDir: string, rules: readonly IgnoreRule[]): IgnoreMatcher;
 }
@@ -38,18 +28,12 @@ const SCANIGNORE_FILE = ".scanignore";
 /**
  * Parse a `.scanignore` file into rules.
  *
- * Supports two scoping syntaxes:
- *
- * 1. **Section headers** — `[env]` sets the scope for all subsequent rules
- *    until the next header or `[]` (which resets to global).
- *
- * 2. **Inline prefix** — `env:pattern` scopes a single rule.
- *
- * Rules without a scope are global and exclude paths from the entire scan.
+ * Supports gitignore-style global rules only: glob patterns, `!` negation,
+ * trailing `/` for directory-only, leading `/` for anchored, comments (`#`),
+ * and blank lines.
  */
 export const parseIgnoreFile = (content: string): IgnoreRule[] => {
   const rules: IgnoreRule[] = [];
-  let currentScope: string | undefined;
 
   for (const rawLine of content.split("\n")) {
     const line = rawLine.trim();
@@ -57,42 +41,16 @@ export const parseIgnoreFile = (content: string): IgnoreRule[] => {
     // Skip empty lines and comments
     if (line === "" || line.startsWith("#")) continue;
 
-    // Section header: [env], [api], [] (reset to global)
-    const sectionMatch = line.match(/^\[([a-z-]*)\]$/);
-    if (sectionMatch) {
-      currentScope = sectionMatch[1] || undefined;
-      continue;
-    }
-
-    // Inline scope prefix: env:pattern, api:pattern, !env:pattern
-    // Strip optional leading `!` before matching the scope prefix,
-    // then re-apply negation to the parsed rule.
-    let inlineScope: string | undefined;
-    let patternLine = line;
-    const stripped = line.startsWith("!") ? line.slice(1) : line;
-    const inlineMatch = stripped.match(/^([a-z][a-z-]*):(.+)$/);
-    if (inlineMatch) {
-      const maybeScope = inlineMatch[1]!;
-      const rest = inlineMatch[2]!;
-      // Only treat as inline scope if the prefix looks like a detector ID
-      // (not a drive letter like "c:" or a path segment like "src:")
-      if (maybeScope.length > 1) {
-        inlineScope = maybeScope;
-        patternLine = line.startsWith("!") ? `!${rest}` : rest;
-      }
-    }
-
-    const rule = parseSingleRule(patternLine);
+    const rule = parseSingleRule(line);
     if (!rule) continue;
 
-    const scope = inlineScope ?? currentScope;
-    rules.push(scope ? { ...rule, scope } : rule);
+    rules.push(rule);
   }
 
   return rules;
 };
 
-/** Parse a single pattern line into a rule (no scope handling). */
+/** Parse a single pattern line into a rule. */
 const parseSingleRule = (input: string): IgnoreRule | undefined => {
   let pattern = input.trim();
   if (pattern === "") return undefined;
@@ -139,7 +97,7 @@ const ruleMatches = (
   // inside the matched directory (gitignore semantics: "e2e/" ignores
   // everything under e2e/).
   if (rule.dirOnly && !isDirectory) {
-    const dirPrefix = rule.anchored ? `${rule.pattern}/` : `${rule.pattern}/`;
+    const dirPrefix = `${rule.pattern}/`;
     // Check if the file is inside the directory
     if (rule.anchored) {
       return relativePath.startsWith(dirPrefix);
@@ -254,18 +212,10 @@ export const buildIgnoreMatcher = (
 
 const createMatcher = (rules: readonly IgnoreRule[]): IgnoreMatcher => {
   return {
-    ignores(
-      relativePath: string,
-      isDirectory: boolean,
-      scope?: string,
-    ): boolean {
+    ignores(relativePath: string, isDirectory: boolean): boolean {
       let ignored = false;
 
       for (const rule of rules) {
-        // Scoped rules only apply when the caller passes a matching scope.
-        // Global rules (no scope on rule) always apply.
-        if (rule.scope && rule.scope !== scope) continue;
-
         if (ruleMatches(rule, relativePath, isDirectory)) {
           ignored = !rule.negated;
         }
@@ -276,7 +226,7 @@ const createMatcher = (rules: readonly IgnoreRule[]): IgnoreMatcher => {
 
     child(childDir: string, childRules: readonly IgnoreRule[]): IgnoreMatcher {
       const childPrefix = childDir.endsWith("/") ? childDir : `${childDir}/`;
-      // Combine parent rules with child-scoped rules
+      // Combine parent rules with child rules anchored to the child directory
       const combined = [
         ...rules,
         ...childRules.map((r) => ({

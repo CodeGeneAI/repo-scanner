@@ -1,52 +1,11 @@
-export { getCallChain, getCalleesOf, getCallersOf } from "./call-graph/query";
-export { scanDependencies } from "./dependency";
-export type { DetectorResult, Finding } from "./detectors/types";
-export { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
-export { getAddedLines } from "./diff/git";
-export {
-  buildDiffScanResult,
-  computeNetNewEnvVars,
-  isLikelyTestFile,
-  resetDiffConventionOptions,
-  setDiffConventionOptions,
-} from "./diff/scan-diff";
-export type {
-  DiagramKind,
-  DiagramOutput,
-  TopologyResult,
-} from "./output/topology";
-export { generateTopology } from "./output/topology";
-export { generatePerfDriftReport } from "./perf/drift-report";
-export { recordPerfTrend } from "./perf/trend-history";
+export type { DetectorId } from "./detectors/catalog";
 export { scanRepo } from "./scanner";
 export type {
-  ApiEndpoint,
-  ApiSurface,
-  CallGraph,
-  CallGraphEdge,
-  CallGraphNode,
-  CliOptions,
-  CodeDuplicationGroup,
-  CodeDuplicationInstance,
-  CodeDuplicationResult,
-  CodeDuplicationStats,
+  Architecture,
   Component,
   ComponentKind,
-  ComponentMetadata,
-  CrossPackageDependencyGraph,
-  DeadExport,
-  DependencyScanConfig,
-  DiffDuplicationResult,
-  DiffScanResult,
-  EnvValueType,
-  EnvVarInfo,
-  EnvVarUsage,
+  Inventory,
   LanguageStats,
-  LargeFileInfo,
-  PackageDependencyEdge,
   RepoScanResult,
-  RuntimeInfo,
   ScanRepoOptions,
-  SolidHealthResult,
-  TodoAnnotation,
 } from "./types";

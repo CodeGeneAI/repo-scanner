@@ -6,6 +6,15 @@ interface ClassifyInput {
   readonly name?: string;
 }
 
+const VALID_KINDS: readonly ComponentKind[] = [
+  "app",
+  "service",
+  "package",
+  "library",
+  "infra",
+  "script",
+];
+
 const PATH_RULES: readonly [RegExp, ComponentKind][] = [
   [/^(?:apps|app)(?:\/|$)/, "app"],
   [/^(?:services|service)(?:\/|$)/, "service"],
@@ -15,18 +24,16 @@ const PATH_RULES: readonly [RegExp, ComponentKind][] = [
   [/^(?:e2e|test|tests|__tests__)(?:\/|$)/, "script"],
 ];
 
-export const classifyComponent = (input: ClassifyInput): ComponentKind => {
+/**
+ * Classify a component hint into a ComponentKind. Returns undefined when no
+ * rule matches; the aggregator should skip components that cannot be classified.
+ */
+export const classifyComponent = (
+  input: ClassifyInput,
+): ComponentKind | undefined => {
   // Explicit kind from detector hint
   if (input.kind) {
-    const valid: ComponentKind[] = [
-      "app",
-      "service",
-      "package",
-      "library",
-      "infra",
-      "script",
-    ];
-    if (valid.includes(input.kind as ComponentKind))
+    if (VALID_KINDS.includes(input.kind as ComponentKind))
       return input.kind as ComponentKind;
   }
 
@@ -50,5 +57,5 @@ export const classifyComponent = (input: ClassifyInput): ComponentKind => {
   )
     return "app";
 
-  return "unknown";
+  return undefined;
 };

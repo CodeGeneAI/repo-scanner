@@ -52,49 +52,6 @@ describe("FileIndex", () => {
       expect(file.relativePath).toBe("src/utils/helper.ts");
       expect(file.path).toBe(path.join(tmpDir, "src/utils/helper.ts"));
     });
-
-    it("exposes nested scoped .scanignore rules on ignoreMatcher", async () => {
-      await mkdir(
-        path.join(
-          tmpDir,
-          "packages",
-          "repo-scanner",
-          "src",
-          "detectors",
-          "api",
-        ),
-        { recursive: true },
-      );
-      await writeFile(
-        path.join(tmpDir, "packages", "repo-scanner", ".scanignore"),
-        "[api]\n/src/detectors/api/graphql-extractors.ts\n",
-      );
-      await writeFile(
-        path.join(
-          tmpDir,
-          "packages",
-          "repo-scanner",
-          "src",
-          "detectors",
-          "api",
-          "graphql-extractors.ts",
-        ),
-        "export const noop = true;\n",
-      );
-
-      const scopedIndex = await FileIndex.build(tmpDir);
-      const relPath =
-        "packages/repo-scanner/src/detectors/api/graphql-extractors.ts";
-
-      // Scoped nested rule is visible to detector-level matching.
-      expect(scopedIndex.ignoreMatcher?.ignores(relPath, false, "api")).toBe(
-        true,
-      );
-      // Same rule should not apply without the matching scope.
-      expect(scopedIndex.ignoreMatcher?.ignores(relPath, false)).toBe(false);
-      // Scoped rules should not filter files out during the initial file walk.
-      expect(scopedIndex.getByName("graphql-extractors.ts")).toHaveLength(1);
-    });
   });
 
   describe("hasFile", () => {
@@ -191,62 +148,6 @@ describe("FileIndex", () => {
     it("matches exact name patterns", () => {
       expect(index.hasAny(["go.mod"])).toBe(true);
       expect(index.hasAny(["go.sum"])).toBe(false);
-    });
-  });
-
-  describe("fromPaths", () => {
-    it("builds index from relative file paths", () => {
-      const idx = FileIndex.fromPaths("/root/repo", [
-        "src/index.ts",
-        "src/utils/helper.ts",
-        "package.json",
-      ]);
-      expect(idx.size).toBe(3);
-      expect(idx.rootPath).toBe("/root/repo");
-    });
-
-    it("populates byName map correctly", () => {
-      const idx = FileIndex.fromPaths("/root/repo", [
-        "src/index.ts",
-        "lib/index.ts",
-      ]);
-      expect(idx.getByName("index.ts")).toHaveLength(2);
-    });
-
-    it("populates byExt map correctly", () => {
-      const idx = FileIndex.fromPaths("/root/repo", [
-        "src/index.ts",
-        "src/helper.ts",
-        "config.json",
-      ]);
-      expect(idx.getByExtension(".ts")).toHaveLength(2);
-      expect(idx.getByExtension(".json")).toHaveLength(1);
-    });
-
-    it("returns empty index for empty paths list", () => {
-      const idx = FileIndex.fromPaths("/root/repo", []);
-      expect(idx.size).toBe(0);
-      expect(idx.all()).toHaveLength(0);
-    });
-
-    it("sets correct absolute paths", () => {
-      const idx = FileIndex.fromPaths("/root/repo", ["src/index.ts"]);
-      const file = idx.all()[0]!;
-      expect(file.path).toBe(path.join("/root/repo", "src/index.ts"));
-      expect(file.relativePath).toBe("src/index.ts");
-      expect(file.name).toBe("index.ts");
-      expect(file.ext).toBe(".ts");
-    });
-
-    it("normalizes relative paths to prevent mismatches", () => {
-      const idx = FileIndex.fromPaths("/root/repo", [
-        "src/../src/index.ts",
-        "src/./utils/helper.ts",
-      ]);
-      expect(idx.size).toBe(2);
-      const paths = idx.all().map((f) => f.relativePath);
-      expect(paths).toContain("src/index.ts");
-      expect(paths).toContain("src/utils/helper.ts");
     });
   });
 });

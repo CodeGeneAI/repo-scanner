@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { FileIndex } from "../utils/file-index";
+import { DETECTOR_IDS } from "./catalog";
 import "./init";
 import { getDetectors } from "./registry";
 import type { Detector, DetectorResult } from "./types";
@@ -12,6 +13,23 @@ function findDetector(id: string): Detector {
   if (!detector) throw new Error(`Detector "${id}" not found in registry`);
   return detector;
 }
+
+describe("detector catalog", () => {
+  it("exposes exactly three detector ids", () => {
+    expect([...DETECTOR_IDS].sort()).toEqual([
+      "framework",
+      "language",
+      "monorepo",
+    ]);
+  });
+
+  it("registers exactly three detectors via init", () => {
+    const registeredIds = getDetectors()
+      .map((detector) => detector.id)
+      .sort();
+    expect(registeredIds).toEqual(["framework", "language", "monorepo"]);
+  });
+});
 
 describe("language detector", () => {
   let tmpDir: string;
@@ -38,53 +56,6 @@ describe("language detector", () => {
     expect(values).toContain("TypeScript");
     expect(values).toContain("Python");
     expect(values).toContain("Shell");
-  });
-});
-
-describe("dependency-manager detector", () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(path.join(os.tmpdir(), "det-depmgr-"));
-    await writeFile(path.join(tmpDir, "bun.lock"), "");
-    await writeFile(path.join(tmpDir, "package.json"), "{}");
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it("detects Bun", async () => {
-    const detector = findDetector("dependency-manager");
-    const index = await FileIndex.build(tmpDir);
-    const result: DetectorResult = await detector.detect(tmpDir, index);
-    const values = result.findings.map((f) => f.value);
-
-    expect(values).toContain("Bun");
-  });
-});
-
-describe("ci detector", () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(path.join(os.tmpdir(), "det-ci-"));
-    await mkdir(path.join(tmpDir, ".github", "workflows"), { recursive: true });
-    await writeFile(path.join(tmpDir, ".github", "workflows", "ci.yml"), "");
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it("detects GitHub Actions with hasCi signal", async () => {
-    const detector = findDetector("ci");
-    const index = await FileIndex.build(tmpDir);
-    const result: DetectorResult = await detector.detect(tmpDir, index);
-    const values = result.findings.map((f) => f.value);
-
-    expect(values).toContain("GitHub Actions");
-    expect(result.signals?.hasCi).toBe(true);
   });
 });
 
@@ -119,56 +90,5 @@ describe("monorepo detector", () => {
     expect(result.componentHints).toBeDefined();
     const paths = result.componentHints!.map((h) => h.path);
     expect(paths).toContain("packages/foo");
-  });
-});
-
-describe("repo-tools detector", () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(path.join(os.tmpdir(), "det-tools-"));
-    await writeFile(path.join(tmpDir, "README.md"), "");
-    await mkdir(path.join(tmpDir, ".husky"), { recursive: true });
-    await writeFile(path.join(tmpDir, ".husky", "pre-commit"), "#!/bin/sh");
-    await mkdir(path.join(tmpDir, ".changeset"), { recursive: true });
-    await writeFile(path.join(tmpDir, ".changeset", "config.json"), "{}");
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it("detects Husky, Changesets, and hasReadme signal", async () => {
-    const detector = findDetector("repo-tools");
-    const index = await FileIndex.build(tmpDir);
-    const result: DetectorResult = await detector.detect(tmpDir, index);
-    const values = result.findings.map((f) => f.value);
-
-    expect(values).toContain("Husky");
-    expect(values).toContain("Changesets");
-    expect(result.signals?.hasReadme).toBe(true);
-  });
-});
-
-describe("containerization detector", () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(path.join(os.tmpdir(), "det-container-"));
-    await writeFile(path.join(tmpDir, "Dockerfile"), "");
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it("detects Docker with hasContainerization signal", async () => {
-    const detector = findDetector("containerization");
-    const index = await FileIndex.build(tmpDir);
-    const result: DetectorResult = await detector.detect(tmpDir, index);
-    const values = result.findings.map((f) => f.value);
-
-    expect(values).toContain("Docker");
-    expect(result.signals?.hasContainerization).toBe(true);
   });
 });

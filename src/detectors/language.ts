@@ -1,4 +1,3 @@
-import type { LanguageStats } from "../types";
 import { mapWithConcurrency } from "../utils/concurrency";
 import type { FileIndex, IndexedFile } from "../utils/file-index";
 import { countLines } from "../utils/fs";
@@ -128,18 +127,15 @@ registerDetector({
 
     // Compute language stats (file counts + percentages + LoC)
     const totalFiles = [...counts.values()].reduce((sum, n) => sum + n, 0);
-    const totalLinesOfCode = [...locByLang.values()].reduce(
-      (sum, n) => sum + n,
-      0,
-    );
-    const languageStats: LanguageStats[] =
+    const totalLines = [...locByLang.values()].reduce((sum, n) => sum + n, 0);
+    const perLanguage =
       totalFiles > 0
         ? [...counts.entries()]
-            .map(([name, fileCount]) => ({
-              name,
-              fileCount,
-              linesOfCode: locByLang.get(name) ?? 0,
-              percentage: Math.round((fileCount / totalFiles) * 1000) / 10,
+            .map(([language, files]) => ({
+              language,
+              files,
+              lines: locByLang.get(language) ?? 0,
+              percentage: Math.round((files / totalFiles) * 1000) / 10,
             }))
             .sort((a, b) => b.percentage - a.percentage)
         : [];
@@ -147,7 +143,7 @@ registerDetector({
     return {
       detectorId: "language",
       findings: findings.sort((a, b) => b.confidence - a.confidence),
-      metadata: { languageStats, totalFiles, totalLinesOfCode },
+      metadata: { perLanguage, totalFiles, totalLines },
     };
   },
 });

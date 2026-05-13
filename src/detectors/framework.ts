@@ -155,57 +155,10 @@ const SCALA_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["dev.zio", "ZIO"],
 ]);
 
-/** npm deps that indicate typed contracts. */
-const TYPED_CONTRACT_NPM_DEPS = new Set([
-  "@trpc/server",
-  "@trpc/client",
-  "graphql",
-  "@apollo/server",
-  "@apollo/client",
-  "@graphql-codegen/cli",
-  "protobufjs",
-  "google-protobuf",
-  "@grpc/grpc-js",
-  "@connectrpc/connect",
-]);
-
-/** Check if typed contracts signals are present. */
-const detectTypedContracts = (
-  index: FileIndex,
-  allNpmDeps: Set<string>,
-): boolean => {
-  if (
-    index.getByExtensionPrimary(".graphql").length > 0 ||
-    index.getByExtensionPrimary(".gql").length > 0
-  ) {
-    return true;
-  }
-  if (index.getByExtensionPrimary(".proto").length > 0) {
-    return true;
-  }
-  if (
-    index.hasFilePrimary("openapi.yaml") ||
-    index.hasFilePrimary("openapi.yml") ||
-    index.hasFilePrimary("openapi.json") ||
-    index.hasFilePrimary("swagger.yaml") ||
-    index.hasFilePrimary("swagger.yml") ||
-    index.hasFilePrimary("swagger.json")
-  ) {
-    return true;
-  }
-  for (const dep of TYPED_CONTRACT_NPM_DEPS) {
-    if (allNpmDeps.has(dep)) {
-      return true;
-    }
-  }
-  return false;
-};
-
 registerDetector({
   id: "framework",
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
     const { findings, addFinding } = createFindingAdder();
-    const allNpmDeps = new Set<string>();
 
     // 1. Check config files (highest confidence), skip secondary paths
     for (const [fileName, framework] of CONFIG_FRAMEWORK_MAP) {
@@ -219,14 +172,6 @@ registerDetector({
     for (const pkgFile of index.getByNamePrimary("package.json")) {
       const pkg = await readJson<PackageJson>(pkgFile.path);
       if (!pkg) continue;
-
-      const allDeps = {
-        ...pkg.dependencies,
-        ...pkg.devDependencies,
-      };
-      for (const depName of Object.keys(allDeps)) {
-        allNpmDeps.add(depName);
-      }
 
       for (const depName of Object.keys(pkg.dependencies ?? {})) {
         const framework = NPM_FRAMEWORK_MAP.get(depName);
@@ -321,13 +266,9 @@ registerDetector({
       "SBT dep",
     );
 
-    // Detect typed contracts signal
-    const hasTypedContracts = detectTypedContracts(index, allNpmDeps);
-
     return {
       detectorId: "framework",
       findings,
-      signals: hasTypedContracts ? { hasTypedContracts: true } : undefined,
     };
   },
 });

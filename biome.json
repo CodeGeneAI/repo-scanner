@@ -8,7 +8,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/*.d.ts", "!src/code-duplication/__fixtures__"]
+    "includes": ["**", "!**/*.d.ts"]
   },
   "formatter": {
     "enabled": true,
