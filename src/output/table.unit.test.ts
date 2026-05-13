@@ -18,7 +18,7 @@ const capture = (result: RepoScanResult): string => {
 const baseResult = (over: Partial<RepoScanResult> = {}): RepoScanResult => ({
   scannedAt: "2026-05-13T00:00:00Z",
   rootPath: "/x",
-  inventory: { languages: [], frameworks: [] },
+  inventory: { languages: [], frameworks: [], packageManagers: [] },
   architecture: { monorepo: false, components: [] },
   languageStats: { totalFiles: 0, totalLines: 0, perLanguage: [] },
   ...over,

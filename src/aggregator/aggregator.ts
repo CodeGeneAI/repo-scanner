@@ -17,6 +17,7 @@ export const aggregate = async (
   index?: FileIndex,
 ): Promise<RepoScanResult> => {
   const frameworks = new Set<string>();
+  const packageManagers = new Set<string>();
   const languageNames = new Set<string>();
 
   const componentMap = new Map<string, Component>();
@@ -26,6 +27,7 @@ export const aggregate = async (
 
   const categoryMap: Record<string, Set<string>> = {
     framework: frameworks,
+    packageManager: packageManagers,
     // language deliberately omitted — sourced from languageStats below
   };
 
@@ -95,6 +97,7 @@ export const aggregate = async (
     inventory: {
       languages: sorted(languageNames),
       frameworks: sorted(frameworks),
+      packageManagers: sorted(packageManagers),
     },
     architecture: {
       monorepo: isMonorepo,

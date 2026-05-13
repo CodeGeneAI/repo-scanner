@@ -206,6 +206,11 @@ describe("aggregate", async () => {
     expect(result.languageStats.totalLines).toBe(0);
   });
 
+  it("inventory.packageManagers is an empty array by default", async () => {
+    const result = await aggregate(rootPath, []);
+    expect(result.inventory.packageManagers).toEqual([]);
+  });
+
   it("inventory.languages mirrors languageStats.perLanguage", async () => {
     const results: DetectorResult[] = [
       {

@@ -19,6 +19,7 @@ export interface Component {
 export interface Inventory {
   readonly languages: readonly string[];
   readonly frameworks: readonly string[];
+  readonly packageManagers: readonly string[];
 }
 
 export interface Architecture {
