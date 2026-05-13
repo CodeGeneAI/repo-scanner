@@ -143,6 +143,21 @@ registerDetector({
       }
     }
 
+    // Parse go.work `use (...)` block into components
+    if (index.hasFile("go.work")) {
+      const goWork = await readText(path.join(rootPath, "go.work"));
+      if (goWork) {
+        for (const usePath of parseGoWorkUseDirective(goWork)) {
+          if (!componentHints.some((c) => c.path === usePath)) {
+            componentHints.push({
+              path: usePath,
+              name: usePath.split("/").pop() ?? usePath,
+            });
+          }
+        }
+      }
+    }
+
     // Check package.json workspaces
     const rootPkg = await readJson<PackageJson>(
       path.join(rootPath, "package.json"),
@@ -388,6 +403,25 @@ registerDetector({
     };
   },
 });
+
+function parseGoWorkUseDirective(text: string): string[] {
+  const out: string[] = [];
+  const blockMatch = text.match(/use\s*\(([^)]*)\)/);
+  if (blockMatch) {
+    for (const raw of blockMatch[1]!.split("\n")) {
+      const line = raw.replace(/\/\/.*$/, "").trim();
+      if (!line) continue;
+      out.push(line.replace(/^\.\//, ""));
+    }
+    return out;
+  }
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/\/\/.*$/, "").trim();
+    const m = line.match(/^use\s+(\S+)$/);
+    if (m) out.push(m[1]!.replace(/^\.\//, ""));
+  }
+  return out;
+}
 
 function parsePnpmWorkspaceGlobs(yamlText: string): string[] {
   const lines = yamlText.split("\n");
