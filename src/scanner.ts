@@ -27,6 +27,10 @@ export function scanRepo(
   scanPath: string,
   options: { detectors: readonly DetectorId[] },
 ): Promise<PartialRepoScanResult>;
+export function scanRepo(
+  scanPath: string,
+  options: ScanRepoOptions,
+): Promise<RepoScanResult | PartialRepoScanResult>;
 export async function scanRepo(
   scanPath: string,
   options?: ScanRepoOptions,
