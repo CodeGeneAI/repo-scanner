@@ -9,6 +9,7 @@ import {
   type DetectorId,
 } from "./detectors/catalog";
 import "./detectors/init";
+import { shouldColor } from "./output/ansi";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { scanRepo } from "./scanner";
@@ -16,9 +17,10 @@ import { scanRepo } from "./scanner";
 const renderDetectorsOutput = (
   json: boolean,
   stream: NodeJS.WritableStream,
+  color: boolean,
 ): void => {
   if (json) {
-    renderJson({ detectors: DETECTOR_CATALOG }, stream);
+    renderJson({ detectors: DETECTOR_CATALOG }, stream, { color });
     return;
   }
 
@@ -45,7 +47,7 @@ _repo_scanner()
     COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
     return 0
   fi
-  COMPREPLY=( $(compgen -W "--help --version --path --json --detectors" -- "\${current}") )
+  COMPREPLY=( $(compgen -W "--help --version --path --json --no-color --detectors" -- "\${current}") )
 }
 complete -F _repo_scanner repo-scanner
 `;
@@ -60,6 +62,7 @@ _repo_scanner() {
     '--detectors[Comma-separated detector IDs]:detectors:->detectors' \\
     '--path[Directory to scan]:path:_files -/' \\
     '--json[Output JSON]' \\
+    '--no-color[Disable ANSI colors in JSON output]' \\
     '--help[Show help]' \\
     '--version[Show version]'
   case $state in
@@ -85,6 +88,7 @@ for detector in $detector_ids
 end
 complete -c repo-scanner -l path -r
 complete -c repo-scanner -l json -d "Output JSON"
+complete -c repo-scanner -l no-color -d "Disable ANSI colors in JSON output"
 complete -c repo-scanner -l help
 complete -c repo-scanner -l version
 `;
@@ -236,8 +240,13 @@ const main = async () => {
     process.exit(0);
   }
 
+  const color = shouldColor({
+    noColor: options.noColor,
+    isTTY: Boolean(process.stdout.isTTY),
+  });
+
   if (options.showDetectors) {
-    renderDetectorsOutput(options.json, process.stdout);
+    renderDetectorsOutput(options.json, process.stdout, color);
     process.exit(0);
   }
 
@@ -307,7 +316,9 @@ const main = async () => {
       : await scanRepo(options.path);
 
   if (options.json) {
-    renderJson(result as unknown as Record<string, unknown>, process.stdout);
+    renderJson(result as unknown as Record<string, unknown>, process.stdout, {
+      color,
+    });
   } else {
     renderTable(result, process.stdout);
   }

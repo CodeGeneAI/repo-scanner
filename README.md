@@ -139,7 +139,8 @@ import type {
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-p`, `--path <dir>` | Directory to scan | cwd |
-| `--json` | Output JSON instead of the default table | |
+| `--json` | Output JSON instead of the default table. JSON output is colorized when stdout is a TTY. Pipe or redirect to disable, or set `NO_COLOR=1` / pass `--no-color`. | |
+| `--no-color` | Disable ANSI colors in JSON output (also honors `NO_COLOR` env var) | colors when stdout is a TTY |
 | `--detectors <list>` | Comma-separated detector IDs (`framework`, `language`, `monorepo`, `packageManager`). When provided, output only includes fields owned by the selected detectors. | all four |
 | `--version`, `-v` | Show version | |
 | `--help`, `-h` | Show help | |

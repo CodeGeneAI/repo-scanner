@@ -34,6 +34,7 @@ Detector selection:
 General:
   -p, --path <dir>                   Directory to scan (default: cwd)
   --json                             Output JSON instead of the default table
+  --no-color                         Disable ANSI colors in JSON output (also honors NO_COLOR env var)
   --version, -v                      Show version
   --help, -h                         Show help
 
@@ -80,6 +81,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   const args = argv.slice(2);
   let pathArg = process.cwd();
   let json = false;
+  let noColor = false;
   let showHelp = false;
   let showVersion = false;
   let showDetectors = false;
@@ -152,6 +154,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--json":
         json = true;
         break;
+      case "--no-color":
+        noColor = true;
+        break;
       case "--detectors": {
         const detectorIds = parseCommaSeparatedValues(args[++i], "--detectors");
         const detectorSources = new Map<string, string[]>();
@@ -194,6 +199,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   return {
     path: pathArg,
     json,
+    noColor,
     showHelp,
     showVersion,
     showDetectors,
