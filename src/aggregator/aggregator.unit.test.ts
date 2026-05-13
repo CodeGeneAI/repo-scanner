@@ -13,6 +13,14 @@ describe("aggregate", async () => {
           { value: "TypeScript", confidence: 1.0, evidence: ["10 files"] },
           { value: "Python", confidence: 0.8, evidence: ["3 files"] },
         ],
+        metadata: {
+          totalFiles: 13,
+          totalLines: 650,
+          perLanguage: [
+            { language: "TypeScript", files: 10, lines: 500, percentage: 76.9 },
+            { language: "Python", files: 3, lines: 150, percentage: 23.1 },
+          ],
+        },
       },
       {
         detectorId: "framework",
@@ -37,6 +45,13 @@ describe("aggregate", async () => {
           { value: "TypeScript", confidence: 1.0, evidence: ["ext"] },
           { value: "TypeScript", confidence: 0.8, evidence: ["manifest"] },
         ],
+        metadata: {
+          totalFiles: 10,
+          totalLines: 500,
+          perLanguage: [
+            { language: "TypeScript", files: 10, lines: 500, percentage: 100 },
+          ],
+        },
       },
     ];
 
@@ -48,7 +63,7 @@ describe("aggregate", async () => {
     ).toHaveLength(1);
   });
 
-  it("filters low-confidence language findings", async () => {
+  it("only surfaces languages present in languageStats.perLanguage", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -56,6 +71,13 @@ describe("aggregate", async () => {
           { value: "TypeScript", confidence: 1.0, evidence: ["10 files"] },
           { value: "Lua", confidence: 0.5, evidence: ["1 file"] },
         ],
+        metadata: {
+          totalFiles: 10,
+          totalLines: 500,
+          perLanguage: [
+            { language: "TypeScript", files: 10, lines: 500, percentage: 100 },
+          ],
+        },
       },
     ];
 
@@ -117,6 +139,15 @@ describe("aggregate", async () => {
           { value: "Go", confidence: 0.8, evidence: [] },
           { value: "TypeScript", confidence: 1.0, evidence: [] },
         ],
+        metadata: {
+          totalFiles: 15,
+          totalLines: 750,
+          perLanguage: [
+            { language: "Python", files: 5, lines: 250, percentage: 33.3 },
+            { language: "Go", files: 5, lines: 250, percentage: 33.3 },
+            { language: "TypeScript", files: 5, lines: 250, percentage: 33.3 },
+          ],
+        },
       },
     ];
 
@@ -173,5 +204,30 @@ describe("aggregate", async () => {
     expect(result.languageStats.perLanguage).toEqual([]);
     expect(result.languageStats.totalFiles).toBe(0);
     expect(result.languageStats.totalLines).toBe(0);
+  });
+
+  it("inventory.languages mirrors languageStats.perLanguage", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [
+          { value: "Rust", confidence: 1.0, evidence: [] },
+          { value: "Ruby", confidence: 0.05, evidence: [] },
+        ],
+        metadata: {
+          totalFiles: 101,
+          totalLines: 10000,
+          perLanguage: [
+            { language: "Rust", files: 100, lines: 9900, percentage: 99 },
+            { language: "Ruby", files: 1, lines: 100, percentage: 1 },
+          ],
+        },
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.languages.slice().sort()).toEqual(["Ruby", "Rust"]);
+    expect(
+      result.languageStats.perLanguage.map((e) => e.language).sort(),
+    ).toEqual(result.inventory.languages.slice().sort());
   });
 });
