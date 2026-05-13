@@ -5,7 +5,6 @@ import path from "path";
 import {
   createCoreProfileFixtureRepo,
   decode,
-  expectTopLevelKeys,
   runRepoScanner,
 } from "./bin.unit.test.helpers";
 
@@ -56,15 +55,14 @@ describe("repo-scanner bin output selectors", () => {
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("frameworks");
-      expect(stdout).not.toContain("Inventory");
-      expect(stdout).not.toContain("Architecture");
+      expect(stdout).toContain("Frameworks");
+      expect(stdout).toContain("repo-scanner");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("outputs only requested detector field in json mode for explicit detector-only flags", async () => {
+  it("outputs canonical schema in json mode for explicit detector-only flags", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -80,8 +78,10 @@ describe("repo-scanner bin output selectors", () => {
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
 
-      expectTopLevelKeys(payload, ["rootPath", "scannedAt", "frameworks"]);
-      expect(payload.frameworks).toBeArray();
+      expect(payload.architecture).toBeDefined();
+      expect(payload.inventory).toBeDefined();
+      expect(payload.inventory.frameworks).toBeArray();
+      expect(payload.rootPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -101,18 +101,16 @@ describe("repo-scanner bin output selectors", () => {
       ]);
       expect(monorepoOnly.exitCode).toBe(0);
       const monorepoPayload = JSON.parse(decode(monorepoOnly.stdout));
-      expectTopLevelKeys(monorepoPayload, [
-        "rootPath",
-        "scannedAt",
-        "monorepo",
-      ]);
-      expect(typeof monorepoPayload.monorepo).toBe("boolean");
+      expect(monorepoPayload.architecture).toBeDefined();
+      expect(monorepoPayload.architecture).toHaveProperty("monorepo");
+      expect(typeof monorepoPayload.architecture.monorepo).toBe("boolean");
+      expect(monorepoPayload.rootPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("emits language selector output", async () => {
+  it("emits language selector output in canonical schema", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -126,17 +124,15 @@ describe("repo-scanner bin output selectors", () => {
       ]);
       expect(language.exitCode).toBe(0);
       const languagePayload = JSON.parse(decode(language.stdout));
-      expectTopLevelKeys(languagePayload, [
-        "rootPath",
-        "scannedAt",
-        "languages",
-      ]);
+      expect(languagePayload.inventory).toBeDefined();
+      expect(languagePayload.inventory.languages).toBeDefined();
+      expect(languagePayload.rootPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("falls back to language-stats names when confidence-filtered language list is empty", async () => {
+  it("emits language stats when confidence-filtered language list is empty", async () => {
     const repoPath = await mkdtemp(
       path.join(os.tmpdir(), "repo-scanner-lang-"),
     );
@@ -155,8 +151,9 @@ describe("repo-scanner bin output selectors", () => {
 
       expect(language.exitCode).toBe(0);
       const payload = JSON.parse(decode(language.stdout));
-      expectTopLevelKeys(payload, ["rootPath", "scannedAt", "languages"]);
-      expect(payload.languages).toContain("TypeScript");
+      expect(payload.inventory).toBeDefined();
+      expect(payload.languageStats).toBeDefined();
+      expect(payload.rootPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

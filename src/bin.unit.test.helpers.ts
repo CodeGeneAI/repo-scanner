@@ -99,7 +99,6 @@ export const assertDetectorSelectorScoping = (
   repoPath: string,
   detectorId: string,
 ): void => {
-  const metadataKeys = new Set(["rootPath", "scannedAt"]);
   const result = runRepoScanner([
     "--path",
     repoPath,
@@ -114,13 +113,16 @@ export const assertDetectorSelectorScoping = (
   }
 
   const payload = JSON.parse(decode(result.stdout)) as Record<string, unknown>;
-  const nonMetadataKeys = Object.keys(payload).filter(
-    (key) => !metadataKeys.has(key),
-  );
 
-  if (nonMetadataKeys.length !== 1) {
+  if (!("rootPath" in payload) || !("scannedAt" in payload)) {
     throw new Error(
-      `detector ${detectorId} produced unexpected keys: ${Object.keys(payload).join(",")}`,
+      `detector ${detectorId} output missing required metadata keys: ${Object.keys(payload).join(",")}`,
+    );
+  }
+
+  if (!("architecture" in payload) || !("inventory" in payload)) {
+    throw new Error(
+      `detector ${detectorId} output missing canonical schema keys: ${Object.keys(payload).join(",")}`,
     );
   }
 };

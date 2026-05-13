@@ -11,7 +11,6 @@ import "./detectors/init";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { scanRepo } from "./scanner";
-import type { RepoScanResult } from "./types";
 
 const renderDetectorsOutput = (
   format: "table" | "json",
@@ -207,76 +206,6 @@ const resolveCompletionInstallPath = (
   );
 };
 
-type DetectorOutputEntry = {
-  readonly key: string;
-  readonly value: unknown;
-};
-
-const resolveLanguageSelectorOutput = (
-  result: RepoScanResult,
-): readonly string[] => {
-  if (result.inventory.languages.length > 0) {
-    return result.inventory.languages;
-  }
-  const languageNames = result.languageStats.perLanguage
-    .map((entry) => entry.language.trim())
-    .filter((name) => name.length > 0);
-  return [...new Set(languageNames)];
-};
-
-const resolveDetectorOutputEntry = (
-  result: RepoScanResult,
-  detectorId: DetectorId,
-): DetectorOutputEntry => {
-  switch (detectorId) {
-    case "framework":
-      return { key: "frameworks", value: result.inventory.frameworks };
-    case "language":
-      return { key: "languages", value: resolveLanguageSelectorOutput(result) };
-    case "monorepo":
-      return { key: "monorepo", value: result.architecture.monorepo };
-  }
-};
-
-const buildDetectorJsonPayload = (
-  result: RepoScanResult,
-  detectorIds: readonly DetectorId[],
-): Record<string, unknown> => {
-  const payload: Record<string, unknown> = {
-    rootPath: result.rootPath,
-    scannedAt: result.scannedAt,
-  };
-  for (const detectorId of detectorIds) {
-    const entry = resolveDetectorOutputEntry(result, detectorId);
-    payload[entry.key] = entry.value;
-  }
-  return payload;
-};
-
-const renderDetectorTablePayload = (
-  result: RepoScanResult,
-  detectorIds: readonly DetectorId[],
-  stream: NodeJS.WritableStream,
-): void => {
-  if (detectorIds.length === 0) return;
-  stream.write(`repo-scanner — scanned ${result.rootPath}\n`);
-
-  for (const detectorId of detectorIds) {
-    const { key, value } = resolveDetectorOutputEntry(result, detectorId);
-    stream.write(`\n${key}\n`);
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      value === null
-    ) {
-      stream.write(`  ${String(value)}\n`);
-      continue;
-    }
-    stream.write(`${JSON.stringify(value, null, 2)}\n`);
-  }
-};
-
 const resolveExplicitDetectorIds = (
   options: ReturnType<typeof parseArgs>,
 ): readonly DetectorId[] => {
@@ -364,20 +293,9 @@ const main = async () => {
   });
 
   if (options.format === "json") {
-    if (explicitDetectorIds.length > 0) {
-      renderJson(
-        buildDetectorJsonPayload(result, explicitDetectorIds),
-        process.stdout,
-      );
-    } else {
-      renderJson(result as unknown as Record<string, unknown>, process.stdout);
-    }
+    renderJson(result as unknown as Record<string, unknown>, process.stdout);
   } else {
-    if (explicitDetectorIds.length > 0) {
-      renderDetectorTablePayload(result, explicitDetectorIds, process.stdout);
-    } else {
-      renderTable(result, process.stdout);
-    }
+    renderTable(result, process.stdout);
   }
 };
 
