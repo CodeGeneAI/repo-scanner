@@ -4,7 +4,6 @@ import os from "os";
 import path from "path";
 import {
   createAllDetectorsFixtureRepo,
-  createCliFixtureRepo,
   createCoreProfileFixtureRepo,
   createEnvFixtureRepo,
   decode,
@@ -69,57 +68,6 @@ describe("repo-scanner bin output selectors", () => {
       expect(stdout).not.toContain("Inventory");
       expect(stdout).not.toContain("External Services");
       expect(stdout).not.toContain("Signals");
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("scopes table output to Dependencies section for --deps", async () => {
-    const repoPath = await createCliFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--deps",
-        "--no-security",
-        "--no-usage",
-        "--no-version-lookup",
-      ]);
-      const stdout = decode(result.stdout);
-
-      expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("Dependencies");
-      expect(stdout).not.toContain("Architecture");
-      expect(stdout).not.toContain("Inventory");
-      expect(stdout).not.toContain("External Services");
-      expect(stdout).not.toContain("Build & Test");
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("scopes table output to policyEvaluation payload for policy-only flags", async () => {
-    const repoPath = await createCliFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--no-security",
-        "--no-usage",
-        "--no-version-lookup",
-        "--fail-on-vulns",
-      ]);
-      const stdout = decode(result.stdout);
-
-      expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("policyEvaluation");
-      expect(stdout).not.toContain("Architecture");
-      expect(stdout).not.toContain("Inventory");
-      expect(stdout).not.toContain("External Services");
-      expect(stdout).not.toContain("Build & Test");
-      expect(stdout).not.toContain("Dependencies");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

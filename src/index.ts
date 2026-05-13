@@ -1,5 +1,4 @@
 export { getCallChain, getCalleesOf, getCallersOf } from "./call-graph/query";
-export { scanDependencies } from "./dependency";
 export type { DetectorResult, Finding } from "./detectors/types";
 export { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
 export { getAddedLines } from "./diff/git";
@@ -35,7 +34,6 @@ export type {
   ComponentMetadata,
   CrossPackageDependencyGraph,
   DeadExport,
-  DependencyScanConfig,
   DiffDuplicationResult,
   DiffScanResult,
   EnvValueType,

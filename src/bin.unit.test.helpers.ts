@@ -7,12 +7,6 @@ const repoRootPath = path.resolve(import.meta.dir, "..");
 const binPath = path.resolve(import.meta.dir, "bin.ts");
 const textDecoder = new TextDecoder();
 
-type RepoScannerResult = {
-  exitCode: number;
-  stderr: string;
-  stdout: string;
-};
-
 export const decode = (value: ArrayBufferLike | ArrayBufferView): string =>
   textDecoder.decode(value);
 
@@ -48,38 +42,6 @@ export const createCliFixtureRepo = async (): Promise<string> => {
 
   return repoPath;
 };
-
-export const createDuplicateDependencyFixtureRepo =
-  async (): Promise<string> => {
-    const repoPath = await mkdtemp(
-      path.join(os.tmpdir(), "repo-scanner-dup-deps-"),
-    );
-    const appDir = path.join(repoPath, "apps", "web");
-    const serviceDir = path.join(repoPath, "services", "api");
-    await mkdir(appDir, { recursive: true });
-    await mkdir(serviceDir, { recursive: true });
-    await writeFile(
-      path.join(repoPath, "README.md"),
-      "# duplicate deps fixture\n",
-    );
-
-    const manifest = JSON.stringify(
-      {
-        name: "fixture",
-        version: "1.0.0",
-        dependencies: {
-          lodash: "^4.17.21",
-        },
-      },
-      null,
-      2,
-    );
-
-    await writeFile(path.join(appDir, "package.json"), manifest);
-    await writeFile(path.join(serviceDir, "package.json"), manifest);
-
-    return repoPath;
-  };
 
 export const createCoreProfileFixtureRepo = async (): Promise<string> => {
   const repoPath = await mkdtemp(
@@ -155,30 +117,6 @@ export const runRepoScanner = (
     stderr: "pipe",
     env: buildRepoScannerEnv(envOverrides),
   });
-
-export const runRepoScannerAsync = async (
-  args: readonly string[],
-  envOverrides?: Record<string, string>,
-): Promise<RepoScannerResult> => {
-  const processResult = Bun.spawn([process.execPath, binPath, ...args], {
-    cwd: repoRootPath,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: buildRepoScannerEnv(envOverrides),
-  });
-
-  const [stdoutBuffer, stderrBuffer, exitCode] = await Promise.all([
-    new Response(processResult.stdout).arrayBuffer(),
-    new Response(processResult.stderr).arrayBuffer(),
-    processResult.exited,
-  ]);
-
-  return {
-    exitCode,
-    stderr: decode(stderrBuffer),
-    stdout: decode(stdoutBuffer),
-  };
-};
 
 const runGit = (repoPath: string, args: readonly string[]): void => {
   const result = Bun.spawnSync(["git", ...args], {
@@ -257,62 +195,6 @@ export const assertDetectorSelectorScoping = (
       `detector ${detectorId} produced unexpected keys: ${Object.keys(payload).join(",")}`,
     );
   }
-};
-
-const assertDetectorSelectorScopingAsync = async (
-  repoPath: string,
-  detectorId: string,
-): Promise<void> => {
-  const metadataKeys = new Set(["scanPath", "timestamp", "durationMs"]);
-  const result = await runRepoScannerAsync([
-    "--path",
-    repoPath,
-    "--detectors",
-    detectorId,
-    "--format",
-    "json",
-  ]);
-
-  if (result.exitCode !== 0) {
-    throw new Error(`detector ${detectorId} failed: ${result.stderr}`);
-  }
-
-  const payload = JSON.parse(result.stdout) as Record<string, unknown>;
-  const nonMetadataKeys = Object.keys(payload).filter(
-    (key) => !metadataKeys.has(key),
-  );
-
-  if (nonMetadataKeys.length !== 1) {
-    throw new Error(
-      `detector ${detectorId} produced unexpected keys: ${Object.keys(payload).join(",")}`,
-    );
-  }
-};
-
-export const assertDetectorSelectorScopingBatch = async (
-  repoPath: string,
-  detectorIds: readonly string[],
-): Promise<void> => {
-  const workerCount = Math.min(4, detectorIds.length);
-
-  const workers = Array.from(
-    { length: workerCount },
-    async (_, workerIndex) => {
-      for (
-        let index = workerIndex;
-        index < detectorIds.length;
-        index += workerCount
-      ) {
-        const detectorId = detectorIds[index];
-        if (detectorId === undefined) {
-          continue;
-        }
-        await assertDetectorSelectorScopingAsync(repoPath, detectorId);
-      }
-    },
-  );
-
-  await Promise.all(workers);
 };
 
 export const expectTopLevelKeys = (

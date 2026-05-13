@@ -122,28 +122,6 @@ const hasExplicitSectionFlags = (
   options.scanExternalServices ||
   options.scanBuildAndTest;
 
-const hasExplicitDependencyOutputFlags = (
-  options: Pick<CliOptions, "deps">,
-): boolean => options.deps;
-
-const hasExplicitPolicyOutputFlags = (
-  options: Pick<
-    CliOptions,
-    | "failOnVulns"
-    | "failOnVulnsCount"
-    | "failOnOutdated"
-    | "failOnOutdatedCount"
-    | "failOnDeadDeps"
-    | "failOnDeadDepsCount"
-  >,
-): boolean =>
-  options.failOnVulns ||
-  options.failOnVulnsCount !== undefined ||
-  options.failOnOutdated ||
-  options.failOnOutdatedCount !== undefined ||
-  options.failOnDeadDeps ||
-  options.failOnDeadDepsCount !== undefined;
-
 const resolveExplicitDetectorOutputIds = (
   options: Pick<
     CliOptions,
@@ -283,9 +261,7 @@ export const resolveScanProfile = (
   const topologyOnlyOutputMode =
     options.topology &&
     !hasExplicitSectionFlags(options) &&
-    explicitDetectorOutputIds.length === 0 &&
-    !hasExplicitDependencyOutputFlags(options) &&
-    !hasExplicitPolicyOutputFlags(options);
+    explicitDetectorOutputIds.length === 0;
 
   if (options.allDetectors) {
     return {

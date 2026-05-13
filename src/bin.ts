@@ -4,7 +4,6 @@ import path from "path";
 import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import { scanForDuplicates } from "./code-duplication/scanner";
 import type { DryCheckResult } from "./code-duplication/types";
-import { evaluateDependencyPolicy } from "./dependency/policy";
 import {
   DETECTOR_CATALOG,
   DETECTOR_IDS,
@@ -39,15 +38,6 @@ const flushWritable = async (stream: NodeJS.WritableStream): Promise<void> => {
     stream.write("", () => resolve());
   });
 };
-
-const shouldEnableDependencyScan = (options: ReturnType<typeof parseArgs>) =>
-  options.deps ||
-  options.failOnVulns ||
-  options.failOnOutdated ||
-  options.failOnVulnsCount !== undefined ||
-  options.failOnOutdatedCount !== undefined ||
-  options.failOnDeadDeps ||
-  options.failOnDeadDepsCount !== undefined;
 
 const resolveValidDirectory = (rawPath: string): string => {
   const resolvedPath = path.resolve(rawPath);
@@ -111,7 +101,7 @@ _repo_scanner()
     COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
     return 0
   fi
-  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors --deps --topology --diff" -- "\${current}") )
+  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors --topology --diff" -- "\${current}") )
 }
 complete -F _repo_scanner repo-scanner
 `;
@@ -543,20 +533,6 @@ const hasExplicitSectionOutputFlags = (
   options.scanExternalServices ||
   options.scanBuildAndTest;
 
-const hasExplicitDependencyOutputFlags = (
-  options: ReturnType<typeof parseArgs>,
-): boolean => options.deps;
-
-const hasExplicitPolicyOutputFlags = (
-  options: ReturnType<typeof parseArgs>,
-): boolean =>
-  options.failOnVulns ||
-  options.failOnVulnsCount !== undefined ||
-  options.failOnOutdated ||
-  options.failOnOutdatedCount !== undefined ||
-  options.failOnDeadDeps ||
-  options.failOnDeadDepsCount !== undefined;
-
 const hasExplicitDiffOutputFlags = (
   options: ReturnType<typeof parseArgs>,
 ): boolean => !!options.diff && options.diff.length > 0;
@@ -570,11 +546,9 @@ const isDiffDryCheckOnly = (
   !options.allDetectors &&
   !options.topology &&
   !options.dryCheck &&
-  !options.deps &&
   !options.diffEnvCheck &&
   !options.failOnNewEnvVars &&
   !hasExplicitSectionOutputFlags(options) &&
-  !hasExplicitPolicyOutputFlags(options) &&
   scanProfile.explicitDetectorOutputIds.length === 0;
 
 const runDiffDuplicationScan = async (
@@ -610,8 +584,6 @@ const hasAnyScanOutputSelectors = (
   options.dryCheck ||
   options.topology ||
   hasExplicitSectionOutputFlags(options) ||
-  hasExplicitDependencyOutputFlags(options) ||
-  hasExplicitPolicyOutputFlags(options) ||
   hasExplicitDiffOutputFlags(options) ||
   scanProfile.explicitDetectorOutputIds.length > 0;
 
@@ -788,38 +760,9 @@ const main = async () => {
     return;
   }
 
-  const dependenciesEnabled = shouldEnableDependencyScan(options);
-  const deadDepsActive =
-    options.failOnDeadDeps || options.failOnDeadDepsCount !== undefined;
-
   const result = await scanRepo(options.path, {
     enabledDetectorIds: scanProfile.enabledDetectorIds,
-    dependencies: {
-      enabled: dependenciesEnabled,
-      ecosystems: options.ecosystems,
-      // Dead dep detection requires usage scanning — override skipUsage when active
-      skipUsage: deadDepsActive ? false : options.skipUsage,
-      skipSecurity: options.skipSecurity,
-      skipVersionLookup: options.skipVersionLookup,
-      concurrency: options.concurrency,
-      componentGrouping: options.componentGrouping,
-      debugVulnerabilityKeys: options.depsDebug,
-      includeDevDeadDeps: options.includeDevDeadDeps,
-    },
   });
-
-  const policyEvaluation = result.dependencies
-    ? evaluateDependencyPolicy(result.dependencies, {
-        failOnVulns: options.failOnVulns,
-        failOnVulnsCount: options.failOnVulnsCount,
-        severityThreshold: options.severityThreshold,
-        failOnOutdated: options.failOnOutdated,
-        failOnOutdatedCount: options.failOnOutdatedCount,
-        outdatedThreshold: options.outdatedThreshold,
-        failOnDeadDeps: options.failOnDeadDeps,
-        failOnDeadDepsCount: options.failOnDeadDepsCount,
-      })
-    : undefined;
 
   const topology = options.topology
     ? generateTopology(result, options.topologyDiagrams)
@@ -872,15 +815,9 @@ const main = async () => {
     hasExplicitSectionOutputFlags(options) || options.allDetectors;
   const detectorOutputExplicitlyRequested =
     scanProfile.explicitDetectorOutputIds.length > 0;
-  const dependencyOutputExplicitlyRequested =
-    hasExplicitDependencyOutputFlags(options);
-  const policyOutputExplicitlyRequested = hasExplicitPolicyOutputFlags(options);
   const diffOutputExplicitlyRequested = hasExplicitDiffOutputFlags(options);
   const nonSectionOutputExplicitlyRequested =
-    detectorOutputExplicitlyRequested ||
-    dependencyOutputExplicitlyRequested ||
-    policyOutputExplicitlyRequested ||
-    diffOutputExplicitlyRequested;
+    detectorOutputExplicitlyRequested || diffOutputExplicitlyRequested;
   const nonTopologyOutputExplicitlyRequested =
     sectionOutputExplicitlyRequested || nonSectionOutputExplicitlyRequested;
   const topologyOnlyOutput =
@@ -888,10 +825,6 @@ const main = async () => {
   const includeReportOutput = !topologyOnlyOutput;
   const includeSectionOutput =
     scanProfile.allDetectors || sectionOutputExplicitlyRequested;
-  const includeDependencyOutput =
-    !!result.dependencies && dependencyOutputExplicitlyRequested;
-  const includePolicyOutput =
-    !!policyEvaluation && policyOutputExplicitlyRequested;
   const includeMetadataEnvelope =
     !scanProfile.allDetectors &&
     !includeSectionOutput &&
@@ -924,12 +857,6 @@ const main = async () => {
         buildDetectorJsonPayload(result, scanProfile.explicitDetectorOutputIds),
       );
     }
-    if (includeDependencyOutput) {
-      jsonPayload.dependencies = result.dependencies;
-    }
-    if (includePolicyOutput) {
-      jsonPayload.policyEvaluation = policyEvaluation;
-    }
     if (topology) {
       jsonPayload.topology = topology;
     }
@@ -939,11 +866,7 @@ const main = async () => {
     renderJson(jsonPayload, process.stdout);
   } else if (includeReportOutput) {
     let renderedMainTable = false;
-    if (
-      scanProfile.allDetectors ||
-      includeSectionOutput ||
-      includeDependencyOutput
-    ) {
+    if (scanProfile.allDetectors || includeSectionOutput) {
       const renderedSections = resolveRenderedSections(
         scanProfile.selectedSections,
       );
@@ -953,7 +876,6 @@ const main = async () => {
           : includeSectionOutput
             ? renderedSections
             : [],
-        includeDependencies: includeDependencyOutput,
         includeSignals: scanProfile.allDetectors,
       });
       renderedMainTable = true;
@@ -963,17 +885,6 @@ const main = async () => {
       renderDetectorTablePayload(
         result,
         scanProfile.explicitDetectorOutputIds,
-        process.stdout,
-        !renderedMainTable,
-      );
-      renderedMainTable = true;
-    }
-
-    if (includePolicyOutput) {
-      renderNamedTablePayload(
-        result,
-        "policyEvaluation",
-        policyEvaluation,
         process.stdout,
         !renderedMainTable,
       );
@@ -999,11 +910,6 @@ const main = async () => {
       const content = renderTopologyToString(topology, "markdown");
       process.stdout.write(includeReportOutput ? `\n${content}` : content);
     }
-  }
-
-  if (policyEvaluation?.failed) {
-    await flushWritable(process.stdout);
-    process.exit(1);
   }
 
   // Diff-scan threshold checks
@@ -1034,13 +940,6 @@ const main = async () => {
     );
     await flushWritable(process.stdout);
     process.exit(1);
-  }
-
-  if (options.depsDebug && result.dependencies?.debug) {
-    const stats = result.dependencies.debug.vulnerabilityKeyStats;
-    process.stderr.write(
-      `[deps-debug] vulnerability keys: total=${stats.totalDependencies} unique=${stats.uniqueKeys} duplicate=${stats.duplicateKeys}\n`,
-    );
   }
 };
 

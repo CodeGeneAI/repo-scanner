@@ -3,7 +3,6 @@ import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import {
-  createCliFixtureRepo,
   createCoreProfileFixtureRepo,
   decode,
   expectTopLevelKeys,
@@ -124,37 +123,6 @@ CREATE TABLE orders (
       expect(stdout).not.toContain("Inventory");
       expect(stdout).not.toContain("Build & Test");
       expect(stdout).not.toContain("# Topology");
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("emits explicit union output for --topology-diagrams erd + --deps in json mode", async () => {
-    const repoPath = await createCliFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--deps",
-        "--no-security",
-        "--no-usage",
-        "--no-version-lookup",
-        "--topology-diagrams",
-        "erd",
-        "--format",
-        "json",
-      ]);
-
-      expect(result.exitCode).toBe(0);
-
-      const payload = JSON.parse(decode(result.stdout));
-      expect(payload.topology).toBeDefined();
-      expect(payload.dependencies).toBeDefined();
-      expect(payload.policyEvaluation).toBeUndefined();
-      expect(payload.architecture).toBeUndefined();
-      expect(payload.inventory).toBeUndefined();
-      expect(payload.buildAndTest).toBeUndefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

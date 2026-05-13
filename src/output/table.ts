@@ -16,7 +16,6 @@ const list = (items: readonly string[]) =>
 
 export interface TableRenderOptions {
   readonly selectedSections?: readonly ScanSection[];
-  readonly includeDependencies?: boolean;
   readonly includeSignals?: boolean;
 }
 
@@ -35,8 +34,6 @@ export const renderTable = (
     ? sectionSet.has("external-services")
     : true;
   const showBuildAndTest = sectionSet ? sectionSet.has("build-and-test") : true;
-  const includeDependencies =
-    options?.includeDependencies ?? sectionSet === undefined;
   const includeSignals = options?.includeSignals ?? sectionSet === undefined;
 
   w(
@@ -612,62 +609,6 @@ export const renderTable = (
     for (const [category, svcs] of byCategory) {
       const names = svcs.map((s) => s.name).join(", ");
       w(`  ${YELLOW}${category}${RESET} (${svcs.length}): ${names}\n`);
-    }
-  }
-
-  if (includeDependencies && result.dependencies) {
-    w(section("Dependencies"));
-    w(`  Ecosystems:       ${list(result.dependencies.summary.ecosystems)}\n`);
-    w(`  Dependencies:     ${result.dependencies.totalDependencies}\n`);
-    w(
-      `  Outdated:         ${result.dependencies.summary.outdatedDependencies}\n`,
-    );
-    w(`  Vulnerabilities:  ${result.dependencies.totalVulnerabilities}\n`);
-    w(`  Dead (unused):    ${result.dependencies.summary.deadDependencies}\n`);
-
-    if (result.dependencies.summary.topOutdated.length > 0) {
-      w("  Top outdated:\n");
-      for (const item of result.dependencies.summary.topOutdated) {
-        w(
-          `    ${YELLOW}${item.name}${RESET} ${DIM}(${item.ecosystem}, ${item.updateType})${RESET}\n`,
-        );
-      }
-    }
-
-    if (result.dependencies.summary.topVulnerable.length > 0) {
-      w("  Top vulnerable:\n");
-      for (const item of result.dependencies.summary.topVulnerable) {
-        w(
-          `    ${YELLOW}${item.name}${RESET} ${DIM}(${item.ecosystem}, ${item.vulnerabilityCount} vuln, highest ${item.highestSeverity})${RESET}\n`,
-        );
-      }
-    }
-
-    if (result.dependencies.summary.topDead.length > 0) {
-      w("  Top dead (unused):\n");
-      for (const item of result.dependencies.summary.topDead) {
-        const dev = item.isDev ? ` ${DIM}(dev)${RESET}` : "";
-        w(
-          `    ${YELLOW}${item.name}${RESET} ${DIM}(${item.ecosystem})${RESET}${dev}\n`,
-        );
-      }
-    }
-
-    if (result.dependencies.summary.byComponent.length > 0) {
-      w("  By component:\n");
-      for (const component of result.dependencies.summary.byComponent.slice(
-        0,
-        10,
-      )) {
-        w(
-          `    ${YELLOW}${component.component}${RESET} ${DIM}deps:${component.totalDependencies} outdated:${component.outdatedDependencies} vulns:${component.vulnerabilityCount} dead:${component.deadDependencies}${RESET}\n`,
-        );
-      }
-      if (result.dependencies.summary.byComponent.length > 10) {
-        w(
-          `    ${DIM}... +${result.dependencies.summary.byComponent.length - 10} more${RESET}\n`,
-        );
-      }
     }
   }
 

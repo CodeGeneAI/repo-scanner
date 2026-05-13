@@ -47,29 +47,11 @@ afterEach(async () => {
 });
 
 describe("scanRepo", () => {
-  it("returns baseline result when dependency scan is disabled", async () => {
+  it("returns baseline result for a minimal repo", async () => {
     const repoPath = await createTempRepo();
     const result = await scanRepo(repoPath);
 
-    expect(result.dependencies).toBeUndefined();
     expect(result.scanPath).toContain("repo-scanner-");
-  });
-
-  it("attaches dependency scan result when enabled", async () => {
-    const repoPath = await createTempRepo();
-    const result = await scanRepo(repoPath, {
-      dependencies: {
-        enabled: true,
-        ecosystems: [],
-        skipSecurity: true,
-        skipUsage: true,
-        concurrency: 1,
-      },
-    });
-
-    expect(result.dependencies).toBeDefined();
-    expect(result.dependencies?.totalDependencies).toBe(0);
-    expect(result.dependencies?.totalVulnerabilities).toBe(0);
   });
 
   it("filters detectors when enabledDetectorIds are provided", async () => {

@@ -1,12 +1,5 @@
 import type { SolidHealthResult } from "./ast/solid/types";
 import type { DryCheckStats, DuplicateGroup } from "./code-duplication/types";
-import type {
-  DependencyComponentGroupingMode,
-  DepScannerResult,
-  Ecosystem,
-  OutdatedThreshold,
-  VulnerabilitySeverity,
-} from "./dependency/types";
 import type { DatabaseSchema } from "./detectors/db-schema/types";
 
 export type { SolidHealthResult } from "./ast/solid/types";
@@ -118,7 +111,6 @@ export interface VcsInfo {
 }
 
 export interface RepoScanResult {
-  readonly dependencies?: DepScannerResult;
   readonly vcs?: VcsInfo;
   readonly inventory: {
     readonly languages: readonly string[];
@@ -417,20 +409,6 @@ export interface CliOptions {
   readonly scanBuildAndTest: boolean;
   readonly allDetectors: boolean;
   readonly dryCheck: boolean;
-  readonly deps: boolean;
-  readonly depsDebug: boolean;
-  readonly ecosystems?: readonly Ecosystem[];
-  readonly skipUsage: boolean;
-  readonly skipSecurity: boolean;
-  readonly skipVersionLookup: boolean;
-  readonly concurrency: number;
-  readonly componentGrouping: DependencyComponentGroupingMode;
-  readonly failOnVulns: boolean;
-  readonly failOnVulnsCount?: number;
-  readonly severityThreshold: VulnerabilitySeverity;
-  readonly failOnOutdated: boolean;
-  readonly failOnOutdatedCount?: number;
-  readonly outdatedThreshold: OutdatedThreshold;
   readonly largeFileThreshold: number;
   readonly minTokens: number;
   readonly minLines: number;
@@ -451,9 +429,6 @@ export interface CliOptions {
   readonly failOnNewDuplicationPct?: number;
   readonly failOnNewEnvVars: boolean;
   readonly callGraph: boolean;
-  readonly failOnDeadDeps: boolean;
-  readonly failOnDeadDepsCount?: number;
-  readonly includeDevDeadDeps: boolean;
   readonly dbSchema: boolean;
   readonly env: boolean;
   readonly namingConvention: boolean;
@@ -491,19 +466,7 @@ export interface CliOptions {
   readonly apiSurfaceDetector: boolean;
   readonly vcs: boolean;
 }
-export interface DependencyScanConfig {
-  readonly enabled: boolean;
-  readonly ecosystems?: readonly Ecosystem[];
-  readonly skipUsage?: boolean;
-  readonly skipSecurity?: boolean;
-  readonly skipVersionLookup?: boolean;
-  readonly concurrency?: number;
-  readonly componentGrouping?: DependencyComponentGroupingMode;
-  readonly debugVulnerabilityKeys?: boolean;
-  readonly includeDevDeadDeps?: boolean;
-}
 
 export interface ScanRepoOptions {
   readonly enabledDetectorIds?: readonly string[];
-  readonly dependencies?: DependencyScanConfig;
 }

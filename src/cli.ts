@@ -1,13 +1,6 @@
-import os from "os";
 import { version as PACKAGE_VERSION } from "../package.json" with {
   type: "json",
 };
-import type {
-  DependencyComponentGroupingMode,
-  Ecosystem,
-  OutdatedThreshold,
-  VulnerabilitySeverity,
-} from "./dependency/types";
 import {
   DETECTOR_IDS,
   DETECTOR_PRESETS,
@@ -28,38 +21,6 @@ export class CliParseError extends Error {
     this.exitCode = exitCode;
   }
 }
-
-const VALID_ECOSYSTEMS = new Set<Ecosystem>([
-  "npm",
-  "pypi",
-  "go",
-  "cargo",
-  "rubygems",
-  "maven",
-  "nuget",
-  "packagist",
-  "cocoapods",
-  "pub",
-  "conan",
-]);
-
-const VALID_SEVERITIES = new Set<VulnerabilitySeverity>([
-  "UNKNOWN",
-  "LOW",
-  "MODERATE",
-  "HIGH",
-  "CRITICAL",
-]);
-
-const VALID_OUTDATED_THRESHOLDS = new Set<OutdatedThreshold>([
-  "patch",
-  "minor",
-  "major",
-]);
-
-const VALID_COMPONENT_GROUPING_MODES = new Set<DependencyComponentGroupingMode>(
-  ["default", "apps-only", "services-only", "workspace-package"],
-);
 
 const VALID_DETECTOR_ID_SET = new Set<string>(DETECTOR_IDS);
 const VALID_DETECTOR_IDS_TEXT = DETECTOR_IDS.join(",");
@@ -83,27 +44,6 @@ Core output profile:
   --detectors <list>                 Comma-separated detector IDs (advanced)
                                       Valid: ${VALID_DETECTOR_IDS_TEXT}
                                       Presets: @inventory,@quality,@architecture
-
-Dependency analysis:
-  --deps                             Enable dependency analysis
-  --ecosystems <list>                Limit ecosystems (npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan)
-  --no-usage                         Skip dependency usage scan
-  --no-security                      Skip vulnerability checks
-  --no-version-lookup                Skip registry version lookups
-  --concurrency <n>                  Max dependency lookup concurrency (default: CPU count)
-  --component-grouping <mode>        Group dependency summary by default|apps-only|services-only|workspace-package
-  --deps-debug                       Emit dependency debug diagnostics to stderr
-
-Policy gates (CI):
-  --fail-on-vulns                    Exit 1 when vulnerability threshold is met
-  --fail-on-vulns-count <n>          Exit 1 when vulnerability matches >= n
-  --severity-threshold <level>       unknown|low|moderate|high|critical (default: low)
-  --fail-on-outdated                 Exit 1 when update threshold is met
-  --fail-on-outdated-count <n>       Exit 1 when outdated matches >= n
-  --outdated-threshold <level>       patch|minor|major (default: patch)
-  --fail-on-dead-deps                Exit 1 when unused dependencies are found
-  --fail-on-dead-deps-count <n>      Exit 1 when dead dependency count >= n
-  --include-dev-dead-deps            Include dev dependencies in dead-dependency checks
 
 Specialized scans:
   --dry-check                        Duplication-only scan with dry-check output
@@ -142,40 +82,8 @@ Examples:
   repo-scanner completion zsh > _repo-scanner
   repo-scanner completion install fish
   repo-scanner completion uninstall fish
-  repo-scanner --deps --fail-on-vulns --severity-threshold high
-  repo-scanner --deps --fail-on-outdated --outdated-threshold minor
   repo-scanner --diff main...HEAD --diff-dry-check --diff-env-check
 `;
-
-const parseSeverity = (raw: string): VulnerabilitySeverity | undefined => {
-  const normalized = raw.trim().toUpperCase();
-  if (!VALID_SEVERITIES.has(normalized as VulnerabilitySeverity)) {
-    return undefined;
-  }
-  return normalized as VulnerabilitySeverity;
-};
-
-const parseOutdatedThreshold = (raw: string): OutdatedThreshold | undefined => {
-  const normalized = raw.trim().toLowerCase();
-  if (!VALID_OUTDATED_THRESHOLDS.has(normalized as OutdatedThreshold)) {
-    return undefined;
-  }
-  return normalized as OutdatedThreshold;
-};
-
-const parseComponentGroupingMode = (
-  raw: string,
-): DependencyComponentGroupingMode | undefined => {
-  const normalized = raw.trim().toLowerCase();
-  if (
-    !VALID_COMPONENT_GROUPING_MODES.has(
-      normalized as DependencyComponentGroupingMode,
-    )
-  ) {
-    return undefined;
-  }
-  return normalized as DependencyComponentGroupingMode;
-};
 
 const parsePositiveInteger = (raw: string): number | undefined => {
   const parsed = Number.parseInt(raw, 10);
@@ -265,22 +173,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let scanBuildAndTest = false;
   let allDetectors = false;
   let dryCheck = false;
-  let deps = false;
-  let depsDebug = false;
-  let ecosystems: Ecosystem[] | undefined;
-  let skipUsage = false;
-  let skipSecurity = false;
-  let skipVersionLookup = false;
-  let concurrency = os.cpus().length;
-  let concurrencyExplicit = false;
-  let componentGrouping: DependencyComponentGroupingMode = "default";
-  let componentGroupingExplicit = false;
-  let failOnVulns = false;
-  let failOnVulnsCount: number | undefined;
-  let severityThreshold: VulnerabilitySeverity = "LOW";
-  let failOnOutdated = false;
-  let failOnOutdatedCount: number | undefined;
-  let outdatedThreshold: OutdatedThreshold = "patch";
   let largeFileThreshold = 500;
   let minTokens = 50;
   let minLines = 6;
@@ -301,9 +193,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let diffEnvCheck = false;
   let failOnNewDuplicationPct: number | undefined;
   let failOnNewEnvVars = false;
-  let failOnDeadDeps = false;
-  let failOnDeadDepsCount: number | undefined;
-  let includeDevDeadDeps = false;
   let dbSchema = false;
   let env = false;
   let namingConvention = false;
@@ -528,31 +417,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
         format = fmt as "table" | "json";
         break;
       }
-      case "--deps":
-        deps = true;
-        break;
       case "--dry-check":
         dryCheck = true;
         break;
-      case "--deps-debug":
-        depsDebug = true;
-        break;
-      case "--ecosystems": {
-        const tokens = parseCommaSeparatedValues(args[++i], "--ecosystems");
-
-        const invalid = tokens.filter(
-          (value) => !VALID_ECOSYSTEMS.has(value as Ecosystem),
-        );
-
-        if (invalid.length > 0) {
-          failCliParse(
-            `Error: invalid ecosystems "${invalid.join(",")}". Use one of npm,pypi,go,cargo,rubygems,maven,nuget,packagist,cocoapods,pub,conan.`,
-          );
-        }
-
-        ecosystems = [...new Set(tokens)] as Ecosystem[];
-        break;
-      }
       case "--detectors": {
         const detectorIds = parseCommaSeparatedValues(args[++i], "--detectors");
         const detectorSources = new Map<string, string[]>();
@@ -598,73 +465,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--schema":
         detectorsSchema = true;
         break;
-      case "--no-usage":
-        skipUsage = true;
-        break;
-      case "--no-security":
-        skipSecurity = true;
-        break;
-      case "--no-version-lookup":
-        skipVersionLookup = true;
-        break;
-      case "--concurrency":
-        concurrency = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--concurrency",
-        );
-        concurrencyExplicit = true;
-        break;
-      case "--component-grouping": {
-        const raw = args[++i] ?? "";
-        const parsed =
-          parseComponentGroupingMode(raw) ??
-          failCliParse(
-            `Error: invalid component grouping mode "${raw}". Use one of default,apps-only,services-only,workspace-package.`,
-          );
-        componentGrouping = parsed;
-        componentGroupingExplicit = true;
-        break;
-      }
-      case "--fail-on-vulns":
-        failOnVulns = true;
-        break;
-      case "--fail-on-vulns-count": {
-        failOnVulnsCount = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--fail-on-vulns-count",
-        );
-        break;
-      }
-      case "--severity-threshold": {
-        const raw = args[++i] ?? "";
-        const parsed =
-          parseSeverity(raw) ??
-          failCliParse(
-            `Error: invalid severity threshold "${raw}". Use one of unknown,low,moderate,high,critical.`,
-          );
-        severityThreshold = parsed;
-        break;
-      }
-      case "--fail-on-outdated":
-        failOnOutdated = true;
-        break;
-      case "--fail-on-outdated-count": {
-        failOnOutdatedCount = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--fail-on-outdated-count",
-        );
-        break;
-      }
-      case "--outdated-threshold": {
-        const raw = args[++i] ?? "";
-        const parsed =
-          parseOutdatedThreshold(raw) ??
-          failCliParse(
-            `Error: invalid outdated threshold "${raw}". Use one of patch,minor,major.`,
-          );
-        outdatedThreshold = parsed;
-        break;
-      }
       case "--large-file-threshold":
         largeFileThreshold = parseRequiredPositiveIntegerOption(
           args[++i],
@@ -802,18 +602,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         // Env-var failure checks require diff env-check payload generation.
         diffEnvCheck = true;
         break;
-      case "--fail-on-dead-deps":
-        failOnDeadDeps = true;
-        break;
-      case "--fail-on-dead-deps-count":
-        failOnDeadDepsCount = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--fail-on-dead-deps-count",
-        );
-        break;
-      case "--include-dev-dead-deps":
-        includeDevDeadDeps = true;
-        break;
       case "--vcs":
         vcs = true;
         break;
@@ -842,29 +630,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     failCliParse("Error: --diff-dry-include-tests requires --diff-dry-check.");
   }
 
-  const dependencyOutputRequested =
-    deps ||
-    failOnVulns ||
-    failOnVulnsCount !== undefined ||
-    failOnOutdated ||
-    failOnOutdatedCount !== undefined ||
-    failOnDeadDeps ||
-    failOnDeadDepsCount !== undefined;
-  const usesDependencyOnlyFlags =
-    depsDebug ||
-    ecosystems !== undefined ||
-    skipUsage ||
-    skipSecurity ||
-    skipVersionLookup ||
-    concurrencyExplicit ||
-    componentGroupingExplicit ||
-    includeDevDeadDeps;
-  if (usesDependencyOnlyFlags && !dependencyOutputRequested) {
-    failCliParse(
-      "Error: dependency-analysis flags (--ecosystems, --no-usage, --no-security, --no-version-lookup, --concurrency, --component-grouping, --deps-debug, --include-dev-dead-deps) require --deps or a dependency policy flag.",
-    );
-  }
-
   return {
     path: pathArg,
     format,
@@ -882,20 +647,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     scanBuildAndTest,
     allDetectors,
     dryCheck,
-    deps,
-    depsDebug,
-    ecosystems,
-    skipUsage,
-    skipSecurity,
-    skipVersionLookup,
-    concurrency,
-    componentGrouping,
-    failOnVulns,
-    failOnVulnsCount,
-    severityThreshold,
-    failOnOutdated,
-    failOnOutdatedCount,
-    outdatedThreshold,
     largeFileThreshold,
     minTokens,
     minLines,
@@ -916,9 +667,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     diffEnvCheck,
     failOnNewDuplicationPct,
     failOnNewEnvVars,
-    failOnDeadDeps,
-    failOnDeadDepsCount,
-    includeDevDeadDeps,
     dbSchema,
     env,
     namingConvention,
