@@ -19,8 +19,8 @@ describe("repo-scanner bin completion", () => {
     expect(stdout).toContain("repo-scanner --detectors");
   });
 
-  it("prints detector catalog as JSON for detectors --format json", () => {
-    const result = runRepoScanner(["detectors", "--format", "json"]);
+  it("prints detector catalog as JSON for detectors --json", () => {
+    const result = runRepoScanner(["detectors", "--json"]);
     const payload = JSON.parse(decode(result.stdout));
 
     expect(result.exitCode).toBe(0);

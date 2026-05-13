@@ -7,53 +7,62 @@ const run = async (args: string[]): Promise<unknown> => {
   return JSON.parse(text);
 };
 
-describe("CLI --detectors filter preserves canonical schema", () => {
-  test("--detectors monorepo emits architecture.monorepo, not flat monorepo", async () => {
+describe("CLI --detectors filter emits sliced schema", () => {
+  test("--detectors monorepo emits sliced shape (only architecture + metadata)", async () => {
     const out = (await run([
       "--path",
       ".",
-      "--format",
-      "json",
+      "--json",
       "--detectors",
       "monorepo",
     ])) as any;
+    expect(Object.keys(out).sort()).toEqual([
+      "architecture",
+      "rootPath",
+      "scannedAt",
+    ]);
     expect(out.architecture).toBeDefined();
-    expect(out.architecture).toHaveProperty("monorepo");
-    expect(out.architecture).toHaveProperty("components");
-    expect(out.inventory).toBeDefined();
-    expect(out.inventory.languages).toEqual([]);
-    expect(out.inventory.frameworks).toEqual([]);
-    expect(out.languageStats).toBeDefined();
+    expect(out.inventory).toBeUndefined();
+    expect(out.languageStats).toBeUndefined();
   });
 
-  test("--detectors language emits inventory.languages with content, monorepo defaults false", async () => {
+  test("--detectors language emits inventory.languages + languageStats only", async () => {
     const out = (await run([
       "--path",
       ".",
-      "--format",
-      "json",
+      "--json",
       "--detectors",
       "language",
     ])) as any;
+    expect(Object.keys(out).sort()).toEqual([
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
     expect(out.inventory.languages.length).toBeGreaterThan(0);
-    expect(out.architecture.monorepo).toBe(false);
-    expect(out.architecture.components).toEqual([]);
+    expect(out.inventory.frameworks).toBeUndefined();
+    expect(out.architecture).toBeUndefined();
   });
 });
 
-test("--detectors packageManager emits canonical schema with empty other fields", async () => {
+test("--detectors packageManager emits sliced schema (inventory.packageManagers only)", async () => {
   const out = (await run([
     "--path",
     ".",
-    "--format",
-    "json",
+    "--json",
     "--detectors",
     "packageManager",
   ])) as any;
+  expect(Object.keys(out).sort()).toEqual([
+    "inventory",
+    "rootPath",
+    "scannedAt",
+  ]);
   expect(out.inventory.packageManagers).toBeDefined();
-  expect(out.inventory.languages).toEqual([]);
-  expect(out.inventory.frameworks).toEqual([]);
-  expect(out.architecture.monorepo).toBe(false);
+  expect(out.inventory.languages).toBeUndefined();
+  expect(out.inventory.frameworks).toBeUndefined();
+  expect(out.architecture).toBeUndefined();
 });
 
 test("--path on nonexistent dir prints a friendly error and exits nonzero", async () => {

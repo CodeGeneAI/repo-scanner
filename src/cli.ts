@@ -33,13 +33,13 @@ Detector selection:
 
 General:
   -p, --path <dir>                   Directory to scan (default: cwd)
-  -f, --format <table|json>          Output format (default: table)
+  --json                             Output JSON instead of the default table
   --version, -v                      Show version
   --help, -h                         Show help
 
 Examples:
   repo-scanner --detectors language,framework
-  repo-scanner --detectors monorepo --format json
+  repo-scanner --detectors monorepo --json
   repo-scanner detectors
   repo-scanner completion zsh > _repo-scanner
   repo-scanner completion install fish
@@ -79,7 +79,7 @@ const failCliParse = (message: string): never => {
 export const parseArgs = (argv: string[]): CliOptions => {
   const args = argv.slice(2);
   let pathArg = process.cwd();
-  let format: "table" | "json" = "table";
+  let json = false;
   let showHelp = false;
   let showVersion = false;
   let showDetectors = false;
@@ -149,18 +149,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--path":
         pathArg = args[++i] ?? pathArg;
         break;
-      case "-f":
-      case "--format": {
-        const fmtArg = args[++i];
-        const fmt = fmtArg ?? "table";
-        if (fmt !== "table" && fmt !== "json") {
-          failCliParse(
-            `Error: invalid format "${fmt}". Must be "table" or "json".`,
-          );
-        }
-        format = fmt as "table" | "json";
+      case "--json":
+        json = true;
         break;
-      }
       case "--detectors": {
         const detectorIds = parseCommaSeparatedValues(args[++i], "--detectors");
         const detectorSources = new Map<string, string[]>();
@@ -202,7 +193,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
 
   return {
     path: pathArg,
-    format,
+    json,
     showHelp,
     showVersion,
     showDetectors,

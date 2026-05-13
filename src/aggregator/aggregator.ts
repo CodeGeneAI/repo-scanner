@@ -1,5 +1,12 @@
+import type { DetectorId } from "../detectors/catalog";
 import type { DetectorResult } from "../detectors/types";
-import type { Component, LanguageStats, RepoScanResult } from "../types";
+import type {
+  Component,
+  LanguageStats,
+  PartialInventory,
+  PartialRepoScanResult,
+  RepoScanResult,
+} from "../types";
 import type { FileIndex } from "../utils/file-index";
 import { classifyComponent } from "./component-classifier";
 import { detectSecondaryKinds } from "./content-signals";
@@ -10,12 +17,31 @@ const EMPTY_LANGUAGE_STATS: LanguageStats = {
   perLanguage: [],
 };
 
+export interface AggregateOptions {
+  readonly selectedDetectors?: ReadonlySet<DetectorId>;
+}
+
 /** Merge all detector results into a single RepoScanResult. */
-export const aggregate = async (
+export async function aggregate(
   rootPath: string,
   results: readonly DetectorResult[],
   index?: FileIndex,
-): Promise<RepoScanResult> => {
+  options?: { selectedDetectors?: undefined },
+): Promise<RepoScanResult>;
+/** Merge all detector results into a sliced PartialRepoScanResult based on selectedDetectors. */
+export async function aggregate(
+  rootPath: string,
+  results: readonly DetectorResult[],
+  index: FileIndex | undefined,
+  options: { selectedDetectors: ReadonlySet<DetectorId> },
+): Promise<PartialRepoScanResult>;
+/** Implementation signature. */
+export async function aggregate(
+  rootPath: string,
+  results: readonly DetectorResult[],
+  index?: FileIndex,
+  options?: AggregateOptions,
+): Promise<RepoScanResult | PartialRepoScanResult> {
   const frameworks = new Set<string>();
   const packageManagers = new Set<string>();
   const languageNames = new Set<string>();
@@ -91,21 +117,57 @@ export const aggregate = async (
     (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),
   );
 
-  return {
+  const selected = options?.selectedDetectors;
+  const include = (id: DetectorId): boolean => !selected || selected.has(id);
+
+  const base = {
     scannedAt: new Date().toISOString(),
     rootPath,
-    inventory: {
-      languages: sorted(languageNames),
-      frameworks: sorted(frameworks),
-      packageManagers: sorted(packageManagers),
-    },
-    architecture: {
-      monorepo: isMonorepo,
-      ...(monorepoToolName ? { toolName: monorepoToolName } : {}),
-      components,
-    },
-    languageStats,
   };
-};
+
+  // Unfiltered fast path: return canonical full shape (preserves existing type).
+  if (!selected) {
+    return {
+      ...base,
+      inventory: {
+        languages: sorted(languageNames),
+        frameworks: sorted(frameworks),
+        packageManagers: sorted(packageManagers),
+      },
+      architecture: {
+        monorepo: isMonorepo,
+        ...(monorepoToolName ? { toolName: monorepoToolName } : {}),
+        components,
+      },
+      languageStats,
+    };
+  }
+
+  // Filtered path: build sliced result.
+  const partialInventory: Record<string, readonly string[]> = {};
+  if (include("language")) partialInventory.languages = sorted(languageNames);
+  if (include("framework")) partialInventory.frameworks = sorted(frameworks);
+  if (include("packageManager"))
+    partialInventory.packageManagers = sorted(packageManagers);
+  const hasInventory = Object.keys(partialInventory).length > 0;
+
+  const partial: PartialRepoScanResult = {
+    ...base,
+    ...(hasInventory
+      ? { inventory: partialInventory as PartialInventory }
+      : {}),
+    ...(include("monorepo")
+      ? {
+          architecture: {
+            monorepo: isMonorepo,
+            ...(monorepoToolName ? { toolName: monorepoToolName } : {}),
+            components,
+          },
+        }
+      : {}),
+    ...(include("language") ? { languageStats } : {}),
+  };
+  return partial;
+}
 
 const sorted = (set: Set<string>): string[] => [...set].sort();

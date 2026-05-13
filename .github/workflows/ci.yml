@@ -27,7 +27,7 @@ jobs:
         run: bun run test:unit
       - name: Self-scan smoke test
         run: |
-          bun src/bin.ts --path . --format json > /tmp/self-scan.json
+          bun src/bin.ts --path . --json > /tmp/self-scan.json
           jq -e '.inventory.languages | length > 0' /tmp/self-scan.json > /dev/null
           jq -e '.languageStats.totalFiles > 0' /tmp/self-scan.json > /dev/null
           jq -e 'has("architecture")' /tmp/self-scan.json > /dev/null

@@ -30,13 +30,18 @@ bun x repo-scanner --path .
 
 ```bash
 repo-scanner --path /path/to/repo
-repo-scanner --path /path/to/repo --format json
+repo-scanner --path /path/to/repo --json
 repo-scanner --detectors language,framework      # subset
 repo-scanner detectors                            # list available detectors
-repo-scanner detectors --format json              # machine-readable catalog
+repo-scanner detectors --json                     # machine-readable catalog
 repo-scanner completion zsh > _repo-scanner
 repo-scanner completion install fish
 repo-scanner --version
+
+# Only the monorepo section (sliced output)
+repo-scanner --path . --detectors monorepo
+repo-scanner --path . --detectors monorepo --json
+# Outputs only architecture + rootPath + scannedAt — inventory and languageStats are omitted.
 ```
 
 ## What it detects
@@ -92,6 +97,26 @@ result.architecture.components;       // Component[]
 result.languageStats;                 // LanguageStats
 ```
 
+### Filtered scans
+
+Passing `options.detectors` makes `scanRepo` return only the fields owned by the selected detectors. Other top-level keys are omitted entirely (not present-as-undefined), so `JSON.stringify` drops them and TypeScript narrows the return type to `PartialRepoScanResult`.
+
+```ts
+const partial = await scanRepo("/path/to/repo", { detectors: ["monorepo"] });
+// partial.architecture   // Architecture
+// partial.inventory      // undefined
+// partial.languageStats  // undefined
+```
+
+Field ownership:
+
+| Detector | Owns |
+|---|---|
+| `language` | `inventory.languages`, `languageStats` |
+| `framework` | `inventory.frameworks` |
+| `monorepo` | `architecture` |
+| `packageManager` | `inventory.packageManagers` |
+
 ### Exported types
 
 ```ts
@@ -102,6 +127,8 @@ import type {
   DetectorId,
   Inventory,
   LanguageStats,
+  PartialInventory,
+  PartialRepoScanResult,
   RepoScanResult,
   ScanRepoOptions,
 } from "@codegeneai/repo-scanner";
@@ -112,8 +139,8 @@ import type {
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-p`, `--path <dir>` | Directory to scan | cwd |
-| `-f`, `--format <fmt>` | Output format: `table` or `json` | `table` |
-| `--detectors <list>` | Comma-separated detector IDs (`language`, `framework`, `monorepo`, `packageManager`) | all |
+| `--json` | Output JSON instead of the default table | |
+| `--detectors <list>` | Comma-separated detector IDs (`framework`, `language`, `monorepo`, `packageManager`). When provided, output only includes fields owned by the selected detectors. | all four |
 | `--version`, `-v` | Show version | |
 | `--help`, `-h` | Show help | |
 
@@ -122,7 +149,7 @@ import type {
 | Command | Description |
 |---------|-------------|
 | `detectors` | List available detector IDs and descriptions |
-| `detectors --format json` | Emit the catalog as JSON |
+| `detectors --json` | Emit the catalog as JSON |
 | `completion <shell>` | Print a completion script (`bash`, `zsh`, `fish`) |
 | `completion install <shell>` | Install the completion script |
 | `completion uninstall <shell>` | Remove the installed completion script |

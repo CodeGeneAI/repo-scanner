@@ -30,7 +30,7 @@ describe("repo-scanner bin output selectors", () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
-      const result = runRepoScanner(["--path", repoPath, "--format", "json"]);
+      const result = runRepoScanner(["--path", repoPath, "--json"]);
 
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
@@ -42,7 +42,7 @@ describe("repo-scanner bin output selectors", () => {
     }
   });
 
-  it("shows detector-scoped output in table mode for explicit detector-only flags", async () => {
+  it("shows full table output for detector-only flags (table always runs full scan)", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -54,6 +54,7 @@ describe("repo-scanner bin output selectors", () => {
       ]);
       const stdout = decode(result.stdout);
 
+      // Table mode always uses a full scan; --detectors is ignored for table output (SL-4 will add partial table support).
       expect(result.exitCode).toBe(0);
       expect(stdout).toContain("Frameworks");
       expect(stdout).toContain("repo-scanner");
@@ -62,7 +63,7 @@ describe("repo-scanner bin output selectors", () => {
     }
   });
 
-  it("outputs canonical schema in json mode for explicit detector-only flags", async () => {
+  it("outputs sliced schema in json mode for explicit detector-only flags", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -71,16 +72,17 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "framework",
-        "--format",
-        "json",
+        "--json",
       ]);
 
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
 
-      expect(payload.architecture).toBeDefined();
+      // framework owns inventory.frameworks only (no architecture, no languageStats).
+      expect(payload.architecture).toBeUndefined();
       expect(payload.inventory).toBeDefined();
       expect(payload.inventory.frameworks).toBeArray();
+      expect(payload.inventory.languages).toBeUndefined();
       expect(payload.rootPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
@@ -96,8 +98,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "monorepo",
-        "--format",
-        "json",
+        "--json",
       ]);
       expect(monorepoOnly.exitCode).toBe(0);
       const monorepoPayload = JSON.parse(decode(monorepoOnly.stdout));
@@ -119,8 +120,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "language",
-        "--format",
-        "json",
+        "--json",
       ]);
       expect(language.exitCode).toBe(0);
       const languagePayload = JSON.parse(decode(language.stdout));
@@ -145,8 +145,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "language",
-        "--format",
-        "json",
+        "--json",
       ]);
 
       expect(language.exitCode).toBe(0);

@@ -51,9 +51,23 @@ export interface ScanRepoOptions {
   readonly detectors?: readonly DetectorId[];
 }
 
+export interface PartialInventory {
+  readonly languages?: readonly string[];
+  readonly frameworks?: readonly string[];
+  readonly packageManagers?: readonly string[];
+}
+
+export interface PartialRepoScanResult {
+  readonly scannedAt: string;
+  readonly rootPath: string;
+  readonly inventory?: PartialInventory;
+  readonly architecture?: Architecture;
+  readonly languageStats?: LanguageStats;
+}
+
 export interface CliOptions {
   readonly path: string;
-  readonly format: "table" | "json";
+  readonly json: boolean;
   readonly showHelp: boolean;
   readonly showVersion: boolean;
   readonly showDetectors: boolean;
