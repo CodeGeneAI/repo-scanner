@@ -1,5 +1,12 @@
 # @codegeneai/repo-scanner
 
+## [1.0.1](https://github.com/CodeGeneAI/repo-scanner/compare/v1.0.0...v1.0.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **packaging:** re-tag prior tarball cleanup as a fix to cut 1.0.1 ([c9daa8a](https://github.com/CodeGeneAI/repo-scanner/commit/c9daa8ad0c9ac52b9cc937716dcec2bd4b84c675))
+
 ## [1.0.0](https://github.com/CodeGeneAI/repo-scanner/compare/v0.4.3...v1.0.0) (2026-05-13)
 
 
