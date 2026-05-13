@@ -41,6 +41,9 @@ export const renderTable = (
   w(section("Frameworks"));
   w(`  ${list(result.inventory.frameworks)}\n`);
 
+  w(section("Monorepo"));
+  w(`  ${result.architecture.monorepo ? "yes" : "no"}\n`);
+
   w(section("Components"));
   if (result.architecture.components.length > 0) {
     for (const c of result.architecture.components) {
