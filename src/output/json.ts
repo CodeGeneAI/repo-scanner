@@ -10,89 +10,97 @@ export const renderJson = (
   opts: RenderJsonOptions = {},
 ): void => {
   const color = opts.color === true;
-  writeValue(value, stream, color, 0);
-  stream.write("\n");
+  const out: string[] = [];
+  writeValue(value, out, color, 0);
+  out.push("\n");
+  // Buffer everything into a single write so a broken pipe (e.g. `| head -5`)
+  // produces at most one EPIPE we can ignore, instead of crashing mid-stream.
+  try {
+    stream.write(out.join(""));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== "EPIPE") throw err;
+  }
 };
 
 const writeValue = (
   v: unknown,
-  s: NodeJS.WritableStream,
+  out: string[],
   color: boolean,
   indent: number,
 ): void => {
   if (v === null) {
-    s.write(color ? `${ANSI.BOLD}null${ANSI.RESET}` : "null");
+    out.push(color ? `${ANSI.BOLD}null${ANSI.RESET}` : "null");
     return;
   }
   if (typeof v === "boolean") {
-    s.write(color ? `${ANSI.BOLD}${v}${ANSI.RESET}` : String(v));
+    out.push(color ? `${ANSI.BOLD}${v}${ANSI.RESET}` : String(v));
     return;
   }
   if (typeof v === "number") {
-    s.write(color ? `${ANSI.YELLOW}${v}${ANSI.RESET}` : String(v));
+    out.push(color ? `${ANSI.YELLOW}${v}${ANSI.RESET}` : String(v));
     return;
   }
   if (typeof v === "string") {
     const literal = JSON.stringify(v);
-    s.write(color ? `${ANSI.GREEN}${literal}${ANSI.RESET}` : literal);
+    out.push(color ? `${ANSI.GREEN}${literal}${ANSI.RESET}` : literal);
     return;
   }
   if (Array.isArray(v)) {
-    writeArray(v, s, color, indent);
+    writeArray(v, out, color, indent);
     return;
   }
   if (typeof v === "object") {
-    writeObject(v as Record<string, unknown>, s, color, indent);
+    writeObject(v as Record<string, unknown>, out, color, indent);
     return;
   }
   // Fallback: undefined/function/symbol — emit null to keep output valid JSON.
-  s.write("null");
+  out.push("null");
 };
 
 const writeArray = (
   arr: readonly unknown[],
-  s: NodeJS.WritableStream,
+  out: string[],
   color: boolean,
   indent: number,
 ): void => {
   if (arr.length === 0) {
-    s.write("[]");
+    out.push("[]");
     return;
   }
   const padInner = "  ".repeat(indent + 1);
   const padOuter = "  ".repeat(indent);
-  s.write("[\n");
+  out.push("[\n");
   arr.forEach((item, i) => {
-    s.write(padInner);
-    writeValue(item, s, color, indent + 1);
-    if (i < arr.length - 1) s.write(",");
-    s.write("\n");
+    out.push(padInner);
+    writeValue(item, out, color, indent + 1);
+    if (i < arr.length - 1) out.push(",");
+    out.push("\n");
   });
-  s.write(`${padOuter}]`);
+  out.push(`${padOuter}]`);
 };
 
 const writeObject = (
   obj: Record<string, unknown>,
-  s: NodeJS.WritableStream,
+  out: string[],
   color: boolean,
   indent: number,
 ): void => {
   const keys = Object.keys(obj);
   if (keys.length === 0) {
-    s.write("{}");
+    out.push("{}");
     return;
   }
   const padInner = "  ".repeat(indent + 1);
   const padOuter = "  ".repeat(indent);
-  s.write("{\n");
+  out.push("{\n");
   keys.forEach((k, i) => {
-    s.write(padInner);
+    out.push(padInner);
     const keyLit = JSON.stringify(k);
-    s.write(color ? `${ANSI.CYAN}${keyLit}${ANSI.RESET}` : keyLit);
-    s.write(": ");
-    writeValue(obj[k], s, color, indent + 1);
-    if (i < keys.length - 1) s.write(",");
-    s.write("\n");
+    out.push(color ? `${ANSI.CYAN}${keyLit}${ANSI.RESET}` : keyLit);
+    out.push(": ");
+    writeValue(obj[k], out, color, indent + 1);
+    if (i < keys.length - 1) out.push(",");
+    out.push("\n");
   });
-  s.write(`${padOuter}}`);
+  out.push(`${padOuter}}`);
 };

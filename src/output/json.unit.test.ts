@@ -23,6 +23,41 @@ const stripAnsi = (s: string): string =>
     .map((part, i) => (i === 0 ? part : part.replace(/^\[[0-9;]*m/, "")))
     .join("");
 
+describe("renderJson EPIPE handling", () => {
+  test("swallows EPIPE so a broken downstream pipe does not crash", () => {
+    const stream = new Writable({
+      write(_chunk, _enc, cbk) {
+        const err = new Error("EPIPE") as NodeJS.ErrnoException;
+        err.code = "EPIPE";
+        cbk(err);
+      },
+    }) as NodeJS.WritableStream;
+    // Force the throw path by overriding write to throw synchronously.
+    const original = stream.write.bind(stream);
+    stream.write = ((chunk: unknown): boolean => {
+      const err = new Error("EPIPE") as NodeJS.ErrnoException;
+      err.code = "EPIPE";
+      throw err;
+    }) as typeof stream.write;
+    // Should not throw.
+    expect(() => renderJson({ a: 1 }, stream)).not.toThrow();
+    // Reattach to avoid unused-variable lint flag.
+    stream.write = original;
+  });
+
+  test("rethrows non-EPIPE errors", () => {
+    const stream = new Writable({
+      write(_chunk, _enc, cbk) {
+        cbk();
+      },
+    }) as NodeJS.WritableStream;
+    stream.write = ((): boolean => {
+      throw new Error("disk full");
+    }) as typeof stream.write;
+    expect(() => renderJson({ a: 1 }, stream)).toThrow(/disk full/);
+  });
+});
+
 describe("renderJson", () => {
   const sample = {
     s: "hello",
