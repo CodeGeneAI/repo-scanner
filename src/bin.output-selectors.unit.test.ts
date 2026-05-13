@@ -30,7 +30,7 @@ describe("repo-scanner bin output selectors", () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
-      const result = runRepoScanner(["--path", repoPath, "--format", "json"]);
+      const result = runRepoScanner(["--path", repoPath, "--json"]);
 
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
@@ -72,8 +72,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "framework",
-        "--format",
-        "json",
+        "--json",
       ]);
 
       expect(result.exitCode).toBe(0);
@@ -99,8 +98,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "monorepo",
-        "--format",
-        "json",
+        "--json",
       ]);
       expect(monorepoOnly.exitCode).toBe(0);
       const monorepoPayload = JSON.parse(decode(monorepoOnly.stdout));
@@ -122,8 +120,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "language",
-        "--format",
-        "json",
+        "--json",
       ]);
       expect(language.exitCode).toBe(0);
       const languagePayload = JSON.parse(decode(language.stdout));
@@ -148,8 +145,7 @@ describe("repo-scanner bin output selectors", () => {
         repoPath,
         "--detectors",
         "language",
-        "--format",
-        "json",
+        "--json",
       ]);
 
       expect(language.exitCode).toBe(0);

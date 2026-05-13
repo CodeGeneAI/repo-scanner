@@ -116,8 +116,7 @@ export const assertDetectorSelectorScoping = (
     repoPath,
     "--detectors",
     detectorId,
-    "--format",
-    "json",
+    "--json",
   ]);
 
   if (result.exitCode !== 0) {

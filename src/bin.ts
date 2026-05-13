@@ -14,10 +14,10 @@ import { renderTable } from "./output/table";
 import { scanRepo } from "./scanner";
 
 const renderDetectorsOutput = (
-  format: "table" | "json",
+  json: boolean,
   stream: NodeJS.WritableStream,
 ): void => {
-  if (format === "json") {
+  if (json) {
     renderJson({ detectors: DETECTOR_CATALOG }, stream);
     return;
   }
@@ -45,7 +45,7 @@ _repo_scanner()
     COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
     return 0
   fi
-  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors" -- "\${current}") )
+  COMPREPLY=( $(compgen -W "--help --version --path --json --detectors" -- "\${current}") )
 }
 complete -F _repo_scanner repo-scanner
 `;
@@ -59,7 +59,7 @@ _repo_scanner() {
   _arguments -C \\
     '--detectors[Comma-separated detector IDs]:detectors:->detectors' \\
     '--path[Directory to scan]:path:_files -/' \\
-    '--format[Output format]:format:(table json)' \\
+    '--json[Output JSON]' \\
     '--help[Show help]' \\
     '--version[Show version]'
   case $state in
@@ -84,7 +84,7 @@ for detector in $detector_ids
   complete -c repo-scanner -l detectors -xa "$detector"
 end
 complete -c repo-scanner -l path -r
-complete -c repo-scanner -l format -xa "table json"
+complete -c repo-scanner -l json -d "Output JSON"
 complete -c repo-scanner -l help
 complete -c repo-scanner -l version
 `;
@@ -237,7 +237,7 @@ const main = async () => {
   }
 
   if (options.showDetectors) {
-    renderDetectorsOutput(options.format, process.stdout);
+    renderDetectorsOutput(options.json, process.stdout);
     process.exit(0);
   }
 
@@ -306,7 +306,7 @@ const main = async () => {
       ? await scanRepo(options.path, { detectors: explicitDetectorIds })
       : await scanRepo(options.path);
 
-  if (options.format === "json") {
+  if (options.json) {
     renderJson(result as unknown as Record<string, unknown>, process.stdout);
   } else {
     renderTable(result, process.stdout);

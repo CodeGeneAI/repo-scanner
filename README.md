@@ -30,17 +30,17 @@ bun x repo-scanner --path .
 
 ```bash
 repo-scanner --path /path/to/repo
-repo-scanner --path /path/to/repo --format json
+repo-scanner --path /path/to/repo --json
 repo-scanner --detectors language,framework      # subset
 repo-scanner detectors                            # list available detectors
-repo-scanner detectors --format json              # machine-readable catalog
+repo-scanner detectors --json                     # machine-readable catalog
 repo-scanner completion zsh > _repo-scanner
 repo-scanner completion install fish
 repo-scanner --version
 
 # Only the monorepo section (sliced output)
 repo-scanner --path . --detectors monorepo
-repo-scanner --path . --detectors monorepo --format json
+repo-scanner --path . --detectors monorepo --json
 # Outputs only architecture + rootPath + scannedAt — inventory and languageStats are omitted.
 ```
 
@@ -139,7 +139,7 @@ import type {
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-p`, `--path <dir>` | Directory to scan | cwd |
-| `-f`, `--format <fmt>` | Output format: `table` or `json` | `table` |
+| `--json` | Output JSON instead of the default table | |
 | `--detectors <list>` | Comma-separated detector IDs (`framework`, `language`, `monorepo`, `packageManager`). When provided, output only includes fields owned by the selected detectors. | all four |
 | `--version`, `-v` | Show version | |
 | `--help`, `-h` | Show help | |
@@ -149,7 +149,7 @@ import type {
 | Command | Description |
 |---------|-------------|
 | `detectors` | List available detector IDs and descriptions |
-| `detectors --format json` | Emit the catalog as JSON |
+| `detectors --json` | Emit the catalog as JSON |
 | `completion <shell>` | Print a completion script (`bash`, `zsh`, `fish`) |
 | `completion install <shell>` | Install the completion script |
 | `completion uninstall <shell>` | Remove the installed completion script |

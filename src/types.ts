@@ -67,7 +67,7 @@ export interface PartialRepoScanResult {
 
 export interface CliOptions {
   readonly path: string;
-  readonly format: "table" | "json";
+  readonly json: boolean;
   readonly showHelp: boolean;
   readonly showVersion: boolean;
   readonly showDetectors: boolean;

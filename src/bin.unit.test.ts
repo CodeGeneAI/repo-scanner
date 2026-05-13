@@ -12,8 +12,7 @@ describe("CLI --detectors filter emits sliced schema", () => {
     const out = (await run([
       "--path",
       ".",
-      "--format",
-      "json",
+      "--json",
       "--detectors",
       "monorepo",
     ])) as any;
@@ -31,8 +30,7 @@ describe("CLI --detectors filter emits sliced schema", () => {
     const out = (await run([
       "--path",
       ".",
-      "--format",
-      "json",
+      "--json",
       "--detectors",
       "language",
     ])) as any;
@@ -52,8 +50,7 @@ test("--detectors packageManager emits sliced schema (inventory.packageManagers 
   const out = (await run([
     "--path",
     ".",
-    "--format",
-    "json",
+    "--json",
     "--detectors",
     "packageManager",
   ])) as any;

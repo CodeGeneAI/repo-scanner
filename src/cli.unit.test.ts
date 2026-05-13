@@ -5,7 +5,7 @@ describe("parseArgs", () => {
   it("parses default values", () => {
     const result = parseArgs(["bun", "repo-scanner"]);
 
-    expect(result.format).toBe("table");
+    expect(result.json).toBe(false);
     expect(result.showDetectors).toBeFalse();
     expect(result.completionShell).toBeUndefined();
     expect(result.completionInstall).toBeFalse();
@@ -15,6 +15,16 @@ describe("parseArgs", () => {
     expect(result.frameworkDetector).toBeFalse();
     expect(result.monorepoDetector).toBeFalse();
     expect(result.packageManagerDetector).toBeFalse();
+  });
+
+  it("parses --json", () => {
+    const result = parseArgs(["bun", "src/bin.ts", "--json"]);
+    expect(result.json).toBe(true);
+  });
+
+  it("defaults to table output (json=false)", () => {
+    const result = parseArgs(["bun", "src/bin.ts"]);
+    expect(result.json).toBe(false);
   });
 
   it("parses --detectors with multiple detector ids", () => {
@@ -84,17 +94,9 @@ describe("parseArgs", () => {
   });
 
   it("supports short aliases for common flags", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "-p",
-      "/tmp/repo",
-      "-f",
-      "json",
-    ]);
+    const result = parseArgs(["bun", "repo-scanner", "-p", "/tmp/repo"]);
 
     expect(result.path).toBe("/tmp/repo");
-    expect(result.format).toBe("json");
   });
 
   it("rejects unknown option flags", () => {
