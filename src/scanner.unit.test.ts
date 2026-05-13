@@ -67,7 +67,9 @@ describe("scanRepo", () => {
       detectors: ["language"],
     });
 
-    expect(result.inventory.frameworks).toEqual([]);
+    // language detector only owns inventory.languages + languageStats; frameworks is absent.
+    expect((result as any).inventory?.frameworks).toBeUndefined();
+    expect(result.inventory?.languages).toBeDefined();
   });
 
   it("includes selected detector results when detectors option matches", async () => {
@@ -76,7 +78,7 @@ describe("scanRepo", () => {
       detectors: ["language", "framework"],
     });
 
-    expect(result.inventory.languages.length).toBeGreaterThan(0);
-    expect(result.inventory.frameworks).toContain("React");
+    expect(result.inventory!.languages!.length).toBeGreaterThan(0);
+    expect(result.inventory!.frameworks).toContain("React");
   });
 });

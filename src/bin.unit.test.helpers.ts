@@ -95,6 +95,18 @@ export const runRepoScanner = (
     env: buildRepoScannerEnv(envOverrides),
   });
 
+// Field ownership map for schema slicing (SL-1/SL-2/SL-3):
+//   language      → inventory.languages, languageStats
+//   framework     → inventory.frameworks
+//   monorepo      → architecture
+//   packageManager → inventory.packageManagers
+const DETECTOR_OWNED_TOP_LEVEL_KEYS: Record<string, readonly string[]> = {
+  language: ["inventory", "languageStats"],
+  framework: ["inventory"],
+  monorepo: ["architecture"],
+  packageManager: ["inventory"],
+};
+
 export const assertDetectorSelectorScoping = (
   repoPath: string,
   detectorId: string,
@@ -120,10 +132,25 @@ export const assertDetectorSelectorScoping = (
     );
   }
 
-  if (!("architecture" in payload) || !("inventory" in payload)) {
-    throw new Error(
-      `detector ${detectorId} output missing canonical schema keys: ${Object.keys(payload).join(",")}`,
-    );
+  // Verify only the expected top-level keys are present (sliced schema).
+  const ownedKeys = DETECTOR_OWNED_TOP_LEVEL_KEYS[detectorId];
+  if (ownedKeys) {
+    for (const key of ownedKeys) {
+      if (!(key in payload)) {
+        throw new Error(
+          `detector ${detectorId} output missing expected key "${key}": ${Object.keys(payload).join(",")}`,
+        );
+      }
+    }
+    // Ensure keys NOT owned by this detector are absent.
+    const allDomainKeys = ["architecture", "inventory", "languageStats"];
+    for (const key of allDomainKeys) {
+      if (!ownedKeys.includes(key) && key in payload) {
+        throw new Error(
+          `detector ${detectorId} output has unexpected key "${key}" (schema slicing violation): ${Object.keys(payload).join(",")}`,
+        );
+      }
+    }
   }
 };
 
