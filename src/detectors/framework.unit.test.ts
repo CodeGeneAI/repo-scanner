@@ -99,6 +99,19 @@ describe("framework detector", () => {
     expect(values).toContain("ZIO");
   });
 
+  // Python
+  it("detects Werkzeug and Jinja2 from pyproject.toml deps", async () => {
+    await writeFile(
+      path.join(tmpDir, "pyproject.toml"),
+      `[project]\nname = "myapp"\ndependencies = [\n  "werkzeug>=3",\n  "jinja2",\n  "markupsafe",\n]\n`,
+    );
+    const { result } = await runFrameworkDetector(tmpDir);
+    const names = result.findings.map((f) => f.value);
+    expect(names).toContain("Werkzeug");
+    expect(names).toContain("Jinja2");
+    expect(names).toContain("MarkupSafe");
+  });
+
   // Dedup
   it("deduplicates Spring Boot from Gradle and Maven", async () => {
     await writeFile(

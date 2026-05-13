@@ -78,6 +78,15 @@ const PYTHON_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["tensorflow", "TensorFlow"],
   ["torch", "PyTorch"],
   ["scikit-learn", "scikit-learn"],
+  ["werkzeug", "Werkzeug"],
+  ["jinja2", "Jinja2"],
+  ["markupsafe", "MarkupSafe"],
+  ["blinker", "Blinker"],
+  ["itsdangerous", "ItsDangerous"],
+  ["click", "Click"],
+  ["asgiref", "ASGI (asgiref)"],
+  ["uvicorn", "Uvicorn"],
+  ["gunicorn", "Gunicorn"],
 ]);
 
 /** Go module → framework name. */
