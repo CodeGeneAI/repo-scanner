@@ -4,6 +4,7 @@ interface ClassifyInput {
   readonly path: string;
   readonly kind?: string;
   readonly name?: string;
+  readonly manifestPath?: string;
 }
 
 const VALID_KINDS: readonly ComponentKind[] = [
@@ -19,6 +20,7 @@ const PATH_RULES: readonly [RegExp, ComponentKind][] = [
   [/^(?:apps|app)(?:\/|$)/, "app"],
   [/^(?:services|service)(?:\/|$)/, "service"],
   [/^(?:packages|libs|pkg)(?:\/|$)/, "package"],
+  [/^crates(?:\/|$)/, "library"],
   [/^(?:infra|terraform|deploy|pulumi|cdk)(?:\/|$)/, "infra"],
   [/^(?:scripts|tools|tooling)(?:\/|$)/, "script"],
   [/^(?:e2e|test|tests|__tests__)(?:\/|$)/, "script"],
@@ -56,6 +58,10 @@ export const classifyComponent = (
     name.includes("dashboard")
   )
     return "app";
+
+  // Explicit workspace members (carrying a manifestPath) shouldn't be silently
+  // dropped just because their parent dir doesn't follow a known convention.
+  if (input.manifestPath) return "package";
 
   return undefined;
 };
