@@ -2,7 +2,6 @@ import type { DetectorResult } from "../detectors/types";
 import type {
   ComplexityHotspot,
   Component,
-  CrossPackageDependencyGraph,
   ExternalService,
   LanguageStats,
   LargeFileInfo,
@@ -12,13 +11,7 @@ import type {
   VcsInfo,
 } from "../types";
 import type { FileIndex } from "../utils/file-index";
-import {
-  computeBlastRadius,
-  detectCircularDeps,
-  detectLayerViolations,
-} from "./architecture-analysis";
 import { classifyComponent } from "./component-classifier";
-import { enrichComponents } from "./component-enrichment";
 import { detectSecondaryKinds } from "./content-signals";
 
 /** Merge all detector results into a single RepoScanResult. */
@@ -65,7 +58,6 @@ export const aggregate = async (
   let runtimes: readonly RuntimeInfo[] = [];
   let largeFiles: readonly LargeFileInfo[] | undefined;
   let todoAnnotations: readonly TodoAnnotation[] | undefined;
-  let crossPackageDeps: CrossPackageDependencyGraph | undefined;
   let complexityHotspots: readonly ComplexityHotspot[] | undefined;
   let externalServices: readonly ExternalService[] | undefined;
   let vcsInfo: VcsInfo | undefined;
@@ -183,18 +175,6 @@ export const aggregate = async (
       }
     }
 
-    // Extract cross-package dependency graph
-    if (
-      result.detectorId === "cross-package-deps" &&
-      result.metadata?.crossPackageDeps
-    ) {
-      const graph = result.metadata
-        .crossPackageDeps as CrossPackageDependencyGraph;
-      if (graph.edges.length > 0) {
-        crossPackageDeps = graph;
-      }
-    }
-
     // Extract complexity hotspots
     if (
       result.detectorId === "complexity-hotspots" &&
@@ -233,43 +213,9 @@ export const aggregate = async (
   if (ciSystems.size > 0) signals.hasCi = true;
   if (languages.size > 1) signals.isPolyglot = true;
 
-  let components = [...componentMap.values()].sort(
+  const components = [...componentMap.values()].sort(
     (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),
   );
-
-  // Architecture analysis (requires both graph and components)
-  let circularDeps: readonly (readonly string[])[] | undefined;
-  let layerViolations: ReturnType<typeof detectLayerViolations> | undefined;
-  let highImpactComponents:
-    | ReturnType<typeof computeBlastRadius>["highImpact"]
-    | undefined;
-
-  if (crossPackageDeps && crossPackageDeps.edges.length > 0) {
-    const cycles = detectCircularDeps(crossPackageDeps);
-    if (cycles.length > 0) circularDeps = cycles;
-
-    const violations = detectLayerViolations(crossPackageDeps, components);
-    if (violations.length > 0) layerViolations = violations;
-
-    const { radiusMap, highImpact } = computeBlastRadius(
-      crossPackageDeps,
-      components,
-    );
-
-    // Attach blast radius to each component
-    if (radiusMap.size > 0) {
-      components = components.map((c) => {
-        const br = radiusMap.get(c.path);
-        return br ? { ...c, blastRadius: br } : c;
-      });
-      if (highImpact.length > 0) highImpactComponents = highImpact;
-    }
-  }
-
-  // Enrich components with per-component metadata
-  if (index) {
-    components = await enrichComponents(components, index, results);
-  }
 
   return {
     vcs: vcsInfo,
@@ -298,10 +244,6 @@ export const aggregate = async (
     architecture: {
       monorepo: isMonorepo,
       components,
-      crossPackageDeps,
-      circularDeps,
-      layerViolations,
-      highImpactComponents,
     },
     buildAndTest: {
       buildCommands: sorted(buildCommands),

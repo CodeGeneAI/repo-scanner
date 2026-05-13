@@ -15,7 +15,6 @@ import "./runtime";
 import "./code-quality";
 import "./large-file";
 import "./todo";
-import "./cross-package-deps";
 import "./deployment-platform";
 import "./external-services";
 import "./complexity-hotspots";

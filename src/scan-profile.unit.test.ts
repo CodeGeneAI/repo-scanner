@@ -27,7 +27,6 @@ describe("resolveScanProfile", () => {
       "build-and-test",
     ]);
     expect(profile.enabledDetectorIds).toContain("monorepo");
-    expect(profile.enabledDetectorIds).toContain("cross-package-deps");
     expect(profile.enabledDetectorIds).toContain("build");
     expect(profile.enabledDetectorIds).toContain("ci");
     expect(profile.enabledDetectorIds).not.toContain("framework");
@@ -148,7 +147,7 @@ describe("resolveScanProfile", () => {
         "bun",
         "repo-scanner",
         "--detectors",
-        "language,framework,monorepo,dependency-manager,ci,containerization,iac,testing,datastore,linting,build,repo-tools,cross-package-deps,code-quality,deployment-platform,external-services",
+        "language,framework,monorepo,dependency-manager,ci,containerization,iac,testing,datastore,linting,build,repo-tools,code-quality,deployment-platform,external-services",
       ]),
     );
 
@@ -167,7 +166,6 @@ describe("resolveScanProfile", () => {
         "linting",
         "build",
         "repo-tools",
-        "cross-package-deps",
         "code-quality",
         "deployment-platform",
         "external-services",
@@ -179,16 +177,6 @@ describe("resolveScanProfile", () => {
     const profile = resolveScanProfile(parseArgs(["bun", "repo-scanner"]));
 
     expect(profile.enabledDetectorIds).not.toContain("todo");
-  });
-
-  it("maps components selector to monorepo execution detector", () => {
-    const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--detectors", "components"]),
-    );
-
-    expect(profile.selectedSections).toEqual([]);
-    expect(profile.explicitDetectorOutputIds).toEqual(["components"]);
-    expect(profile.enabledDetectorIds).toEqual(["monorepo"]);
   });
 
   it("maps language-stats and codebase-size selectors to language detector", () => {
@@ -225,29 +213,6 @@ describe("resolveScanProfile", () => {
         "build-commands",
         "test-commands",
         "lint-commands",
-      ]),
-    );
-  });
-
-  it("maps architecture derived selectors to monorepo + cross-package-deps", () => {
-    const profile = resolveScanProfile(
-      parseArgs([
-        "bun",
-        "repo-scanner",
-        "--detectors",
-        "circular-deps,layer-violations,high-impact-components",
-      ]),
-    );
-
-    expect(profile.selectedSections).toEqual([]);
-    expect(profile.enabledDetectorIds).toEqual(
-      expect.arrayContaining(["monorepo", "cross-package-deps"]),
-    );
-    expect(profile.explicitDetectorOutputIds).toEqual(
-      expect.arrayContaining([
-        "circular-deps",
-        "layer-violations",
-        "high-impact-components",
       ]),
     );
   });

@@ -122,7 +122,7 @@ describe("repo-scanner bin output selectors", () => {
     }
   });
 
-  it("splits monorepo and components outputs into separate selectors", async () => {
+  it("emits monorepo detector output via --detectors selector", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -143,24 +143,6 @@ describe("repo-scanner bin output selectors", () => {
         "monorepo",
       ]);
       expect(typeof monorepoPayload.monorepo).toBe("boolean");
-
-      const componentsOnly = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "components",
-        "--format",
-        "json",
-      ]);
-      expect(componentsOnly.exitCode).toBe(0);
-      const componentsPayload = JSON.parse(decode(componentsOnly.stdout));
-      expectTopLevelKeys(componentsPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "components",
-      ]);
-      expect(componentsPayload.components).toBeArray();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -294,50 +276,6 @@ describe("repo-scanner bin output selectors", () => {
         "buildCommands",
         "testCommands",
         "lintCommands",
-      ]);
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("splits architecture graph and derived analysis selectors", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
-
-    try {
-      const graph = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "cross-package-deps",
-        "--format",
-        "json",
-      ]);
-      expect(graph.exitCode).toBe(0);
-      const graphPayload = JSON.parse(decode(graph.stdout));
-      expectTopLevelKeys(graphPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "crossPackageDeps",
-      ]);
-
-      const derived = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "circular-deps,layer-violations,high-impact-components",
-        "--format",
-        "json",
-      ]);
-      expect(derived.exitCode).toBe(0);
-      const derivedPayload = JSON.parse(decode(derived.stdout));
-      expectTopLevelKeys(derivedPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "circularDeps",
-        "layerViolations",
-        "highImpactComponents",
       ]);
     } finally {
       await rm(repoPath, { recursive: true, force: true });

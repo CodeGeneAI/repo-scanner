@@ -26,7 +26,6 @@ describe("parseArgs", () => {
     expect(result.codebaseSizeDetector).toBeFalse();
     expect(result.frameworkDetector).toBeFalse();
     expect(result.monorepoDetector).toBeFalse();
-    expect(result.componentsDetector).toBeFalse();
     expect(result.dependencyManagerDetector).toBeFalse();
     expect(result.ciDetector).toBeFalse();
     expect(result.containerizationDetector).toBeFalse();
@@ -39,10 +38,6 @@ describe("parseArgs", () => {
     expect(result.testCommandsDetector).toBeFalse();
     expect(result.lintCommandsDetector).toBeFalse();
     expect(result.repoToolsDetector).toBeFalse();
-    expect(result.crossPackageDepsDetector).toBeFalse();
-    expect(result.circularDepsDetector).toBeFalse();
-    expect(result.layerViolationsDetector).toBeFalse();
-    expect(result.highImpactComponentsDetector).toBeFalse();
     expect(result.codeQualityDetector).toBeFalse();
     expect(result.deploymentPlatformDetector).toBeFalse();
     expect(result.externalServicesDetector).toBeFalse();
@@ -89,18 +84,14 @@ describe("parseArgs", () => {
       "bun",
       "repo-scanner",
       "--detectors",
-      "components,language-stats,codebase-size,build-commands,test-commands,lint-commands,circular-deps,layer-violations,high-impact-components",
+      "language-stats,codebase-size,build-commands,test-commands,lint-commands",
     ]);
 
-    expect(result.componentsDetector).toBeTrue();
     expect(result.languageStatsDetector).toBeTrue();
     expect(result.codebaseSizeDetector).toBeTrue();
     expect(result.buildCommandsDetector).toBeTrue();
     expect(result.testCommandsDetector).toBeTrue();
     expect(result.lintCommandsDetector).toBeTrue();
-    expect(result.circularDepsDetector).toBeTrue();
-    expect(result.layerViolationsDetector).toBeTrue();
-    expect(result.highImpactComponentsDetector).toBeTrue();
   });
 
   it("expands detector presets in --detectors", () => {

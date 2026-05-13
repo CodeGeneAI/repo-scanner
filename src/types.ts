@@ -7,44 +7,6 @@ export type ComponentKind =
   | "script"
   | "unknown";
 
-export interface BlastRadius {
-  readonly directDependents: number;
-  readonly transitiveDependents: number;
-  readonly score: number; // 0–100
-}
-
-export type ComponentPlatform =
-  | "web"
-  | "api"
-  | "cli"
-  | "worker"
-  | "library"
-  | "mobile"
-  | "desktop";
-
-export interface ComponentMetadata {
-  readonly frameworks?: readonly string[];
-  readonly platform?: ComponentPlatform;
-  readonly entryPoint?: string;
-  readonly ports?: readonly number[];
-  readonly runtime?: { readonly name: string; readonly version?: string };
-  readonly datastores?: readonly string[];
-  readonly externalServices?: readonly {
-    readonly name: string;
-    readonly category: string;
-  }[];
-  readonly lineCount?: number;
-  readonly version?: string;
-  readonly private?: boolean;
-  readonly hasReadme?: boolean;
-  readonly hasDockerfile?: boolean;
-  readonly hasTests?: boolean;
-  readonly hasMigrations?: boolean;
-  // Reasonable heuristics tier
-  readonly observability?: readonly string[];
-  readonly deployTarget?: string;
-}
-
 export interface Component {
   readonly name: string;
   readonly path: string;
@@ -53,8 +15,6 @@ export interface Component {
   readonly description: string;
   readonly confidence: number;
   readonly evidence: readonly string[];
-  readonly blastRadius?: BlastRadius;
-  readonly metadata?: ComponentMetadata;
 }
 
 export interface LanguageStats {
@@ -113,10 +73,6 @@ export interface RepoScanResult {
   readonly architecture: {
     readonly monorepo: boolean;
     readonly components: readonly Component[];
-    readonly crossPackageDeps?: CrossPackageDependencyGraph;
-    readonly circularDeps?: readonly (readonly string[])[];
-    readonly layerViolations?: readonly LayerViolation[];
-    readonly highImpactComponents?: readonly HighImpactComponent[];
   };
   readonly buildAndTest: {
     readonly buildCommands: readonly string[];
@@ -153,42 +109,12 @@ export interface LargeFileInfo {
   readonly language: string;
 }
 
-export interface PackageDependencyEdge {
-  readonly from: string;
-  readonly to: string;
-  readonly fromName: string;
-  readonly toName: string;
-  readonly ecosystem: string;
-  readonly isDev: boolean;
-}
-
-export interface CrossPackageDependencyGraph {
-  readonly edges: readonly PackageDependencyEdge[];
-  readonly nodes: readonly string[];
-  readonly orphans: readonly string[];
-}
-
 export interface TodoAnnotation {
   readonly tag: "TODO" | "FIXME" | "HACK" | "BUG" | "XXX";
   readonly text: string;
   readonly file: string;
   readonly line: number;
   readonly author?: string;
-}
-
-export interface LayerViolation {
-  readonly from: string;
-  readonly to: string;
-  readonly fromKind: ComponentKind;
-  readonly toKind: ComponentKind;
-  readonly reason: string;
-}
-
-export interface HighImpactComponent {
-  readonly name: string;
-  readonly path: string;
-  readonly score: number;
-  readonly transitiveDependents: number;
 }
 
 export interface ComplexityHotspot {
@@ -231,7 +157,6 @@ export interface CliOptions {
   readonly codebaseSizeDetector: boolean;
   readonly frameworkDetector: boolean;
   readonly monorepoDetector: boolean;
-  readonly componentsDetector: boolean;
   readonly dependencyManagerDetector: boolean;
   readonly ciDetector: boolean;
   readonly containerizationDetector: boolean;
@@ -244,10 +169,6 @@ export interface CliOptions {
   readonly testCommandsDetector: boolean;
   readonly lintCommandsDetector: boolean;
   readonly repoToolsDetector: boolean;
-  readonly crossPackageDepsDetector: boolean;
-  readonly circularDepsDetector: boolean;
-  readonly layerViolationsDetector: boolean;
-  readonly highImpactComponentsDetector: boolean;
   readonly codeQualityDetector: boolean;
   readonly deploymentPlatformDetector: boolean;
   readonly externalServicesDetector: boolean;

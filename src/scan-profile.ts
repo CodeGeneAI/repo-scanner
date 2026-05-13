@@ -16,7 +16,7 @@ const SECTION_DETECTOR_IDS: Record<
   ScanSection,
   readonly ExecutionDetectorId[]
 > = {
-  architecture: ["monorepo", "cross-package-deps"],
+  architecture: ["monorepo"],
   inventory: [
     "language",
     "framework",
@@ -45,21 +45,16 @@ const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   "codebase-size": ["language"],
   "code-quality": ["code-quality"],
   "complexity-hotspots": ["complexity-hotspots"],
-  components: ["monorepo"],
   containerization: ["containerization"],
-  "circular-deps": ["monorepo", "cross-package-deps"],
-  "cross-package-deps": ["cross-package-deps"],
   datastore: ["datastore"],
   "dependency-manager": ["dependency-manager"],
   "deployment-platform": ["deployment-platform"],
   "external-services": ["external-services"],
   framework: ["framework"],
-  "high-impact-components": ["monorepo", "cross-package-deps"],
   iac: ["iac"],
   language: ["language"],
   "language-stats": ["language"],
   "large-file": ["large-file"],
-  "layer-violations": ["monorepo", "cross-package-deps"],
   "lint-commands": ["build"],
   linting: ["linting"],
   monorepo: ["monorepo"],
@@ -105,7 +100,6 @@ const resolveExplicitDetectorOutputIds = (
     | "codebaseSizeDetector"
     | "frameworkDetector"
     | "monorepoDetector"
-    | "componentsDetector"
     | "dependencyManagerDetector"
     | "ciDetector"
     | "containerizationDetector"
@@ -118,10 +112,6 @@ const resolveExplicitDetectorOutputIds = (
     | "testCommandsDetector"
     | "lintCommandsDetector"
     | "repoToolsDetector"
-    | "crossPackageDepsDetector"
-    | "circularDepsDetector"
-    | "layerViolationsDetector"
-    | "highImpactComponentsDetector"
     | "codeQualityDetector"
     | "deploymentPlatformDetector"
     | "externalServicesDetector"
@@ -139,7 +129,6 @@ const resolveExplicitDetectorOutputIds = (
   if (options.codebaseSizeDetector) ids.add("codebase-size");
   if (options.frameworkDetector) ids.add("framework");
   if (options.monorepoDetector) ids.add("monorepo");
-  if (options.componentsDetector) ids.add("components");
   if (options.dependencyManagerDetector) ids.add("dependency-manager");
   if (options.ciDetector) ids.add("ci");
   if (options.containerizationDetector) ids.add("containerization");
@@ -152,10 +141,6 @@ const resolveExplicitDetectorOutputIds = (
   if (options.testCommandsDetector) ids.add("test-commands");
   if (options.lintCommandsDetector) ids.add("lint-commands");
   if (options.repoToolsDetector) ids.add("repo-tools");
-  if (options.crossPackageDepsDetector) ids.add("cross-package-deps");
-  if (options.circularDepsDetector) ids.add("circular-deps");
-  if (options.layerViolationsDetector) ids.add("layer-violations");
-  if (options.highImpactComponentsDetector) ids.add("high-impact-components");
   if (options.codeQualityDetector) ids.add("code-quality");
   if (options.deploymentPlatformDetector) ids.add("deployment-platform");
   if (options.externalServicesDetector) ids.add("external-services");

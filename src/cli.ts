@@ -145,7 +145,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let codebaseSizeDetector = false;
   let frameworkDetector = false;
   let monorepoDetector = false;
-  let componentsDetector = false;
   let dependencyManagerDetector = false;
   let ciDetector = false;
   let containerizationDetector = false;
@@ -158,10 +157,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let testCommandsDetector = false;
   let lintCommandsDetector = false;
   let repoToolsDetector = false;
-  let crossPackageDepsDetector = false;
-  let circularDepsDetector = false;
-  let layerViolationsDetector = false;
-  let highImpactComponentsDetector = false;
   let codeQualityDetector = false;
   let deploymentPlatformDetector = false;
   let externalServicesDetector = false;
@@ -186,17 +181,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "complexity-hotspots":
         complexityHotspots = true;
         return;
-      case "components":
-        componentsDetector = true;
-        return;
       case "containerization":
         containerizationDetector = true;
-        return;
-      case "circular-deps":
-        circularDepsDetector = true;
-        return;
-      case "cross-package-deps":
-        crossPackageDepsDetector = true;
         return;
       case "datastore":
         datastoreDetector = true;
@@ -213,9 +199,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "framework":
         frameworkDetector = true;
         return;
-      case "high-impact-components":
-        highImpactComponentsDetector = true;
-        return;
       case "iac":
         iacDetector = true;
         return;
@@ -230,9 +213,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "linting":
         lintingDetector = true;
-        return;
-      case "layer-violations":
-        layerViolationsDetector = true;
         return;
       case "lint-commands":
         lintCommandsDetector = true;
@@ -420,7 +400,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     codebaseSizeDetector,
     frameworkDetector,
     monorepoDetector,
-    componentsDetector,
     dependencyManagerDetector,
     ciDetector,
     containerizationDetector,
@@ -433,10 +412,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     testCommandsDetector,
     lintCommandsDetector,
     repoToolsDetector,
-    crossPackageDepsDetector,
-    circularDepsDetector,
-    layerViolationsDetector,
-    highImpactComponentsDetector,
     codeQualityDetector,
     deploymentPlatformDetector,
     externalServicesDetector,

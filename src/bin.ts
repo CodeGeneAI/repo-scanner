@@ -270,17 +270,6 @@ type DetectorOutputEntry = {
   readonly value: unknown;
 };
 
-const toComponentIdentity = (result: RepoScanResult) =>
-  result.architecture.components.map((component) => ({
-    name: component.name,
-    path: component.path,
-    kind: component.kind,
-    secondaryKinds: component.secondaryKinds,
-    description: component.description,
-    confidence: component.confidence,
-    evidence: component.evidence,
-  }));
-
 const resolveLanguageSelectorOutput = (
   result: RepoScanResult,
 ): readonly string[] => {
@@ -319,22 +308,10 @@ const resolveDetectorOutputEntry = (
         key: "complexityHotspots",
         value: result.inventory.complexityHotspots ?? [],
       };
-    case "components":
-      return { key: "components", value: toComponentIdentity(result) };
     case "containerization":
       return {
         key: "containerization",
         value: result.inventory.containerization,
-      };
-    case "circular-deps":
-      return {
-        key: "circularDeps",
-        value: result.architecture.circularDeps ?? [],
-      };
-    case "cross-package-deps":
-      return {
-        key: "crossPackageDeps",
-        value: result.architecture.crossPackageDeps ?? null,
       };
     case "datastore":
       return { key: "datastores", value: result.inventory.datastores };
@@ -355,11 +332,6 @@ const resolveDetectorOutputEntry = (
       };
     case "framework":
       return { key: "frameworks", value: result.inventory.frameworks };
-    case "high-impact-components":
-      return {
-        key: "highImpactComponents",
-        value: result.architecture.highImpactComponents ?? [],
-      };
     case "iac":
       return { key: "iac", value: result.inventory.iac };
     case "language":
@@ -368,11 +340,6 @@ const resolveDetectorOutputEntry = (
       return { key: "languageStats", value: result.inventory.languageStats };
     case "large-file":
       return { key: "largeFiles", value: result.inventory.largeFiles ?? [] };
-    case "layer-violations":
-      return {
-        key: "layerViolations",
-        value: result.architecture.layerViolations ?? [],
-      };
     case "lint-commands":
       return { key: "lintCommands", value: result.buildAndTest.lintCommands };
     case "linting":
