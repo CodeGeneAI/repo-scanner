@@ -19,8 +19,9 @@ describe("repo-scanner bin output selectors", () => {
 
       expect(result.exitCode).toBe(0);
       expect(stdout).toContain("repo-scanner");
-      expect(stdout).toContain("Architecture");
-      expect(stdout).toContain("Inventory");
+      expect(stdout).toContain("Languages");
+      expect(stdout).toContain("Frameworks");
+      expect(stdout).toContain("Components");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

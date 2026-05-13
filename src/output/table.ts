@@ -2,7 +2,6 @@ import type { RepoScanResult } from "../types";
 
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
-const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 const CYAN = "\x1b[36m";
 const RESET = "\x1b[0m";
@@ -19,28 +18,10 @@ export const renderTable = (
 
   w(`${BOLD}repo-scanner${RESET} — scanned ${result.rootPath}\n`);
 
-  w(section("Architecture"));
-  w(
-    `  Monorepo: ${result.architecture.monorepo ? `${GREEN}yes${RESET}` : "no"}\n`,
-  );
-  if (result.architecture.components.length > 0) {
-    w(`  Components (${result.architecture.components.length}):\n`);
-    for (const c of result.architecture.components) {
-      const desc = c.description ? ` ${DIM}— ${c.description}${RESET}` : "";
-      const secondary =
-        c.secondaryKinds && c.secondaryKinds.length > 0
-          ? ` ${DIM}(+${c.secondaryKinds.join(", +")})${RESET}`
-          : "";
-      w(
-        `    ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${desc} ${DIM}${c.path}${RESET}\n`,
-      );
-    }
-  }
-
-  w(section("Inventory"));
+  w(section("Languages"));
   if (result.languageStats.perLanguage.length > 0) {
     w(
-      `  Languages: ${DIM}${result.languageStats.totalFiles.toLocaleString()} files, ${result.languageStats.totalLines.toLocaleString()} lines${RESET}\n`,
+      `  ${DIM}${result.languageStats.totalFiles.toLocaleString()} files, ${result.languageStats.totalLines.toLocaleString()} lines${RESET}\n`,
     );
     for (const lang of result.languageStats.perLanguage) {
       const pct =
@@ -54,9 +35,27 @@ export const renderTable = (
       );
     }
   } else {
-    w(`  Languages:    ${list(result.inventory.languages)}\n`);
+    w(`  ${list(result.inventory.languages)}\n`);
   }
-  w(`  Frameworks:   ${list(result.inventory.frameworks)}\n`);
+
+  w(section("Frameworks"));
+  w(`  ${list(result.inventory.frameworks)}\n`);
+
+  w(section("Components"));
+  if (result.architecture.components.length > 0) {
+    for (const c of result.architecture.components) {
+      const desc = c.description ? ` ${DIM}— ${c.description}${RESET}` : "";
+      const secondary =
+        c.secondaryKinds && c.secondaryKinds.length > 0
+          ? ` ${DIM}(+${c.secondaryKinds.join(", +")})${RESET}`
+          : "";
+      w(
+        `  ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${desc} ${DIM}${c.path}${RESET}\n`,
+      );
+    }
+  } else {
+    w(`  ${DIM}(none)${RESET}\n`);
+  }
 
   w("\n");
 };

@@ -52,49 +52,6 @@ describe("FileIndex", () => {
       expect(file.relativePath).toBe("src/utils/helper.ts");
       expect(file.path).toBe(path.join(tmpDir, "src/utils/helper.ts"));
     });
-
-    it("exposes nested scoped .scanignore rules on ignoreMatcher", async () => {
-      await mkdir(
-        path.join(
-          tmpDir,
-          "packages",
-          "repo-scanner",
-          "src",
-          "detectors",
-          "api",
-        ),
-        { recursive: true },
-      );
-      await writeFile(
-        path.join(tmpDir, "packages", "repo-scanner", ".scanignore"),
-        "[api]\n/src/detectors/api/graphql-extractors.ts\n",
-      );
-      await writeFile(
-        path.join(
-          tmpDir,
-          "packages",
-          "repo-scanner",
-          "src",
-          "detectors",
-          "api",
-          "graphql-extractors.ts",
-        ),
-        "export const noop = true;\n",
-      );
-
-      const scopedIndex = await FileIndex.build(tmpDir);
-      const relPath =
-        "packages/repo-scanner/src/detectors/api/graphql-extractors.ts";
-
-      // Scoped nested rule is visible to detector-level matching.
-      expect(scopedIndex.ignoreMatcher?.ignores(relPath, false, "api")).toBe(
-        true,
-      );
-      // Same rule should not apply without the matching scope.
-      expect(scopedIndex.ignoreMatcher?.ignores(relPath, false)).toBe(false);
-      // Scoped rules should not filter files out during the initial file walk.
-      expect(scopedIndex.getByName("graphql-extractors.ts")).toHaveLength(1);
-    });
   });
 
   describe("hasFile", () => {

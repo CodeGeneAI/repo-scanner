@@ -58,7 +58,7 @@ export class FileIndex {
   private readonly byName = new Map<string, IndexedFile[]>();
   private readonly byExt = new Map<string, IndexedFile[]>();
   readonly rootPath: string;
-  /** The ignore matcher (if a .scanignore was found). Detectors use this for scoped filtering. */
+  /** The ignore matcher (if a .scanignore was found). */
   readonly ignoreMatcher?: IgnoreMatcher;
 
   constructor(rootPath: string, ignoreMatcher?: IgnoreMatcher) {
@@ -174,8 +174,8 @@ export class FileIndex {
 }
 
 /**
- * Collect .scanignore rules from root and nested directories, preserving
- * directory-local scope by prefixing nested patterns.
+ * Collect .scanignore rules from root and nested directories, anchoring
+ * nested patterns to the subdirectory they were declared in.
  */
 const collectScanignoreRules = async (
   rootPath: string,
