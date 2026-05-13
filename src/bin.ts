@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import fs from "fs";
+import { stat } from "fs/promises";
 import path from "path";
 import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import {
@@ -285,6 +286,17 @@ const main = async () => {
     }
     process.stdout.write(script);
     process.exit(0);
+  }
+
+  try {
+    const s = await stat(options.path);
+    if (!s.isDirectory()) {
+      process.stderr.write(`Error: ${options.path} is not a directory.\n`);
+      process.exit(2);
+    }
+  } catch {
+    process.stderr.write(`Error: no such directory: ${options.path}\n`);
+    process.exit(2);
   }
 
   const explicitDetectorIds = resolveExplicitDetectorIds(options);

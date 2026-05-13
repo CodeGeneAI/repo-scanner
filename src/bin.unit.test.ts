@@ -40,3 +40,15 @@ describe("CLI --detectors filter preserves canonical schema", () => {
     expect(out.architecture.components).toEqual([]);
   });
 });
+
+test("--path on nonexistent dir prints a friendly error and exits nonzero", async () => {
+  const proc = Bun.spawn(
+    ["bun", "src/bin.ts", "--path", "/definitely/not/here/foo"],
+    { stdout: "pipe", stderr: "pipe" },
+  );
+  const stderr = await new Response(proc.stderr).text();
+  const exit = await proc.exited;
+  expect(exit).not.toBe(0);
+  expect(stderr).toMatch(/no such directory|does not exist|cannot find/i);
+  expect(stderr).not.toMatch(/scandir/);
+});
