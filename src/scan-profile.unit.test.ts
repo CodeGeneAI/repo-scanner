@@ -57,24 +57,24 @@ describe("resolveScanProfile", () => {
         "repo-scanner",
         "--inventory",
         "--detectors",
-        "solid-health,db-schema",
+        "complexity-hotspots,large-file",
       ]),
     );
 
     expect(profile.allDetectors).toBeFalse();
-    expect(profile.enabledDetectorIds).toContain("solid-health");
-    expect(profile.enabledDetectorIds).toContain("db-schema");
+    expect(profile.enabledDetectorIds).toContain("complexity-hotspots");
+    expect(profile.enabledDetectorIds).toContain("large-file");
   });
 
-  it("runs env-only mode via --detectors without section flags", () => {
+  it("runs todo-only mode via --detectors without section flags", () => {
     const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--detectors", "env"]),
+      parseArgs(["bun", "repo-scanner", "--detectors", "todo"]),
     );
 
     expect(profile.allDetectors).toBeFalse();
     expect(profile.selectedSections).toEqual([]);
-    expect(profile.enabledDetectorIds).toEqual(["env"]);
-    expect(profile.explicitDetectorOutputIds).toEqual(["env"]);
+    expect(profile.enabledDetectorIds).toEqual(["todo"]);
+    expect(profile.explicitDetectorOutputIds).toEqual(["todo"]);
   });
 
   it("runs explicit detector-only mode via --detectors list", () => {
@@ -103,25 +103,25 @@ describe("resolveScanProfile", () => {
         "bun",
         "repo-scanner",
         "--detectors",
-        "language,env,todo,external-services",
+        "language,todo,external-services",
       ]),
     );
 
     expect(profile.allDetectors).toBeFalse();
     expect(profile.selectedSections).toEqual([]);
     expect(profile.enabledDetectorIds).toEqual(
-      expect.arrayContaining(["language", "env", "todo", "external-services"]),
+      expect.arrayContaining(["language", "todo", "external-services"]),
     );
   });
 
-  it("adds env detector to section profile when combined with section flags", () => {
+  it("adds todo detector to section profile when combined with section flags", () => {
     const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--inventory", "--detectors", "env"]),
+      parseArgs(["bun", "repo-scanner", "--inventory", "--detectors", "todo"]),
     );
 
     expect(profile.allDetectors).toBeFalse();
     expect(profile.selectedSections).toEqual(["inventory"]);
-    expect(profile.enabledDetectorIds).toContain("env");
+    expect(profile.enabledDetectorIds).toContain("todo");
     expect(profile.enabledDetectorIds).toContain("language");
   });
 
@@ -132,15 +132,13 @@ describe("resolveScanProfile", () => {
         "repo-scanner",
         "--inventory",
         "--detectors",
-        "naming-convention,runtime,large-file,todo,dead-export,complexity-hotspots",
+        "runtime,large-file,todo,complexity-hotspots",
       ]),
     );
 
-    expect(profile.enabledDetectorIds).toContain("naming-convention");
     expect(profile.enabledDetectorIds).toContain("runtime");
     expect(profile.enabledDetectorIds).toContain("large-file");
     expect(profile.enabledDetectorIds).toContain("todo");
-    expect(profile.enabledDetectorIds).toContain("dead-export");
     expect(profile.enabledDetectorIds).toContain("complexity-hotspots");
   });
 
@@ -150,7 +148,7 @@ describe("resolveScanProfile", () => {
         "bun",
         "repo-scanner",
         "--detectors",
-        "language,framework,monorepo,dependency-manager,ci,containerization,iac,testing,datastore,linting,build,repo-tools,cross-package-deps,code-quality,deployment-platform,external-services,api-surface",
+        "language,framework,monorepo,dependency-manager,ci,containerization,iac,testing,datastore,linting,build,repo-tools,cross-package-deps,code-quality,deployment-platform,external-services",
       ]),
     );
 
@@ -173,15 +171,14 @@ describe("resolveScanProfile", () => {
         "code-quality",
         "deployment-platform",
         "external-services",
-        "api-surface",
       ]),
     );
   });
 
-  it("does not add env detector by default", () => {
+  it("does not add todo detector by default", () => {
     const profile = resolveScanProfile(parseArgs(["bun", "repo-scanner"]));
 
-    expect(profile.enabledDetectorIds).not.toContain("env");
+    expect(profile.enabledDetectorIds).not.toContain("todo");
   });
 
   it("maps components selector to monorepo execution detector", () => {

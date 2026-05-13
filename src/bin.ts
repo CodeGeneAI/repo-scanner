@@ -8,11 +8,8 @@ import {
   DETECTOR_PRESETS,
   type DetectorId,
 } from "./detectors/catalog";
-import { setDbSchemaOptions } from "./detectors/db-schema";
-import { setEnvIncludeTestFiles } from "./detectors/env";
 import "./detectors/init";
 import { setLargeFileThreshold } from "./detectors/large-file";
-import { setSolidOptions } from "./detectors/solid-health";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import {
@@ -301,8 +298,6 @@ const resolveDetectorOutputEntry = (
   detectorId: DetectorId,
 ): DetectorOutputEntry => {
   switch (detectorId) {
-    case "api-surface":
-      return { key: "apiSurface", value: result.inventory.apiSurface ?? null };
     case "build":
       return { key: "buildTools", value: result.inventory.buildTools };
     case "build-commands":
@@ -343,13 +338,6 @@ const resolveDetectorOutputEntry = (
       };
     case "datastore":
       return { key: "datastores", value: result.inventory.datastores };
-    case "db-schema":
-      return {
-        key: "databaseSchema",
-        value: result.inventory.databaseSchema ?? null,
-      };
-    case "dead-export":
-      return { key: "deadExports", value: result.inventory.deadExports ?? [] };
     case "dependency-manager":
       return {
         key: "dependencyManagers",
@@ -360,8 +348,6 @@ const resolveDetectorOutputEntry = (
         key: "deploymentPlatforms",
         value: result.inventory.deploymentPlatforms,
       };
-    case "env":
-      return { key: "envVars", value: result.inventory.envVars };
     case "external-services":
       return {
         key: "externalServices",
@@ -393,20 +379,10 @@ const resolveDetectorOutputEntry = (
       return { key: "linting", value: result.inventory.linting };
     case "monorepo":
       return { key: "monorepo", value: result.architecture.monorepo };
-    case "naming-convention":
-      return {
-        key: "namingConventions",
-        value: result.inventory.namingConventions ?? [],
-      };
     case "repo-tools":
       return { key: "repoTools", value: result.inventory.repoTools };
     case "runtime":
       return { key: "runtimes", value: result.inventory.runtimes };
-    case "solid-health":
-      return {
-        key: "solidHealth",
-        value: result.inventory.solidHealth ?? null,
-      };
     case "test-commands":
       return { key: "testCommands", value: result.buildAndTest.testCommands };
     case "testing":
@@ -486,15 +462,6 @@ const main = async () => {
     }
   }
   setLargeFileThreshold(options.largeFileThreshold);
-  const allDetectorsEnabled = options.allDetectors;
-  setSolidOptions({
-    enabled: options.solid || allDetectorsEnabled,
-    threshold: options.solidThreshold,
-  });
-  setEnvIncludeTestFiles(options.envIncludeTests);
-  setDbSchemaOptions({
-    enabled: options.dbSchema || allDetectorsEnabled,
-  });
 
   if (options.showVersion) {
     process.stdout.write(`${getVersion()}\n`);

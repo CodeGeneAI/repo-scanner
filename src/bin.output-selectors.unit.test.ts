@@ -5,7 +5,6 @@ import path from "path";
 import {
   createAllDetectorsFixtureRepo,
   createCoreProfileFixtureRepo,
-  createEnvFixtureRepo,
   decode,
   expectTopLevelKeys,
   runRepoScanner,
@@ -74,15 +73,19 @@ describe("repo-scanner bin output selectors", () => {
   });
 
   it("shows detector-scoped output in table mode for explicit detector-only flags", async () => {
-    const repoPath = await createEnvFixtureRepo();
+    const repoPath = await createCoreProfileFixtureRepo();
 
     try {
-      const result = runRepoScanner(["--path", repoPath, "--detectors", "env"]);
+      const result = runRepoScanner([
+        "--path",
+        repoPath,
+        "--detectors",
+        "todo",
+      ]);
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("envVars");
-      expect(stdout).toContain("OPENAI_API_KEY");
+      expect(stdout).toContain("todoAnnotations");
       expect(stdout).not.toContain("Inventory");
       expect(stdout).not.toContain("Architecture");
       expect(stdout).not.toContain("Build & Test");
@@ -92,14 +95,14 @@ describe("repo-scanner bin output selectors", () => {
   });
 
   it("outputs only requested detector field in json mode for explicit detector-only flags", async () => {
-    const repoPath = await createEnvFixtureRepo();
+    const repoPath = await createCoreProfileFixtureRepo();
 
     try {
       const result = runRepoScanner([
         "--path",
         repoPath,
         "--detectors",
-        "env",
+        "todo",
         "--format",
         "json",
       ]);
@@ -111,10 +114,9 @@ describe("repo-scanner bin output selectors", () => {
         "scanPath",
         "timestamp",
         "durationMs",
-        "envVars",
+        "todoAnnotations",
       ]);
-      expect(payload.envVars).toBeArray();
-      expect(payload.envVars[0].name).toBe("OPENAI_API_KEY");
+      expect(payload.todoAnnotations).toBeArray();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -427,10 +429,6 @@ describe("repo-scanner bin output selectors", () => {
       });
 
       expect(normalize(fullPayload)).toEqual(normalize(allPayload));
-      expect(allPayload.inventory.solidHealth).toBeDefined();
-      expect(fullPayload.inventory.solidHealth).toBeDefined();
-      expect(allPayload.inventory.databaseSchema).toBeDefined();
-      expect(fullPayload.inventory.databaseSchema).toBeDefined();
       expect(decode(allDetectors.stdout)).toContain('"signals"');
       expect(decode(fullScan.stdout)).toContain('"signals"');
     } finally {

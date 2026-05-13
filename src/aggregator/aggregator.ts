@@ -1,13 +1,8 @@
-import type { SolidHealthResult } from "../ast/solid/types";
-import type { DatabaseSchema } from "../detectors/db-schema/types";
 import type { DetectorResult } from "../detectors/types";
 import type {
-  ApiSurface,
   ComplexityHotspot,
   Component,
   CrossPackageDependencyGraph,
-  DeadExport,
-  EnvVarInfo,
   ExternalService,
   LanguageStats,
   LargeFileInfo,
@@ -67,26 +62,13 @@ export const aggregate = async (
   let totalFiles = 0;
   let totalLinesOfCode = 0;
   let isMonorepo = false;
-  let envVars: readonly EnvVarInfo[] = [];
   let runtimes: readonly RuntimeInfo[] = [];
-  let apiSurface: ApiSurface | undefined;
   let largeFiles: readonly LargeFileInfo[] | undefined;
   let todoAnnotations: readonly TodoAnnotation[] | undefined;
   let crossPackageDeps: CrossPackageDependencyGraph | undefined;
-  let deadExports: readonly DeadExport[] | undefined;
-  let solidHealth: SolidHealthResult | undefined;
   let complexityHotspots: readonly ComplexityHotspot[] | undefined;
   let externalServices: readonly ExternalService[] | undefined;
-  let databaseSchema: DatabaseSchema | undefined;
   let vcsInfo: VcsInfo | undefined;
-  let namingConventions:
-    | readonly {
-        category: string;
-        dominantStyle: string;
-        percentage: number;
-        sampleSize: number;
-      }[]
-    | undefined;
 
   const categoryMap: Record<string, Set<string>> = {
     language: languages,
@@ -171,45 +153,12 @@ export const aggregate = async (
       }
     }
 
-    // Extract env var details from env detector metadata
-    if (
-      result.detectorId === "env" &&
-      Array.isArray(result.metadata?.envVarDetails)
-    ) {
-      envVars = result.metadata.envVarDetails as EnvVarInfo[];
-    }
-
-    // Extract naming convention patterns
-    if (
-      result.detectorId === "naming-convention" &&
-      Array.isArray(result.metadata?.namingPatterns)
-    ) {
-      namingConventions = (
-        result.metadata.namingPatterns as {
-          category: string;
-          dominantStyle: string;
-          percentage: number;
-          sampleSize: number;
-        }[]
-      ).map((p) => ({
-        category: p.category,
-        dominantStyle: p.dominantStyle,
-        percentage: p.percentage,
-        sampleSize: p.sampleSize,
-      }));
-    }
-
     // Extract runtime details
     if (
       result.detectorId === "runtime" &&
       Array.isArray(result.metadata?.runtimeDetails)
     ) {
       runtimes = result.metadata.runtimeDetails as RuntimeInfo[];
-    }
-
-    // Extract API surface
-    if (result.detectorId === "api-surface" && result.metadata?.apiSurface) {
-      apiSurface = result.metadata.apiSurface as ApiSurface;
     }
 
     // Extract large files
@@ -246,22 +195,6 @@ export const aggregate = async (
       }
     }
 
-    // Extract dead exports
-    if (
-      result.detectorId === "dead-export" &&
-      Array.isArray(result.metadata?.deadExports)
-    ) {
-      const exports = result.metadata.deadExports as DeadExport[];
-      if (exports.length > 0) {
-        deadExports = exports;
-      }
-    }
-
-    // Extract SOLID health
-    if (result.detectorId === "solid-health" && result.metadata?.solidHealth) {
-      solidHealth = result.metadata.solidHealth as SolidHealthResult;
-    }
-
     // Extract complexity hotspots
     if (
       result.detectorId === "complexity-hotspots" &&
@@ -282,23 +215,6 @@ export const aggregate = async (
       const services = result.metadata.externalServices as ExternalService[];
       if (services.length > 0) {
         externalServices = services;
-      }
-    }
-
-    // Extract database schema (validates outer envelope: tables[], relationships[])
-    if (result.detectorId === "db-schema" && result.metadata?.databaseSchema) {
-      const candidate = result.metadata.databaseSchema;
-      if (
-        typeof candidate === "object" &&
-        candidate !== null &&
-        "tables" in candidate &&
-        "relationships" in candidate &&
-        Array.isArray((candidate as DatabaseSchema).tables)
-      ) {
-        const schema = candidate as DatabaseSchema;
-        if (schema.tables.length > 0) {
-          databaseSchema = schema;
-        }
       }
     }
 
@@ -373,17 +289,11 @@ export const aggregate = async (
       codeQuality: sorted(codeQuality),
       deploymentPlatforms: sorted(deploymentPlatforms),
       repoTools: sorted(repoTools),
-      envVars,
       runtimes,
-      apiSurface,
-      namingConventions,
       largeFiles,
       todoAnnotations,
-      deadExports,
-      solidHealth,
       complexityHotspots,
       externalServices,
-      databaseSchema,
     },
     architecture: {
       monorepo: isMonorepo,

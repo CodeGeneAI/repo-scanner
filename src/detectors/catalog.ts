@@ -1,5 +1,4 @@
 export const DETECTOR_CATALOG = [
-  { id: "api-surface", description: "API endpoint and protocol detection" },
   { id: "build", description: "Build systems and commands" },
   { id: "build-commands", description: "Build command extraction" },
   { id: "ci", description: "CI provider and workflow detection" },
@@ -17,11 +16,8 @@ export const DETECTOR_CATALOG = [
   },
   { id: "cross-package-deps", description: "Cross-package dependency graph" },
   { id: "datastore", description: "Datastore and cache detection" },
-  { id: "db-schema", description: "Database schema extraction" },
-  { id: "dead-export", description: "Potentially unused export detection" },
   { id: "dependency-manager", description: "Dependency manager detection" },
   { id: "deployment-platform", description: "Deployment platform detection" },
-  { id: "env", description: "Environment variable usage and inference" },
   {
     id: "external-services",
     description: "External service integration detection",
@@ -42,10 +38,8 @@ export const DETECTOR_CATALOG = [
   { id: "lint-commands", description: "Lint command extraction" },
   { id: "linting", description: "Linter and formatter detection" },
   { id: "monorepo", description: "Monorepo structure and components" },
-  { id: "naming-convention", description: "Naming convention analysis" },
   { id: "repo-tools", description: "Repository tooling and config detection" },
   { id: "runtime", description: "Runtime version detection" },
-  { id: "solid-health", description: "SOLID principle analysis" },
   { id: "test-commands", description: "Test command extraction" },
   { id: "testing", description: "Test framework detection" },
   { id: "todo", description: "TODO/FIXME annotation detection" },
@@ -77,15 +71,7 @@ export const DETECTOR_PRESETS = {
     "repo-tools",
     "runtime",
   ],
-  "@quality": [
-    "code-quality",
-    "complexity-hotspots",
-    "dead-export",
-    "large-file",
-    "naming-convention",
-    "solid-health",
-    "todo",
-  ],
+  "@quality": ["code-quality", "complexity-hotspots", "large-file", "todo"],
   "@architecture": [
     "monorepo",
     "components",
@@ -93,7 +79,6 @@ export const DETECTOR_PRESETS = {
     "circular-deps",
     "layer-violations",
     "high-impact-components",
-    "api-surface",
     "external-services",
   ],
 } as const satisfies Record<string, readonly DetectorId[]>;

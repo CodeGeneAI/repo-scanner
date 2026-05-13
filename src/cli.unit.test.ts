@@ -17,12 +17,9 @@ describe("parseArgs", () => {
     expect(result.completionUninstall).toBeFalse();
     expect(result.detectorsSchema).toBeFalse();
     expect(result.detectorSelectionWarnings).toEqual([]);
-    expect(result.env).toBeFalse();
-    expect(result.namingConvention).toBeFalse();
     expect(result.runtime).toBeFalse();
     expect(result.largeFile).toBeFalse();
     expect(result.todo).toBeFalse();
-    expect(result.deadExport).toBeFalse();
     expect(result.complexityHotspots).toBeFalse();
     expect(result.languageDetector).toBeFalse();
     expect(result.languageStatsDetector).toBeFalse();
@@ -49,7 +46,6 @@ describe("parseArgs", () => {
     expect(result.codeQualityDetector).toBeFalse();
     expect(result.deploymentPlatformDetector).toBeFalse();
     expect(result.externalServicesDetector).toBeFalse();
-    expect(result.apiSurfaceDetector).toBeFalse();
   });
 
   it("parses section profile flags", () => {
@@ -74,24 +70,17 @@ describe("parseArgs", () => {
     expect(result.allDetectors).toBeTrue();
   });
 
-  it("parses --solid legacy convenience flag", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--solid"]);
-    expect(result.solid).toBeTrue();
-  });
-
   it("parses --detectors with multiple detector ids", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
       "--detectors",
-      "env,language,todo,external-services,solid-health,vcs",
+      "language,todo,external-services,vcs",
     ]);
 
-    expect(result.env).toBeTrue();
     expect(result.languageDetector).toBeTrue();
     expect(result.todo).toBeTrue();
     expect(result.externalServicesDetector).toBeTrue();
-    expect(result.solid).toBeTrue();
     expect(result.vcs).toBeTrue();
   });
 

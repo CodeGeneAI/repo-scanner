@@ -1,18 +1,15 @@
 import { EXT_TO_LANGUAGE } from "../detectors/language-extensions";
 import type { DetectorResult } from "../detectors/types";
 import type {
-  ApiSurface,
   Component,
   ComponentMetadata,
   ComponentPlatform,
-  EnvVarInfo,
   ExternalService,
   RuntimeInfo,
 } from "../types";
 import { mapWithConcurrency } from "../utils/concurrency";
 import type { FileIndex, IndexedFile } from "../utils/file-index";
 import { countLines, readJson, readText } from "../utils/fs";
-import { deriveProtocol } from "../utils/protocol";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -615,8 +612,6 @@ const buildManifestCache = async (
 // ─── Extracted detector data ─────────────────────────────────────────
 
 interface ExtractedData {
-  readonly envVars: readonly EnvVarInfo[];
-  readonly apiSurface: ApiSurface | undefined;
   readonly externalServices: readonly ExternalService[];
   readonly runtimes: readonly RuntimeInfo[];
 }
@@ -624,21 +619,10 @@ interface ExtractedData {
 const extractDetectorData = (
   results: readonly DetectorResult[],
 ): ExtractedData => {
-  let envVars: readonly EnvVarInfo[] = [];
-  let apiSurface: ApiSurface | undefined;
   let externalServices: readonly ExternalService[] = [];
   let runtimes: readonly RuntimeInfo[] = [];
 
   for (const result of results) {
-    if (
-      result.detectorId === "env" &&
-      Array.isArray(result.metadata?.envVarDetails)
-    ) {
-      envVars = result.metadata.envVarDetails as EnvVarInfo[];
-    }
-    if (result.detectorId === "api-surface" && result.metadata?.apiSurface) {
-      apiSurface = result.metadata.apiSurface as ApiSurface;
-    }
     if (
       result.detectorId === "external-services" &&
       Array.isArray(result.metadata?.externalServices)
@@ -653,7 +637,7 @@ const extractDetectorData = (
     }
   }
 
-  return { envVars, apiSurface, externalServices, runtimes };
+  return { externalServices, runtimes };
 };
 
 // ─── Per-component enrichment functions ──────────────────────────────
@@ -1006,22 +990,6 @@ const detectPorts = async (
   return [...ports].sort((a, b) => a - b);
 };
 
-const filterEnvVars = (
-  componentPath: string,
-  envVars: readonly EnvVarInfo[],
-): string[] => {
-  const names = new Set<string>();
-  for (const v of envVars) {
-    for (const usage of v.usages) {
-      if (isUnderComponent(usage.file, componentPath)) {
-        names.add(v.name);
-        break;
-      }
-    }
-  }
-  return [...names].sort();
-};
-
 const detectRuntime = (
   componentPath: string,
   files: readonly IndexedFile[],
@@ -1083,27 +1051,6 @@ const filterExternalServices = (
     (a, b) =>
       a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
   );
-};
-
-const filterApiSurface = (
-  componentPath: string,
-  apiSurface: ApiSurface | undefined,
-): { endpointCount: number; protocols: readonly string[] } | undefined => {
-  if (!apiSurface || apiSurface.endpoints.length === 0) return undefined;
-
-  const endpoints = apiSurface.endpoints.filter((ep) =>
-    isUnderComponent(ep.file, componentPath),
-  );
-  if (endpoints.length === 0) return undefined;
-
-  const protocols = new Set<string>();
-  for (const ep of endpoints) {
-    protocols.add(deriveProtocol(ep.method));
-  }
-  return {
-    endpointCount: endpoints.length,
-    protocols: [...protocols].sort(),
-  };
 };
 
 const countComponentLines = async (
@@ -1247,13 +1194,11 @@ const enrichSingleComponent = async (
     detectPorts(files),
     countComponentLines(files),
   ]);
-  const envVars = filterEnvVars(component.path, data.envVars);
   const runtime = detectRuntime(component.path, files, data.runtimes, cache);
   const externalServices = filterExternalServices(
     component.path,
     data.externalServices,
   );
-  const apiSurface = filterApiSurface(component.path, data.apiSurface);
   const booleanFlags = detectBooleanFlags(files);
 
   const metadata: ComponentMetadata = {
@@ -1261,11 +1206,9 @@ const enrichSingleComponent = async (
     ...(platform ? { platform } : {}),
     ...(entryPoint ? { entryPoint } : {}),
     ...(ports.length > 0 ? { ports } : {}),
-    ...(envVars.length > 0 ? { envVars } : {}),
     ...(runtime ? { runtime } : {}),
     ...(datastores.length > 0 ? { datastores } : {}),
     ...(externalServices.length > 0 ? { externalServices } : {}),
-    ...(apiSurface ? { apiSurface } : {}),
     ...(lineCount > 0 ? { lineCount } : {}),
     ...(version ? { version } : {}),
     ...(isPrivate ? { private: true } : {}),
@@ -1280,11 +1223,9 @@ const enrichSingleComponent = async (
     platform !== undefined ||
     entryPoint !== undefined ||
     ports.length > 0 ||
-    envVars.length > 0 ||
     runtime !== undefined ||
     datastores.length > 0 ||
     externalServices.length > 0 ||
-    apiSurface !== undefined ||
     lineCount > 0 ||
     version !== undefined ||
     isPrivate ||

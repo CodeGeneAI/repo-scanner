@@ -1,6 +1,5 @@
 import type { ScanSection } from "../scan-profile";
 import type { RepoScanResult } from "../types";
-import { deriveProtocol } from "../utils/protocol";
 
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
@@ -104,14 +103,6 @@ export const renderTable = (
           if (m.externalServices && m.externalServices.length > 0)
             w(
               `             ${DIM}services: ${m.externalServices.map((s) => s.name).join(", ")}${RESET}\n`,
-            );
-          if (m.envVars && m.envVars.length > 0)
-            w(
-              `             ${DIM}env: ${m.envVars.length} var${m.envVars.length !== 1 ? "s" : ""}${RESET}\n`,
-            );
-          if (m.apiSurface)
-            w(
-              `             ${DIM}api: ${m.apiSurface.endpointCount} endpoints (${m.apiSurface.protocols.join(", ")})${RESET}\n`,
             );
           if (m.observability && m.observability.length > 0)
             w(
@@ -247,47 +238,6 @@ export const renderTable = (
     if (result.inventory.repoTools.length > 0)
       w(`  Other Tools:  ${list(result.inventory.repoTools)}\n`);
 
-    if (result.inventory.envVars.length > 0) {
-      w(section("Environment Variables"));
-      w(`  Found: ${result.inventory.envVars.length} unique variables\n`);
-      for (const v of result.inventory.envVars) {
-        const type =
-          v.inferredType !== "unknown"
-            ? ` ${DIM}(${v.inferredType})${RESET}`
-            : "";
-        const req = v.required
-          ? `${YELLOW}required${RESET}`
-          : `${DIM}optional${RESET}`;
-        const def = v.defaultValue
-          ? ` ${DIM}default: ${v.defaultValue}${RESET}`
-          : "";
-        const prefix = v.frameworkPrefix
-          ? ` ${CYAN}[${v.frameworkPrefix}]${RESET}`
-          : "";
-        w(`    ${v.name}${type}  ${req}${def}${prefix}\n`);
-        for (const u of v.usages.slice(0, 3)) {
-          w(`      ${DIM}${u.file}:${u.line}${RESET}\n`);
-        }
-        if (v.usages.length > 3)
-          w(`      ${DIM}... +${v.usages.length - 3} more${RESET}\n`);
-      }
-    }
-
-    if (
-      result.inventory.namingConventions &&
-      result.inventory.namingConventions.length > 0
-    ) {
-      w(section("Naming Conventions"));
-      for (const nc of result.inventory.namingConventions) {
-        const cat = nc.category.padEnd(12);
-        const style = nc.dominantStyle.padEnd(22);
-        const pct = `${nc.percentage.toFixed(0)}%`.padStart(4);
-        w(
-          `  ${YELLOW}${cat}${RESET} ${style} ${pct}  ${DIM}(${nc.sampleSize} samples)${RESET}\n`,
-        );
-      }
-    }
-
     // Runtimes
     if (result.inventory.runtimes.length > 0) {
       w(section("Runtimes"));
@@ -297,43 +247,6 @@ export const renderTable = (
         w(
           `  ${YELLOW}${lang}${RESET} ${ver} ${DIM}(${r.source} — ${r.file})${RESET}\n`,
         );
-      }
-    }
-
-    // API Surface
-    if (
-      result.inventory.apiSurface &&
-      result.inventory.apiSurface.endpoints.length > 0
-    ) {
-      const api = result.inventory.apiSurface;
-      w(section("API Surface"));
-      w(`  Protocols:  ${api.protocols.join(", ")}\n`);
-      w(`  Frameworks: ${api.frameworksUsed.join(", ")}\n`);
-      w(`  Endpoints:  ${api.endpoints.length}\n`);
-
-      // Group by protocol
-      const byProtocol = new Map<string, (typeof api.endpoints)[number][]>();
-      for (const ep of api.endpoints) {
-        const proto = deriveProtocol(ep.method);
-        const group = byProtocol.get(proto);
-        if (group) group.push(ep);
-        else byProtocol.set(proto, [ep]);
-      }
-
-      const MAX_SHOWN = 10;
-      for (const [proto, endpoints] of byProtocol) {
-        w(`\n  ${BOLD}${proto}${RESET} (${endpoints.length}):\n`);
-        const shown = endpoints.slice(0, MAX_SHOWN);
-        for (const ep of shown) {
-          const method = ep.method.padEnd(8);
-          const path = ep.path.padEnd(30);
-          w(
-            `    ${YELLOW}${method}${RESET} ${path} ${DIM}(${ep.framework} — ${ep.file}:${ep.line})${RESET}\n`,
-          );
-        }
-        if (endpoints.length > MAX_SHOWN) {
-          w(`    ${DIM}... +${endpoints.length - MAX_SHOWN} more${RESET}\n`);
-        }
       }
     }
 
@@ -393,100 +306,6 @@ export const renderTable = (
       }
     }
 
-    // Likely Dead Exports
-    if (
-      result.inventory.deadExports &&
-      result.inventory.deadExports.length > 0
-    ) {
-      const dead = result.inventory.deadExports;
-      w(section("Likely Dead Exports"));
-      w(
-        `  Found: ${dead.length} exported symbol${dead.length > 1 ? "s" : ""} with no detected imports ${DIM}(heuristic)${RESET}\n`,
-      );
-      const MAX_SHOWN = 20;
-      const shown = dead.slice(0, MAX_SHOWN);
-      for (const d of shown) {
-        const kind = d.exportType.padEnd(10);
-        const sym = d.symbol.padEnd(24);
-        w(
-          `    ${YELLOW}${kind}${RESET} ${sym} ${DIM}${d.file}:${d.line}${RESET}  ${d.language}\n`,
-        );
-      }
-      if (dead.length > MAX_SHOWN) {
-        w(`    ${DIM}... +${dead.length - MAX_SHOWN} more${RESET}\n`);
-      }
-    }
-
-    // SOLID Health
-    if (result.inventory.solidHealth) {
-      const sh = result.inventory.solidHealth;
-      const scoreColor =
-        sh.score >= 80 ? GREEN : sh.score >= 50 ? YELLOW : "\x1b[31m";
-      w(section("SOLID Health"));
-      w(
-        `  Score: ${BOLD}${scoreColor}${sh.score}/100${RESET}  ${DIM}(${sh.analyzedFiles} files, ${sh.analyzedClasses} classes)${RESET}\n\n`,
-      );
-
-      const confidenceLabel = (c: number) =>
-        c >= 0.8 ? "high" : c >= 0.6 ? "medium" : "low";
-
-      const principles = [
-        { key: "SRP", data: sh.principles.srp },
-        { key: "OCP", data: sh.principles.ocp },
-        { key: "LSP", data: sh.principles.lsp },
-        { key: "ISP", data: sh.principles.isp },
-        { key: "DIP", data: sh.principles.dip },
-      ] as const;
-
-      for (const { key, data } of principles) {
-        const pColor =
-          data.score >= 80 ? GREEN : data.score >= 50 ? YELLOW : "\x1b[31m";
-        const conf = confidenceLabel(data.confidence);
-        const violCount = data.violations.length;
-        w(
-          `  ${BOLD}${key}${RESET}  ${pColor}${String(data.score).padStart(3)}/100${RESET}  ${DIM}(${conf} confidence)${RESET}  ${violCount > 0 ? `${violCount} violation${violCount > 1 ? "s" : ""}` : `${GREEN}clean${RESET}`}\n`,
-        );
-      }
-
-      if (sh.worstFiles.length > 0) {
-        w(`\n  ${BOLD}Worst Files:${RESET}\n`);
-        const MAX_SHOWN = 10;
-        for (const f of sh.worstFiles.slice(0, MAX_SHOWN)) {
-          const fColor =
-            f.score >= 80 ? GREEN : f.score >= 50 ? YELLOW : "\x1b[31m";
-          w(
-            `    ${fColor}${String(f.score).padStart(3)}/100${RESET}  ${f.file}  ${DIM}(${f.violations} violations)${RESET}\n`,
-          );
-        }
-        if (sh.worstFiles.length > MAX_SHOWN) {
-          w(
-            `    ${DIM}... +${sh.worstFiles.length - MAX_SHOWN} more${RESET}\n`,
-          );
-        }
-      }
-
-      // Top violations
-      const allViolations = [
-        ...sh.principles.srp.violations,
-        ...sh.principles.ocp.violations,
-        ...sh.principles.lsp.violations,
-        ...sh.principles.isp.violations,
-        ...sh.principles.dip.violations,
-      ];
-      if (allViolations.length > 0) {
-        w(`\n  ${BOLD}Top Violations:${RESET}\n`);
-        const topViolations = allViolations
-          .filter((v) => v.severity === "error" || v.severity === "warning")
-          .slice(0, 10);
-        for (const v of topViolations) {
-          const sev = v.severity === "error" ? "\x1b[31m" : YELLOW;
-          w(
-            `    ${sev}${v.principle.padEnd(4)}${RESET} ${DIM}${v.file}:${v.line}${RESET}  ${v.entity}: ${v.message}\n`,
-          );
-        }
-      }
-    }
-
     // Complexity Hotspots
     if (
       result.inventory.complexityHotspots &&
@@ -505,55 +324,6 @@ export const renderTable = (
         w(
           `    ${scoreColor}${score}${RESET}  ${DIM}complexity=${complexity} churn=${churn}${RESET}  ${lang} ${DIM}${h.file}${RESET}\n`,
         );
-      }
-    }
-
-    // Database Schema
-    if (result.inventory.databaseSchema) {
-      const schema = result.inventory.databaseSchema;
-      w(section("Database Schema"));
-      w(
-        `  Tables: ${schema.summary.totalTables}  Columns: ${schema.summary.totalColumns}  Relationships: ${schema.summary.totalRelationships}\n`,
-      );
-
-      const MAX_TABLES = 20;
-      const shownTables = schema.tables.slice(0, MAX_TABLES);
-      for (const t of shownTables) {
-        const pk = t.primaryKey
-          ? ` ${DIM}PK: ${t.primaryKey.join(", ")}${RESET}`
-          : "";
-        const fkCount = t.columns.filter((c) => c.isForeignKey).length;
-        const fk = fkCount > 0 ? ` ${DIM}FK: ${fkCount}${RESET}` : "";
-        w(
-          `    ${YELLOW}${t.name.padEnd(30)}${RESET} ${t.columns.length} col${t.columns.length !== 1 ? "s" : ""}${pk}${fk}  ${DIM}(${t.source.parser})${RESET}\n`,
-        );
-      }
-      if (schema.tables.length > MAX_TABLES) {
-        w(
-          `    ${DIM}... +${schema.tables.length - MAX_TABLES} more tables${RESET}\n`,
-        );
-      }
-
-      if (schema.relationships.length > 0) {
-        w("\n  Relationships:\n");
-        const MAX_RELS = 15;
-        const shownRels = schema.relationships.slice(0, MAX_RELS);
-        for (const r of shownRels) {
-          const typeLabel =
-            r.type === "one-to-many"
-              ? "1:N"
-              : r.type === "one-to-one"
-                ? "1:1"
-                : "M:N";
-          w(
-            `    ${r.from.table}.${r.from.column} ${DIM}→${RESET} ${r.to.table}.${r.to.column}  ${DIM}(${typeLabel})${RESET}\n`,
-          );
-        }
-        if (schema.relationships.length > MAX_RELS) {
-          w(
-            `    ${DIM}... +${schema.relationships.length - MAX_RELS} more${RESET}\n`,
-          );
-        }
       }
     }
   }

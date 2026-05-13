@@ -81,29 +81,6 @@ export const createCoreProfileFixtureRepo = async (): Promise<string> => {
 
 export const createAllDetectorsFixtureRepo = async (): Promise<string> => {
   const repoPath = await createCoreProfileFixtureRepo();
-
-  await mkdir(path.join(repoPath, "db"), { recursive: true });
-  await writeFile(
-    path.join(repoPath, "db", "schema.sql"),
-    "CREATE TABLE users (id INT PRIMARY KEY, email TEXT);\n",
-  );
-  await writeFile(
-    path.join(repoPath, "solid.ts"),
-    "export class Service { run(): number { return 1; } }\n",
-  );
-
-  return repoPath;
-};
-
-export const createEnvFixtureRepo = async (): Promise<string> => {
-  const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-env-"));
-
-  await writeFile(path.join(repoPath, "README.md"), "# env fixture\n");
-  await writeFile(
-    path.join(repoPath, "index.ts"),
-    "export const apiKey = process.env.OPENAI_API_KEY;\n",
-  );
-
   return repoPath;
 };
 

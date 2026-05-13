@@ -39,7 +39,6 @@ const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   DetectorId,
   readonly ExecutionDetectorId[]
 > = {
-  "api-surface": ["api-surface"],
   build: ["build"],
   "build-commands": ["build"],
   ci: ["ci"],
@@ -51,11 +50,8 @@ const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   "circular-deps": ["monorepo", "cross-package-deps"],
   "cross-package-deps": ["cross-package-deps"],
   datastore: ["datastore"],
-  "db-schema": ["db-schema"],
-  "dead-export": ["dead-export"],
   "dependency-manager": ["dependency-manager"],
   "deployment-platform": ["deployment-platform"],
-  env: ["env"],
   "external-services": ["external-services"],
   framework: ["framework"],
   "high-impact-components": ["monorepo", "cross-package-deps"],
@@ -67,10 +63,8 @@ const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   "lint-commands": ["build"],
   linting: ["linting"],
   monorepo: ["monorepo"],
-  "naming-convention": ["naming-convention"],
   "repo-tools": ["repo-tools"],
   runtime: ["runtime"],
-  "solid-health": ["solid-health"],
   "test-commands": ["build"],
   testing: ["testing"],
   todo: ["todo"],
@@ -101,15 +95,10 @@ const hasExplicitSectionFlags = (
 const resolveExplicitDetectorOutputIds = (
   options: Pick<
     CliOptions,
-    | "env"
     | "vcs"
-    | "solid"
-    | "dbSchema"
-    | "namingConvention"
     | "runtime"
     | "largeFile"
     | "todo"
-    | "deadExport"
     | "complexityHotspots"
     | "languageDetector"
     | "languageStatsDetector"
@@ -136,20 +125,14 @@ const resolveExplicitDetectorOutputIds = (
     | "codeQualityDetector"
     | "deploymentPlatformDetector"
     | "externalServicesDetector"
-    | "apiSurfaceDetector"
   >,
 ): DetectorId[] => {
   const ids = new Set<DetectorId>();
 
-  if (options.env) ids.add("env");
   if (options.vcs) ids.add("vcs");
-  if (options.solid) ids.add("solid-health");
-  if (options.dbSchema) ids.add("db-schema");
-  if (options.namingConvention) ids.add("naming-convention");
   if (options.runtime) ids.add("runtime");
   if (options.largeFile) ids.add("large-file");
   if (options.todo) ids.add("todo");
-  if (options.deadExport) ids.add("dead-export");
   if (options.complexityHotspots) ids.add("complexity-hotspots");
   if (options.languageDetector) ids.add("language");
   if (options.languageStatsDetector) ids.add("language-stats");
@@ -176,7 +159,6 @@ const resolveExplicitDetectorOutputIds = (
   if (options.codeQualityDetector) ids.add("code-quality");
   if (options.deploymentPlatformDetector) ids.add("deployment-platform");
   if (options.externalServicesDetector) ids.add("external-services");
-  if (options.apiSurfaceDetector) ids.add("api-surface");
 
   return [...ids];
 };

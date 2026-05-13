@@ -1,9 +1,3 @@
-import type { SolidHealthResult } from "./ast/solid/types";
-import type { DatabaseSchema } from "./detectors/db-schema/types";
-
-export type { SolidHealthResult } from "./ast/solid/types";
-export type { DatabaseSchema } from "./detectors/db-schema/types";
-
 export type ComponentKind =
   | "app"
   | "service"
@@ -33,17 +27,12 @@ export interface ComponentMetadata {
   readonly platform?: ComponentPlatform;
   readonly entryPoint?: string;
   readonly ports?: readonly number[];
-  readonly envVars?: readonly string[];
   readonly runtime?: { readonly name: string; readonly version?: string };
   readonly datastores?: readonly string[];
   readonly externalServices?: readonly {
     readonly name: string;
     readonly category: string;
   }[];
-  readonly apiSurface?: {
-    readonly endpointCount: number;
-    readonly protocols: readonly string[];
-  };
   readonly lineCount?: number;
   readonly version?: string;
   readonly private?: boolean;
@@ -51,18 +40,6 @@ export interface ComponentMetadata {
   readonly hasDockerfile?: boolean;
   readonly hasTests?: boolean;
   readonly hasMigrations?: boolean;
-  readonly namingConventions?: {
-    readonly file?: {
-      readonly dominantStyle: string;
-      readonly percentage: number;
-      readonly sampleSize: number;
-    };
-    readonly directory?: {
-      readonly dominantStyle: string;
-      readonly percentage: number;
-      readonly sampleSize: number;
-    };
-  };
   // Reasonable heuristics tier
   readonly observability?: readonly string[];
   readonly deployTarget?: string;
@@ -127,22 +104,11 @@ export interface RepoScanResult {
     readonly codeQuality: readonly string[];
     readonly deploymentPlatforms: readonly string[];
     readonly repoTools: readonly string[];
-    readonly envVars: readonly EnvVarInfo[];
     readonly runtimes: readonly RuntimeInfo[];
-    readonly apiSurface?: ApiSurface;
-    readonly namingConventions?: readonly {
-      readonly category: string;
-      readonly dominantStyle: string;
-      readonly percentage: number;
-      readonly sampleSize: number;
-    }[];
     readonly largeFiles?: readonly LargeFileInfo[];
     readonly todoAnnotations?: readonly TodoAnnotation[];
-    readonly deadExports?: readonly DeadExport[];
-    readonly solidHealth?: SolidHealthResult;
     readonly complexityHotspots?: readonly ComplexityHotspot[];
     readonly externalServices?: readonly ExternalService[];
-    readonly databaseSchema?: DatabaseSchema;
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -174,35 +140,6 @@ export interface RepoScanResult {
   readonly durationMs: number;
 }
 
-/** A single usage of an environment variable in source code or config. */
-export interface EnvVarUsage {
-  readonly file: string;
-  readonly line: number;
-  readonly pattern: string;
-  readonly accessType: "read" | "write" | "definition";
-}
-
-/** Inferred value type for an environment variable. */
-export type EnvValueType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "url"
-  | "path"
-  | "json"
-  | "unknown";
-
-/** A deduplicated environment variable with all metadata. */
-export interface EnvVarInfo {
-  readonly name: string;
-  readonly usages: readonly EnvVarUsage[];
-  readonly inferredType: EnvValueType;
-  readonly defaultValue?: string;
-  readonly required: boolean;
-  readonly definedInConfig: boolean;
-  readonly frameworkPrefix?: string;
-}
-
 export interface RuntimeInfo {
   readonly language: string;
   readonly version: string;
@@ -231,41 +168,12 @@ export interface CrossPackageDependencyGraph {
   readonly orphans: readonly string[];
 }
 
-export interface DeadExport {
-  readonly symbol: string;
-  readonly file: string;
-  readonly line: number;
-  readonly language: string;
-  readonly exportType:
-    | "function"
-    | "class"
-    | "const"
-    | "type"
-    | "interface"
-    | "enum"
-    | "other";
-}
-
 export interface TodoAnnotation {
   readonly tag: "TODO" | "FIXME" | "HACK" | "BUG" | "XXX";
   readonly text: string;
   readonly file: string;
   readonly line: number;
   readonly author?: string;
-}
-
-export interface ApiEndpoint {
-  readonly method: string;
-  readonly path: string;
-  readonly file: string;
-  readonly line: number;
-  readonly framework: string;
-}
-
-export interface ApiSurface {
-  readonly endpoints: readonly ApiEndpoint[];
-  readonly protocols: readonly string[];
-  readonly frameworksUsed: readonly string[];
 }
 
 export interface LayerViolation {
@@ -314,16 +222,9 @@ export interface CliOptions {
   readonly scanBuildAndTest: boolean;
   readonly allDetectors: boolean;
   readonly largeFileThreshold: number;
-  readonly solid: boolean;
-  readonly solidThreshold: number;
-  readonly envIncludeTests: boolean;
-  readonly dbSchema: boolean;
-  readonly env: boolean;
-  readonly namingConvention: boolean;
   readonly runtime: boolean;
   readonly largeFile: boolean;
   readonly todo: boolean;
-  readonly deadExport: boolean;
   readonly complexityHotspots: boolean;
   readonly languageDetector: boolean;
   readonly languageStatsDetector: boolean;
@@ -350,7 +251,6 @@ export interface CliOptions {
   readonly codeQualityDetector: boolean;
   readonly deploymentPlatformDetector: boolean;
   readonly externalServicesDetector: boolean;
-  readonly apiSurfaceDetector: boolean;
   readonly vcs: boolean;
 }
 

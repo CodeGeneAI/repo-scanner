@@ -45,10 +45,7 @@ Core output profile:
 General:
   -p, --path <dir>                   Directory to scan (default: cwd)
   -f, --format <table|json>          Output format (default: table)
-  --env-include-tests                Include test files in env-var detection
   --large-file-threshold <n>         Large-file threshold in lines (default: 500)
-  --solid                            Enable SOLID analysis detector
-  --solid-threshold <n>              SOLID score threshold (default: 80)
   --version, -v                      Show version
   --help, -h                         Show help
   --schema                           JSON schema payload mode for detectors JSON output
@@ -139,16 +136,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let scanBuildAndTest = false;
   let allDetectors = false;
   let largeFileThreshold = 500;
-  let solid = false;
-  let solidThreshold = 80;
-  let envIncludeTests = false;
-  let dbSchema = false;
-  let env = false;
-  let namingConvention = false;
   let runtime = false;
   let largeFile = false;
   let todo = false;
-  let deadExport = false;
   let complexityHotspots = false;
   let languageDetector = false;
   let languageStatsDetector = false;
@@ -175,13 +165,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let codeQualityDetector = false;
   let deploymentPlatformDetector = false;
   let externalServicesDetector = false;
-  let apiSurfaceDetector = false;
   let vcs = false;
   const enableDetector = (detectorId: DetectorId): void => {
     switch (detectorId) {
-      case "api-surface":
-        apiSurfaceDetector = true;
-        return;
       case "build":
         buildDetector = true;
         return;
@@ -215,20 +201,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "datastore":
         datastoreDetector = true;
         return;
-      case "db-schema":
-        dbSchema = true;
-        return;
-      case "dead-export":
-        deadExport = true;
-        return;
       case "dependency-manager":
         dependencyManagerDetector = true;
         return;
       case "deployment-platform":
         deploymentPlatformDetector = true;
-        return;
-      case "env":
-        env = true;
         return;
       case "external-services":
         externalServicesDetector = true;
@@ -263,17 +240,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "monorepo":
         monorepoDetector = true;
         return;
-      case "naming-convention":
-        namingConvention = true;
-        return;
       case "repo-tools":
         repoToolsDetector = true;
         return;
       case "runtime":
         runtime = true;
-        return;
-      case "solid-health":
-        solid = true;
         return;
       case "testing":
         testingDetector = true;
@@ -410,18 +381,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
           "--large-file-threshold",
         );
         break;
-      case "--env-include-tests":
-        envIncludeTests = true;
-        break;
-      case "--solid":
-        solid = true;
-        break;
-      case "--solid-threshold":
-        solidThreshold = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--solid-threshold",
-        );
-        break;
       case "--vcs":
         vcs = true;
         break;
@@ -452,16 +411,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
     scanBuildAndTest,
     allDetectors,
     largeFileThreshold,
-    solid,
-    solidThreshold,
-    envIncludeTests,
-    dbSchema,
-    env,
-    namingConvention,
     runtime,
     largeFile,
     todo,
-    deadExport,
     complexityHotspots,
     languageDetector,
     languageStatsDetector,
@@ -488,7 +440,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     codeQualityDetector,
     deploymentPlatformDetector,
     externalServicesDetector,
-    apiSurfaceDetector,
     vcs,
   };
 };
