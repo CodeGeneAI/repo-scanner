@@ -1,10 +1,7 @@
 import type { PartialRepoScanResult, RepoScanResult } from "../types";
+import { ANSI } from "./ansi";
 
-const BOLD = "\x1b[1m";
-const DIM = "\x1b[2m";
-const YELLOW = "\x1b[33m";
-const CYAN = "\x1b[36m";
-const RESET = "\x1b[0m";
+const { BOLD, DIM, YELLOW, CYAN, RESET } = ANSI;
 
 const section = (title: string) => `\n${BOLD}${CYAN}${title}${RESET}\n`;
 const list = (items: readonly string[]) =>

@@ -6,6 +6,7 @@ describe("parseArgs", () => {
     const result = parseArgs(["bun", "repo-scanner"]);
 
     expect(result.json).toBe(false);
+    expect(result.noColor).toBe(false);
     expect(result.showDetectors).toBeFalse();
     expect(result.completionShell).toBeUndefined();
     expect(result.completionInstall).toBeFalse();
@@ -15,6 +16,11 @@ describe("parseArgs", () => {
     expect(result.frameworkDetector).toBeFalse();
     expect(result.monorepoDetector).toBeFalse();
     expect(result.packageManagerDetector).toBeFalse();
+  });
+
+  it("parses --no-color", () => {
+    const result = parseArgs(["bun", "repo-scanner", "--no-color"]);
+    expect(result.noColor).toBe(true);
   });
 
   it("parses --json", () => {
