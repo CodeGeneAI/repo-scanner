@@ -55,22 +55,25 @@ describe("scanRepo", () => {
     const repoPath = await createTempRepo();
     const result = await scanRepo(repoPath);
 
-    expect(result.scanPath).toContain("repo-scanner-");
+    expect(Array.isArray(result.inventory.languages)).toBe(true);
+    expect(Array.isArray(result.architecture.components)).toBe(true);
+    expect(result.languageStats).toBeDefined();
+    expect(result.rootPath).toContain("repo-scanner-");
   });
 
-  it("filters detectors when enabledDetectorIds are provided", async () => {
+  it("filters detectors when detectors option is provided", async () => {
     const repoPath = await createReactFixtureRepo();
     const result = await scanRepo(repoPath, {
-      enabledDetectorIds: ["language"],
+      detectors: ["language"],
     });
 
     expect(result.inventory.frameworks).toEqual([]);
   });
 
-  it("includes selected detector results when enabledDetectorIds match", async () => {
+  it("includes selected detector results when detectors option matches", async () => {
     const repoPath = await createReactFixtureRepo();
     const result = await scanRepo(repoPath, {
-      enabledDetectorIds: ["language", "framework"],
+      detectors: ["language", "framework"],
     });
 
     expect(result.inventory.languages.length).toBeGreaterThan(0);

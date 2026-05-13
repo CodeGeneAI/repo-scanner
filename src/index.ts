@@ -1,9 +1,10 @@
-export type { DetectorResult, Finding } from "./detectors/types";
+export type { DetectorId } from "./detectors/catalog";
 export { scanRepo } from "./scanner";
 export type {
-  CliOptions,
+  Architecture,
   Component,
   ComponentKind,
+  Inventory,
   LanguageStats,
   RepoScanResult,
   ScanRepoOptions,

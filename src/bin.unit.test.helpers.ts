@@ -99,7 +99,7 @@ export const assertDetectorSelectorScoping = (
   repoPath: string,
   detectorId: string,
 ): void => {
-  const metadataKeys = new Set(["scanPath", "timestamp", "durationMs"]);
+  const metadataKeys = new Set(["rootPath", "scannedAt"]);
   const result = runRepoScanner([
     "--path",
     repoPath,

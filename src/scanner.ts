@@ -15,12 +15,11 @@ export const scanRepo = async (
   options?: ScanRepoOptions,
 ): Promise<RepoScanResult> => {
   const absolutePath = path.resolve(scanPath);
-  const start = performance.now();
 
   const index = await FileIndex.build(absolutePath);
   const detectors = getDetectors();
-  const detectorIdSet = options?.enabledDetectorIds
-    ? new Set(options.enabledDetectorIds)
+  const detectorIdSet = options?.detectors
+    ? new Set<string>(options.detectors)
     : undefined;
   const enabledDetectors = detectorIdSet
     ? detectors.filter((detector) => detectorIdSet.has(detector.id))
@@ -40,6 +39,5 @@ export const scanRepo = async (
     )
     .map((r) => r.value);
 
-  const durationMs = Math.round(performance.now() - start);
-  return aggregate(absolutePath, durationMs, results, index);
+  return aggregate(absolutePath, results, index);
 };

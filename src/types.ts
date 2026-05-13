@@ -1,44 +1,52 @@
+import type { DetectorId } from "./detectors/catalog";
+
 export type ComponentKind =
   | "app"
   | "service"
   | "package"
-  | "library"
   | "infra"
   | "script"
-  | "unknown";
+  | "library";
 
 export interface Component {
-  readonly name: string;
   readonly path: string;
+  readonly name: string;
   readonly kind: ComponentKind;
   readonly secondaryKinds?: readonly ComponentKind[];
-  readonly description: string;
-  readonly confidence: number;
-  readonly evidence: readonly string[];
+  readonly description?: string;
+}
+
+export interface Inventory {
+  readonly languages: readonly string[];
+  readonly frameworks: readonly string[];
+}
+
+export interface Architecture {
+  readonly monorepo: boolean;
+  readonly components: readonly Component[];
 }
 
 export interface LanguageStats {
-  readonly name: string;
-  readonly fileCount: number;
-  readonly linesOfCode: number;
-  readonly percentage: number; // 0–100, rounded to 1 decimal
+  readonly totalFiles: number;
+  readonly totalLines: number;
+  readonly perLanguage: ReadonlyArray<{
+    readonly language: string;
+    readonly files: number;
+    readonly lines: number;
+    readonly percentage: number;
+  }>;
 }
 
 export interface RepoScanResult {
-  readonly inventory: {
-    readonly languages: readonly string[];
-    readonly languageStats: readonly LanguageStats[];
-    readonly totalFiles: number;
-    readonly totalLinesOfCode: number;
-    readonly frameworks: readonly string[];
-  };
-  readonly architecture: {
-    readonly monorepo: boolean;
-    readonly components: readonly Component[];
-  };
-  readonly scanPath: string;
-  readonly timestamp: string;
-  readonly durationMs: number;
+  readonly scannedAt: string;
+  readonly rootPath: string;
+  readonly inventory: Inventory;
+  readonly architecture: Architecture;
+  readonly languageStats: LanguageStats;
+}
+
+export interface ScanRepoOptions {
+  readonly detectors?: readonly DetectorId[];
 }
 
 export interface CliOptions {
@@ -54,8 +62,4 @@ export interface CliOptions {
   readonly languageDetector: boolean;
   readonly frameworkDetector: boolean;
   readonly monorepoDetector: boolean;
-}
-
-export interface ScanRepoOptions {
-  readonly enabledDetectorIds?: readonly string[];
 }

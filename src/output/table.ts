@@ -17,9 +17,7 @@ export const renderTable = (
 ): void => {
   const w = (s: string) => stream.write(s);
 
-  w(
-    `${BOLD}repo-scanner${RESET} — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
-  );
+  w(`${BOLD}repo-scanner${RESET} — scanned ${result.rootPath}\n`);
 
   w(section("Architecture"));
   w(
@@ -40,19 +38,19 @@ export const renderTable = (
   }
 
   w(section("Inventory"));
-  if (result.inventory.languageStats.length > 0) {
+  if (result.languageStats.perLanguage.length > 0) {
     w(
-      `  Languages: ${DIM}${result.inventory.totalFiles.toLocaleString()} files, ${result.inventory.totalLinesOfCode.toLocaleString()} lines${RESET}\n`,
+      `  Languages: ${DIM}${result.languageStats.totalFiles.toLocaleString()} files, ${result.languageStats.totalLines.toLocaleString()} lines${RESET}\n`,
     );
-    for (const lang of result.inventory.languageStats) {
+    for (const lang of result.languageStats.perLanguage) {
       const pct =
-        lang.fileCount > 0 && lang.percentage < 0.1
+        lang.files > 0 && lang.percentage < 0.1
           ? "< 0.1"
           : lang.percentage.toFixed(1).padStart(5);
-      const files = `${lang.fileCount}`.padStart(4);
-      const loc = lang.linesOfCode.toLocaleString().padStart(8);
+      const files = `${lang.files}`.padStart(4);
+      const loc = lang.lines.toLocaleString().padStart(8);
       w(
-        `    ${YELLOW}${lang.name.padEnd(14)}${RESET} ${pct}%  ${DIM}(${files} files, ${loc} lines)${RESET}\n`,
+        `    ${YELLOW}${lang.language.padEnd(14)}${RESET} ${pct}%  ${DIM}(${files} files, ${loc} lines)${RESET}\n`,
       );
     }
   } else {

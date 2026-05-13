@@ -4,10 +4,15 @@ import type { FileIndex } from "../utils/file-index";
 import { classifyComponent } from "./component-classifier";
 import { detectSecondaryKinds } from "./content-signals";
 
+const EMPTY_LANGUAGE_STATS: LanguageStats = {
+  totalFiles: 0,
+  totalLines: 0,
+  perLanguage: [],
+};
+
 /** Merge all detector results into a single RepoScanResult. */
 export const aggregate = async (
-  scanPath: string,
-  durationMs: number,
+  rootPath: string,
   results: readonly DetectorResult[],
   index?: FileIndex,
 ): Promise<RepoScanResult> => {
@@ -15,9 +20,7 @@ export const aggregate = async (
   const frameworks = new Set<string>();
 
   const componentMap = new Map<string, Component>();
-  let languageStats: readonly LanguageStats[] = [];
-  let totalFiles = 0;
-  let totalLinesOfCode = 0;
+  let languageStats: LanguageStats = EMPTY_LANGUAGE_STATS;
   let isMonorepo = false;
 
   const categoryMap: Record<string, Set<string>> = {
@@ -49,33 +52,36 @@ export const aggregate = async (
       for (const hint of result.componentHints) {
         if (!componentMap.has(hint.path)) {
           const kind = classifyComponent(hint);
+          if (!kind) continue;
           const secondary = index
             ? detectSecondaryKinds(hint.path, kind, index)
             : [];
-          componentMap.set(hint.path, {
+          const component: Component = {
             name: hint.name ?? hint.path.split("/").pop() ?? hint.path,
             path: hint.path,
             kind,
             ...(secondary.length > 0 ? { secondaryKinds: secondary } : {}),
-            description: hint.description ?? "",
-            confidence: 0.8,
-            evidence: [],
-          });
+            ...(hint.description ? { description: hint.description } : {}),
+          };
+          componentMap.set(hint.path, component);
         }
       }
     }
 
     // Extract language stats from language detector metadata
     if (result.detectorId === "language" && result.metadata) {
-      if (Array.isArray(result.metadata.languageStats)) {
-        languageStats = result.metadata.languageStats as LanguageStats[];
-      }
-      if (typeof result.metadata.totalFiles === "number") {
-        totalFiles = result.metadata.totalFiles;
-      }
-      if (typeof result.metadata.totalLinesOfCode === "number") {
-        totalLinesOfCode = result.metadata.totalLinesOfCode;
-      }
+      const totalFiles =
+        typeof result.metadata.totalFiles === "number"
+          ? result.metadata.totalFiles
+          : 0;
+      const totalLines =
+        typeof result.metadata.totalLines === "number"
+          ? result.metadata.totalLines
+          : 0;
+      const perLanguage = Array.isArray(result.metadata.perLanguage)
+        ? (result.metadata.perLanguage as LanguageStats["perLanguage"])
+        : [];
+      languageStats = { totalFiles, totalLines, perLanguage };
     }
 
     // Special: monorepo detection
@@ -89,20 +95,17 @@ export const aggregate = async (
   );
 
   return {
+    scannedAt: new Date().toISOString(),
+    rootPath,
     inventory: {
       languages: sorted(languages),
-      languageStats,
-      totalFiles,
-      totalLinesOfCode,
       frameworks: sorted(frameworks),
     },
     architecture: {
       monorepo: isMonorepo,
       components,
     },
-    scanPath,
-    timestamp: new Date().toISOString(),
-    durationMs,
+    languageStats,
   };
 };
 

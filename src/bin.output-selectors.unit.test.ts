@@ -36,7 +36,7 @@ describe("repo-scanner bin output selectors", () => {
       const payload = JSON.parse(decode(result.stdout));
       expect(payload.architecture).toBeDefined();
       expect(payload.inventory).toBeDefined();
-      expect(payload.scanPath).toBeDefined();
+      expect(payload.rootPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -79,12 +79,7 @@ describe("repo-scanner bin output selectors", () => {
       expect(result.exitCode).toBe(0);
       const payload = JSON.parse(decode(result.stdout));
 
-      expectTopLevelKeys(payload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "frameworks",
-      ]);
+      expectTopLevelKeys(payload, ["rootPath", "scannedAt", "frameworks"]);
       expect(payload.frameworks).toBeArray();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
@@ -106,9 +101,8 @@ describe("repo-scanner bin output selectors", () => {
       expect(monorepoOnly.exitCode).toBe(0);
       const monorepoPayload = JSON.parse(decode(monorepoOnly.stdout));
       expectTopLevelKeys(monorepoPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
+        "rootPath",
+        "scannedAt",
         "monorepo",
       ]);
       expect(typeof monorepoPayload.monorepo).toBe("boolean");
@@ -132,9 +126,8 @@ describe("repo-scanner bin output selectors", () => {
       expect(language.exitCode).toBe(0);
       const languagePayload = JSON.parse(decode(language.stdout));
       expectTopLevelKeys(languagePayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
+        "rootPath",
+        "scannedAt",
         "languages",
       ]);
     } finally {
@@ -161,12 +154,7 @@ describe("repo-scanner bin output selectors", () => {
 
       expect(language.exitCode).toBe(0);
       const payload = JSON.parse(decode(language.stdout));
-      expectTopLevelKeys(payload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "languages",
-      ]);
+      expectTopLevelKeys(payload, ["rootPath", "scannedAt", "languages"]);
       expect(payload.languages).toContain("TypeScript");
     } finally {
       await rm(repoPath, { recursive: true, force: true });

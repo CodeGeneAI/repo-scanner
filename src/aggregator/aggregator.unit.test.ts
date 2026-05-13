@@ -3,8 +3,7 @@ import type { DetectorResult } from "../detectors/types";
 import { aggregate } from "./aggregator";
 
 describe("aggregate", async () => {
-  const scanPath = "/tmp/test-repo";
-  const durationMs = 42;
+  const rootPath = "/tmp/test-repo";
 
   it("merges findings from language and framework detectors into correct categories", async () => {
     const results: DetectorResult[] = [
@@ -23,7 +22,7 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
     expect(result.inventory.languages).toContain("TypeScript");
     expect(result.inventory.languages).toContain("Python");
@@ -41,7 +40,7 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
     // Set-based dedup means TypeScript appears once
     expect(
@@ -60,7 +59,7 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
     expect(result.inventory.languages).toContain("TypeScript");
     expect(result.inventory.languages).not.toContain("Lua");
@@ -81,7 +80,7 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
     expect(result.architecture.monorepo).toBe(true);
     expect(result.architecture.components).toHaveLength(2);
@@ -98,16 +97,15 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
     expect(result.architecture.monorepo).toBe(false);
   });
 
-  it("includes scanPath and durationMs in result", async () => {
-    const result = await aggregate(scanPath, durationMs, []);
+  it("includes rootPath and scannedAt in result", async () => {
+    const result = await aggregate(rootPath, []);
 
-    expect(result.scanPath).toBe(scanPath);
-    expect(result.durationMs).toBe(durationMs);
-    expect(result.timestamp).toBeDefined();
+    expect(result.rootPath).toBe(rootPath);
+    expect(result.scannedAt).toBeDefined();
   });
 
   it("returns sorted arrays", async () => {
@@ -122,15 +120,15 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
     expect(result.inventory.languages).toEqual(["Go", "Python", "TypeScript"]);
   });
 
-  it("forwards languageStats and totals from language detector metadata", async () => {
-    const stats = [
-      { name: "TypeScript", fileCount: 10, linesOfCode: 500, percentage: 71.4 },
-      { name: "Python", fileCount: 4, linesOfCode: 200, percentage: 28.6 },
+  it("forwards perLanguage and totals from language detector metadata", async () => {
+    const perLanguage = [
+      { language: "TypeScript", files: 10, lines: 500, percentage: 71.4 },
+      { language: "Python", files: 4, lines: 200, percentage: 28.6 },
     ];
     const results: DetectorResult[] = [
       {
@@ -140,21 +138,21 @@ describe("aggregate", async () => {
           { value: "Python", confidence: 0.8, evidence: [] },
         ],
         metadata: {
-          languageStats: stats,
+          perLanguage,
           totalFiles: 14,
-          totalLinesOfCode: 700,
+          totalLines: 700,
         },
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
-    expect(result.inventory.languageStats).toEqual(stats);
-    expect(result.inventory.totalFiles).toBe(14);
-    expect(result.inventory.totalLinesOfCode).toBe(700);
+    expect(result.languageStats.perLanguage).toEqual(perLanguage);
+    expect(result.languageStats.totalFiles).toBe(14);
+    expect(result.languageStats.totalLines).toBe(700);
   });
 
-  it("returns empty languageStats and zero totals when metadata is absent", async () => {
+  it("returns empty perLanguage and zero totals when metadata is absent", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -162,18 +160,18 @@ describe("aggregate", async () => {
       },
     ];
 
-    const result = await aggregate(scanPath, durationMs, results);
+    const result = await aggregate(rootPath, results);
 
-    expect(result.inventory.languageStats).toEqual([]);
-    expect(result.inventory.totalFiles).toBe(0);
-    expect(result.inventory.totalLinesOfCode).toBe(0);
+    expect(result.languageStats.perLanguage).toEqual([]);
+    expect(result.languageStats.totalFiles).toBe(0);
+    expect(result.languageStats.totalLines).toBe(0);
   });
 
   it("returns zero totals when no language detector present", async () => {
-    const result = await aggregate(scanPath, durationMs, []);
+    const result = await aggregate(rootPath, []);
 
-    expect(result.inventory.languageStats).toEqual([]);
-    expect(result.inventory.totalFiles).toBe(0);
-    expect(result.inventory.totalLinesOfCode).toBe(0);
+    expect(result.languageStats.perLanguage).toEqual([]);
+    expect(result.languageStats.totalFiles).toBe(0);
+    expect(result.languageStats.totalLines).toBe(0);
   });
 });

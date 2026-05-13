@@ -218,8 +218,8 @@ const resolveLanguageSelectorOutput = (
   if (result.inventory.languages.length > 0) {
     return result.inventory.languages;
   }
-  const languageNames = result.inventory.languageStats
-    .map((entry) => entry.name.trim())
+  const languageNames = result.languageStats.perLanguage
+    .map((entry) => entry.language.trim())
     .filter((name) => name.length > 0);
   return [...new Set(languageNames)];
 };
@@ -243,9 +243,8 @@ const buildDetectorJsonPayload = (
   detectorIds: readonly DetectorId[],
 ): Record<string, unknown> => {
   const payload: Record<string, unknown> = {
-    scanPath: result.scanPath,
-    timestamp: result.timestamp,
-    durationMs: result.durationMs,
+    rootPath: result.rootPath,
+    scannedAt: result.scannedAt,
   };
   for (const detectorId of detectorIds) {
     const entry = resolveDetectorOutputEntry(result, detectorId);
@@ -260,9 +259,7 @@ const renderDetectorTablePayload = (
   stream: NodeJS.WritableStream,
 ): void => {
   if (detectorIds.length === 0) return;
-  stream.write(
-    `repo-scanner — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
-  );
+  stream.write(`repo-scanner — scanned ${result.rootPath}\n`);
 
   for (const detectorId of detectorIds) {
     const { key, value } = resolveDetectorOutputEntry(result, detectorId);
@@ -363,8 +360,7 @@ const main = async () => {
 
   const explicitDetectorIds = resolveExplicitDetectorIds(options);
   const result = await scanRepo(options.path, {
-    enabledDetectorIds:
-      explicitDetectorIds.length > 0 ? explicitDetectorIds : undefined,
+    detectors: explicitDetectorIds.length > 0 ? explicitDetectorIds : undefined,
   });
 
   if (options.format === "json") {
