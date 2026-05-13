@@ -232,3 +232,84 @@ describe("packageManager detector: manifest fallback", () => {
     expect(names.filter((n) => n === "Cargo")).toHaveLength(1);
   });
 });
+
+describe("packageManager detector: PR #11 review fixes", () => {
+  test("C1: pip still reported when requirements.txt is in a different component than poetry", async () => {
+    const names = await detect({
+      "services/api/pyproject.toml": '[tool.poetry]\nname = "api"\n',
+      "jobs/worker/requirements.txt": "requests==2\n",
+    });
+    expect([...names].sort()).toEqual(["Poetry", "pip"]);
+  });
+
+  test("C1: pip suppressed when requirements.txt sibling of pyproject", async () => {
+    const names = await detect({
+      "pyproject.toml": "[tool.poetry]\n",
+      "requirements.txt": "requests==2\n",
+    });
+    expect(names).toContain("Poetry");
+    expect(names).not.toContain("pip");
+  });
+
+  test("C1: pip suppressed when requirements.txt is descendant of poetry dir", async () => {
+    const names = await detect({
+      "svc/pyproject.toml": "[tool.poetry]\n",
+      "svc/dev-requirements/requirements.txt": "pytest==7\n",
+    });
+    expect(names).toContain("Poetry");
+    expect(names).not.toContain("pip");
+  });
+
+  test("C2: package.json packageManager: pnpm@9 → pnpm", async () => {
+    const names = await detect({
+      "package.json": JSON.stringify({ packageManager: "pnpm@9.0.0" }),
+    });
+    expect(names).toContain("pnpm");
+  });
+
+  test("C2: package.json packageManager: yarn@4 → Yarn", async () => {
+    const names = await detect({
+      "package.json": JSON.stringify({ packageManager: "yarn@4.0.0" }),
+    });
+    expect(names).toContain("Yarn");
+  });
+
+  test("C2: package.json without packageManager field → no JS PM", async () => {
+    const names = await detect({
+      "package.json": JSON.stringify({ name: "x", dependencies: {} }),
+    });
+    // No JS PM should be reported from a bare package.json with no lockfile / packageManager field.
+    expect(
+      names.filter((n) => ["npm", "pnpm", "Yarn", "Bun"].includes(n)),
+    ).toEqual([]);
+  });
+
+  test("C3: pyproject.toml [tool.uv.sources] → uv", async () => {
+    const names = await detect({
+      "pyproject.toml": '[tool.uv.sources]\nfoo = { path = "./foo" }\n',
+    });
+    expect(names).toContain("uv");
+  });
+
+  test("C3: pyproject.toml [tool.uv.dev-dependencies] → uv", async () => {
+    const names = await detect({
+      "pyproject.toml": '[tool.uv.dev-dependencies]\npytest = "*"\n',
+    });
+    expect(names).toContain("uv");
+  });
+
+  test("C4: pnpm-workspace.yaml alone → pnpm", async () => {
+    const names = await detect({
+      "pnpm-workspace.yaml": "packages:\n  - 'apps/*'\n",
+    });
+    expect(names).toContain("pnpm");
+  });
+
+  test("C4: pnpm-workspace.yaml + pnpm-lock.yaml → still single pnpm entry (dedup)", async () => {
+    const names = await detect({
+      "pnpm-workspace.yaml": "packages:\n  - 'apps/*'\n",
+      "pnpm-lock.yaml": "lockfileVersion: '9'\n",
+    });
+    expect(names.filter((n) => n === "pnpm")).toHaveLength(1);
+  });
+});

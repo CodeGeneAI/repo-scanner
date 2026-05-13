@@ -1,5 +1,5 @@
 import type { FileIndex } from "../utils/file-index";
-import { readText } from "../utils/fs";
+import { readJson, readText } from "../utils/fs";
 import { registerDetector } from "./registry";
 import { createFindingAdder } from "./shared";
 import type { DetectorResult } from "./types";
@@ -36,6 +36,11 @@ type ManifestRule = {
   readonly name: string;
 };
 
+/** Regex matching any [tool.uv] or [tool.uv.<subtable>] header in pyproject.toml.
+ *  C3 fix: broadened from /\[tool\.uv(?:\.workspace)?\]/ to cover [tool.uv.sources],
+ *  [tool.uv.dev-dependencies], etc. */
+const PY_UV_RE = /\[tool\.uv(?:\.[a-zA-Z][a-zA-Z0-9_-]*)?\]/;
+
 const MANIFEST_RULES: readonly ManifestRule[] = [
   // Python: content-aware (no bare-pyproject false positives).
   {
@@ -45,7 +50,7 @@ const MANIFEST_RULES: readonly ManifestRule[] = [
   },
   {
     file: "pyproject.toml",
-    match: (c) => /\[tool\.uv(?:\.workspace)?\]/.test(c),
+    match: (c) => PY_UV_RE.test(c),
     name: "uv",
   },
   {
@@ -54,6 +59,8 @@ const MANIFEST_RULES: readonly ManifestRule[] = [
     name: "Pipenv",
   },
   { file: "Pipfile", name: "Pipenv" },
+  // C4 fix: pnpm-workspace.yaml presence → pnpm.
+  { file: "pnpm-workspace.yaml", name: "pnpm" },
   // Non-Python manifests with no lockfile of their own.
   { file: "Cargo.toml", name: "Cargo" },
   { file: "go.mod", name: "Go modules" },
@@ -79,13 +86,26 @@ const MANIFEST_EXT_RULES: ReadonlyMap<string, string> = new Map([
   [".vbproj", "NuGet"],
 ]);
 
-/** Python-PM names: if any of these were already found, suppress 'pip' from requirements.txt. */
-const PYTHON_PM_NAMES = new Set(["Poetry", "uv", "Pipenv"]);
+/** C2 fix: Corepack-style packageManager field name → display name mapping. */
+const NPM_PACKAGE_MANAGER_FIELDS: ReadonlyMap<string, string> = new Map([
+  ["npm", "npm"],
+  ["pnpm", "pnpm"],
+  ["yarn", "Yarn"],
+  ["bun", "Bun"],
+]);
+
+/** Returns the directory portion of a relative path (repo-root-relative).
+ *  e.g. "services/api/pyproject.toml" → "services/api"
+ *       "requirements.txt" → "." */
+const dirOf = (rel: string): string => {
+  const i = rel.lastIndexOf("/");
+  return i < 0 ? "." : rel.slice(0, i);
+};
 
 registerDetector({
   id: "packageManager",
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
-    const { findings, addFinding, seen } = createFindingAdder();
+    const { findings, addFinding } = createFindingAdder();
 
     // 1. Lockfiles first (presence-based, confidence 1.0).
     for (const [fileName, pmName] of LOCKFILE_RULES) {
@@ -114,17 +134,67 @@ registerDetector({
       }
     }
 
-    // 4. requirements.txt → pip, ONLY if no stronger Python signal already present.
-    const pythonSignalPresent =
-      [...seen].some((n) => PYTHON_PM_NAMES.has(n)) ||
-      index.getByNamePrimary("uv.lock").length > 0 ||
-      index.getByNamePrimary("poetry.lock").length > 0 ||
-      index.getByNamePrimary("Pipfile.lock").length > 0;
-    if (!pythonSignalPresent) {
-      const reqs = index.getByNamePrimary("requirements.txt");
-      if (reqs.length > 0) {
-        addFinding("pip", 0.7, `manifest: ${reqs[0]!.relativePath}`);
+    // 4. C2 fix: package.json#packageManager field (Corepack syntax: <name>@<version>).
+    //    Reports JS PM even when no lockfile is committed.
+    for (const pkgFile of index.getByNamePrimary("package.json")) {
+      const pkg = await readJson<{ packageManager?: string }>(pkgFile.path);
+      const declared = pkg?.packageManager;
+      if (!declared) continue;
+      const [name] = declared.split("@", 2);
+      const display = name
+        ? NPM_PACKAGE_MANAGER_FIELDS.get(name.toLowerCase())
+        : undefined;
+      if (display) {
+        addFinding(
+          display,
+          0.7,
+          `manifest: ${pkgFile.relativePath} packageManager=${declared}`,
+        );
       }
+    }
+
+    // 5. C1 fix: requirements.txt → pip, scoped per-component.
+    //    Pip is suppressed only when a stronger Python signal (Poetry/uv/Pipenv) lives
+    //    in the same directory or an ancestor directory of the requirements file.
+    //    This allows a monorepo where one component uses Poetry and another uses pip.
+    const pythonSignalDirs = new Set<string>();
+
+    for (const f of index.getByNamePrimary("uv.lock"))
+      pythonSignalDirs.add(dirOf(f.relativePath));
+    for (const f of index.getByNamePrimary("poetry.lock"))
+      pythonSignalDirs.add(dirOf(f.relativePath));
+    for (const f of index.getByNamePrimary("Pipfile.lock"))
+      pythonSignalDirs.add(dirOf(f.relativePath));
+    for (const f of index.getByNamePrimary("Pipfile"))
+      pythonSignalDirs.add(dirOf(f.relativePath));
+    for (const f of index.getByNamePrimary("pyproject.toml")) {
+      const content = await readText(f.path);
+      if (!content) continue;
+      if (
+        /\[tool\.poetry\]/.test(content) ||
+        PY_UV_RE.test(content) ||
+        /\[tool\.pipenv\]/.test(content)
+      ) {
+        pythonSignalDirs.add(dirOf(f.relativePath));
+      }
+    }
+
+    const isCoveredByPythonSignal = (reqPath: string): boolean => {
+      let dir = dirOf(reqPath);
+      while (true) {
+        if (pythonSignalDirs.has(dir)) return true;
+        if (dir === "." || dir === "") return false;
+        const next = dir.includes("/")
+          ? dir.slice(0, dir.lastIndexOf("/"))
+          : ".";
+        if (next === dir) return false;
+        dir = next;
+      }
+    };
+
+    for (const req of index.getByNamePrimary("requirements.txt")) {
+      if (isCoveredByPythonSignal(req.relativePath)) continue;
+      addFinding("pip", 0.7, `manifest: ${req.relativePath}`);
     }
 
     return {
