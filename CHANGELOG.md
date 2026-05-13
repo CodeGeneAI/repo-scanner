@@ -1,5 +1,16 @@
 # @codegeneai/repo-scanner
 
+## [1.0.0](https://github.com/CodeGeneAI/repo-scanner/compare/v0.4.3...v1.0.0) (2026-05-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* strip down to language + framework + monorepo detectors ([#7](https://github.com/CodeGeneAI/repo-scanner/issues/7))
+
+### Features
+
+* strip down to language + framework + monorepo detectors ([#7](https://github.com/CodeGeneAI/repo-scanner/issues/7)) ([68607ac](https://github.com/CodeGeneAI/repo-scanner/commit/68607ac3858f9e899c46cc9efb607862d0c71caa))
+
 ## [0.4.3](https://github.com/CodeGeneAI/repo-scanner/compare/v0.4.2...v0.4.3) (2026-05-12)
 
 
