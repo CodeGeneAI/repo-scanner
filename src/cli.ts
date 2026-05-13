@@ -90,6 +90,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let languageDetector = false;
   let frameworkDetector = false;
   let monorepoDetector = false;
+  let packageManagerDetector = false;
   const enableDetector = (detectorId: DetectorId): void => {
     switch (detectorId) {
       case "framework":
@@ -100,6 +101,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "monorepo":
         monorepoDetector = true;
+        return;
+      case "packageManager":
+        packageManagerDetector = true;
         return;
     }
   };
@@ -209,6 +213,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     languageDetector,
     frameworkDetector,
     monorepoDetector,
+    packageManagerDetector,
   };
 };
 

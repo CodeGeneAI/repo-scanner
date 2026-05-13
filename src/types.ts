@@ -64,4 +64,5 @@ export interface CliOptions {
   readonly languageDetector: boolean;
   readonly frameworkDetector: boolean;
   readonly monorepoDetector: boolean;
+  readonly packageManagerDetector: boolean;
 }

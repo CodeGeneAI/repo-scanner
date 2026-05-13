@@ -41,6 +41,9 @@ export const renderTable = (
   w(section("Frameworks"));
   w(`  ${list(result.inventory.frameworks)}\n`);
 
+  w(section("Package managers"));
+  w(`  ${list(result.inventory.packageManagers)}\n`);
+
   w(section("Monorepo"));
   const flag = result.architecture.monorepo ? "yes" : "no";
   const suffix = result.architecture.toolName

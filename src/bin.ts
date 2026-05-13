@@ -214,6 +214,7 @@ const resolveExplicitDetectorIds = (
   if (options.languageDetector) ids.push("language");
   if (options.frameworkDetector) ids.push("framework");
   if (options.monorepoDetector) ids.push("monorepo");
+  if (options.packageManagerDetector) ids.push("packageManager");
   return ids;
 };
 

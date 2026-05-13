@@ -14,6 +14,7 @@ describe("parseArgs", () => {
     expect(result.languageDetector).toBeFalse();
     expect(result.frameworkDetector).toBeFalse();
     expect(result.monorepoDetector).toBeFalse();
+    expect(result.packageManagerDetector).toBeFalse();
   });
 
   it("parses --detectors with multiple detector ids", () => {
@@ -27,6 +28,20 @@ describe("parseArgs", () => {
     expect(result.languageDetector).toBeTrue();
     expect(result.frameworkDetector).toBeTrue();
     expect(result.monorepoDetector).toBeTrue();
+  });
+
+  it("parses --detectors packageManager", () => {
+    const result = parseArgs([
+      "bun",
+      "repo-scanner",
+      "--detectors",
+      "packageManager",
+    ]);
+
+    expect(result.packageManagerDetector).toBeTrue();
+    expect(result.languageDetector).toBeFalse();
+    expect(result.frameworkDetector).toBeFalse();
+    expect(result.monorepoDetector).toBeFalse();
   });
 
   it("emits warnings for duplicate detector selection", () => {

@@ -46,3 +46,23 @@ describe("renderTable monorepo line", () => {
     expect(out).toMatch(/Monorepo[\s\S]*yes[\s\S]*Turborepo/);
   });
 });
+
+test("renders Package managers section with detected entries", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: ["Bun", "pnpm"],
+      },
+    }),
+  );
+  expect(out).toMatch(/Package managers/);
+  expect(out).toMatch(/Bun.*pnpm|pnpm.*Bun/);
+});
+
+test("renders Package managers section with (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/Package managers/);
+  expect(out).toMatch(/Package managers[\s\S]*\(none\)/);
+});

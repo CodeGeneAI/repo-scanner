@@ -44,6 +44,7 @@ repo-scanner --version
 - **language** — files and lines of code per language across the supported language set (extension-based).
 - **framework** — framework and library detection from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Gemfile`, `composer.json`, `pubspec.yaml`, etc.).
 - **monorepo** — workspace detection (Turborepo, Nx, Lerna, Rush, pnpm workspaces, Go workspaces, Bazel, Pants, Melos, .NET Solutions) plus component classification. Returns the detected workspace tool name in `architecture.toolName`.
+- **packageManager** — detects npm, pnpm, Yarn, Bun, pip, Poetry, uv, Pipenv, Cargo, Go modules, Bundler, Composer, NuGet, pub, Maven, Gradle, sbt, Mix, Swift Package Manager, Stack, Cabal from lockfiles and manifests.
 
 ## Component classification
 
@@ -84,6 +85,7 @@ const result = await scanRepo("/path/to/repo");
 
 result.inventory.languages;           // string[]
 result.inventory.frameworks;          // string[]
+result.inventory.packageManagers;     // string[]
 result.architecture.monorepo;         // boolean
 result.architecture.toolName;         // string | undefined — workspace tool, e.g. "Turborepo"
 result.architecture.components;       // Component[]
@@ -111,7 +113,7 @@ import type {
 |------|-------------|---------|
 | `-p`, `--path <dir>` | Directory to scan | cwd |
 | `-f`, `--format <fmt>` | Output format: `table` or `json` | `table` |
-| `--detectors <list>` | Comma-separated detector IDs (`language`, `framework`, `monorepo`) | all three |
+| `--detectors <list>` | Comma-separated detector IDs (`language`, `framework`, `monorepo`, `packageManager`) | all |
 | `--version`, `-v` | Show version | |
 | `--help`, `-h` | Show help | |
 

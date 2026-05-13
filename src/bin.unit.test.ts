@@ -41,6 +41,21 @@ describe("CLI --detectors filter preserves canonical schema", () => {
   });
 });
 
+test("--detectors packageManager emits canonical schema with empty other fields", async () => {
+  const out = (await run([
+    "--path",
+    ".",
+    "--format",
+    "json",
+    "--detectors",
+    "packageManager",
+  ])) as any;
+  expect(out.inventory.packageManagers).toBeDefined();
+  expect(out.inventory.languages).toEqual([]);
+  expect(out.inventory.frameworks).toEqual([]);
+  expect(out.architecture.monorepo).toBe(false);
+});
+
 test("--path on nonexistent dir prints a friendly error and exits nonzero", async () => {
   const proc = Bun.spawn(
     ["bun", "src/bin.ts", "--path", "/definitely/not/here/foo"],
