@@ -3,11 +3,9 @@
 **/*.unit.test.tsx
 **/*.unit.spec.ts
 **/*.unit.spec.tsx
+**/*.test.helpers.ts
 **/__fixtures__/
 **/__snapshots__/
-
-# Dev-only helpers
-src/perf/
 
 # Build artifacts and caches
 dist/
@@ -21,6 +19,17 @@ coverage/
 # Editor / OS cruft
 .DS_Store
 *.log
+
+# Repo tooling / CI / release infra (not useful to consumers)
+.github/
+.release-please-config.json
+.release-please-manifest.json
+bun.lock
+.gitignore
+.npmignore
+.agents/
+.codex/
+docs/
 
 # Agent / workspace guidance (not useful to consumers)
 AGENTS.md
