@@ -1,4 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
+import { mkdir, mkdtemp, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import path from "path";
+import { walkFiles } from "./fs";
 import { buildIgnoreMatcher, parseIgnoreFile } from "./scanignore";
 
 describe("parseIgnoreFile", () => {
@@ -123,4 +127,21 @@ describe("buildIgnoreMatcher", () => {
     expect(matcher.ignores("test-data", false)).toBe(true);
     expect(matcher.ignores("testing", false)).toBe(false);
   });
+});
+
+test("walker re-includes child of an ignored directory via negation", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "rs-neg-"));
+  await mkdir(path.join(dir, "tools/critical-tool"), { recursive: true });
+  await mkdir(path.join(dir, "tools/other"), { recursive: true });
+  await mkdir(path.join(dir, "src"), { recursive: true });
+  await writeFile(path.join(dir, "src/a.js"), "1\n");
+  await writeFile(path.join(dir, "tools/critical-tool/c.js"), "1\n");
+  await writeFile(path.join(dir, "tools/other/d.js"), "1\n");
+  await writeFile(path.join(dir, ".scanignore"), "tools/\n!tools/critical-tool/\n");
+  const files: string[] = [];
+  for await (const f of walkFiles(dir, { rootForRelative: dir })) {
+    files.push(path.relative(dir, f));
+  }
+  files.sort();
+  expect(files).toEqual([".scanignore", "src/a.js", "tools/critical-tool/c.js"]);
 });

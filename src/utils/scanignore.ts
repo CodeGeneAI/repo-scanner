@@ -21,6 +21,12 @@ export interface IgnoreMatcher {
   ignores(relativePath: string, isDirectory: boolean): boolean;
   /** Create a child matcher that inherits parent rules and adds new ones scoped to a subdirectory. */
   child(childDir: string, rules: readonly IgnoreRule[]): IgnoreMatcher;
+  /**
+   * Returns true when at least one negation rule could re-include something
+   * under `dirRel`. Callers (the walker) use this to decide whether to
+   * recurse into an otherwise-ignored directory.
+   */
+  mightReincludeUnder(dirRel: string): boolean;
 }
 
 const SCANIGNORE_FILE = ".scanignore";
@@ -236,6 +242,20 @@ const createMatcher = (rules: readonly IgnoreRule[]): IgnoreMatcher => {
         })),
       ];
       return createMatcher(combined);
+    },
+
+    mightReincludeUnder(dirRel: string): boolean {
+      const normalized = dirRel.endsWith("/") ? dirRel : `${dirRel}/`;
+      for (const rule of rules) {
+        if (!rule.negated) continue;
+        // Negation rules whose pattern starts inside the ignored directory.
+        if (rule.pattern.startsWith(normalized)) return true;
+        // Unanchored negation patterns can match anywhere under the dir.
+        if (!rule.anchored) return true;
+        // `**/...` patterns may match descendants too.
+        if (rule.pattern.startsWith("**/")) return true;
+      }
+      return false;
     },
   };
 };
