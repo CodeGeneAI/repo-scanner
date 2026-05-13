@@ -196,6 +196,7 @@ registerDetector({
       addFinding,
       0.95,
       "Go dep",
+      { excludeLinePrefixes: ["module "] },
     );
 
     // 5. Check Cargo.toml for Rust frameworks (primary only)
