@@ -28,6 +28,11 @@ export function createFindingAdder(): {
   return { seen, findings, addFinding };
 }
 
+export interface ScanIndicatorsOptions {
+  /** Lines starting with any of these prefixes are skipped when matching. */
+  excludeLinePrefixes?: readonly string[];
+}
+
 /**
  * Scan named files for substring indicators from a map.
  * Used by testing, framework, and datastore detectors to check
@@ -40,13 +45,25 @@ export async function scanFilesForIndicators(
   addFinding: (name: string, confidence: number, evidence: string) => void,
   confidence: number,
   evidencePrefix: string,
+  options?: ScanIndicatorsOptions,
 ): Promise<void> {
+  const excludePrefixes = options?.excludeLinePrefixes ?? [];
   for (const fileName of fileNames) {
     for (const file of index.getByNamePrimary(fileName)) {
       const content = await readText(file.path);
       if (!content) continue;
+      const haystack =
+        excludePrefixes.length === 0
+          ? content
+          : content
+              .split("\n")
+              .filter(
+                (line) =>
+                  !excludePrefixes.some((p) => line.trimStart().startsWith(p)),
+              )
+              .join("\n");
       for (const [indicator, name] of indicatorMap) {
-        if (content.includes(indicator)) {
+        if (haystack.includes(indicator)) {
           addFinding(
             name,
             confidence,

@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import fs from "fs";
+import { stat } from "fs/promises";
 import path from "path";
 import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import {
@@ -11,13 +12,12 @@ import "./detectors/init";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { scanRepo } from "./scanner";
-import type { RepoScanResult } from "./types";
 
 const renderDetectorsOutput = (
-  format: "table" | "json",
+  json: boolean,
   stream: NodeJS.WritableStream,
 ): void => {
-  if (format === "json") {
+  if (json) {
     renderJson({ detectors: DETECTOR_CATALOG }, stream);
     return;
   }
@@ -45,7 +45,7 @@ _repo_scanner()
     COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
     return 0
   fi
-  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors" -- "\${current}") )
+  COMPREPLY=( $(compgen -W "--help --version --path --json --detectors" -- "\${current}") )
 }
 complete -F _repo_scanner repo-scanner
 `;
@@ -59,7 +59,7 @@ _repo_scanner() {
   _arguments -C \\
     '--detectors[Comma-separated detector IDs]:detectors:->detectors' \\
     '--path[Directory to scan]:path:_files -/' \\
-    '--format[Output format]:format:(table json)' \\
+    '--json[Output JSON]' \\
     '--help[Show help]' \\
     '--version[Show version]'
   case $state in
@@ -84,7 +84,7 @@ for detector in $detector_ids
   complete -c repo-scanner -l detectors -xa "$detector"
 end
 complete -c repo-scanner -l path -r
-complete -c repo-scanner -l format -xa "table json"
+complete -c repo-scanner -l json -d "Output JSON"
 complete -c repo-scanner -l help
 complete -c repo-scanner -l version
 `;
@@ -207,76 +207,6 @@ const resolveCompletionInstallPath = (
   );
 };
 
-type DetectorOutputEntry = {
-  readonly key: string;
-  readonly value: unknown;
-};
-
-const resolveLanguageSelectorOutput = (
-  result: RepoScanResult,
-): readonly string[] => {
-  if (result.inventory.languages.length > 0) {
-    return result.inventory.languages;
-  }
-  const languageNames = result.languageStats.perLanguage
-    .map((entry) => entry.language.trim())
-    .filter((name) => name.length > 0);
-  return [...new Set(languageNames)];
-};
-
-const resolveDetectorOutputEntry = (
-  result: RepoScanResult,
-  detectorId: DetectorId,
-): DetectorOutputEntry => {
-  switch (detectorId) {
-    case "framework":
-      return { key: "frameworks", value: result.inventory.frameworks };
-    case "language":
-      return { key: "languages", value: resolveLanguageSelectorOutput(result) };
-    case "monorepo":
-      return { key: "monorepo", value: result.architecture.monorepo };
-  }
-};
-
-const buildDetectorJsonPayload = (
-  result: RepoScanResult,
-  detectorIds: readonly DetectorId[],
-): Record<string, unknown> => {
-  const payload: Record<string, unknown> = {
-    rootPath: result.rootPath,
-    scannedAt: result.scannedAt,
-  };
-  for (const detectorId of detectorIds) {
-    const entry = resolveDetectorOutputEntry(result, detectorId);
-    payload[entry.key] = entry.value;
-  }
-  return payload;
-};
-
-const renderDetectorTablePayload = (
-  result: RepoScanResult,
-  detectorIds: readonly DetectorId[],
-  stream: NodeJS.WritableStream,
-): void => {
-  if (detectorIds.length === 0) return;
-  stream.write(`repo-scanner — scanned ${result.rootPath}\n`);
-
-  for (const detectorId of detectorIds) {
-    const { key, value } = resolveDetectorOutputEntry(result, detectorId);
-    stream.write(`\n${key}\n`);
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      value === null
-    ) {
-      stream.write(`  ${String(value)}\n`);
-      continue;
-    }
-    stream.write(`${JSON.stringify(value, null, 2)}\n`);
-  }
-};
-
 const resolveExplicitDetectorIds = (
   options: ReturnType<typeof parseArgs>,
 ): readonly DetectorId[] => {
@@ -284,6 +214,7 @@ const resolveExplicitDetectorIds = (
   if (options.languageDetector) ids.push("language");
   if (options.frameworkDetector) ids.push("framework");
   if (options.monorepoDetector) ids.push("monorepo");
+  if (options.packageManagerDetector) ids.push("packageManager");
   return ids;
 };
 
@@ -306,7 +237,7 @@ const main = async () => {
   }
 
   if (options.showDetectors) {
-    renderDetectorsOutput(options.format, process.stdout);
+    renderDetectorsOutput(options.json, process.stdout);
     process.exit(0);
   }
 
@@ -358,26 +289,27 @@ const main = async () => {
     process.exit(0);
   }
 
-  const explicitDetectorIds = resolveExplicitDetectorIds(options);
-  const result = await scanRepo(options.path, {
-    detectors: explicitDetectorIds.length > 0 ? explicitDetectorIds : undefined,
-  });
+  try {
+    const s = await stat(options.path);
+    if (!s.isDirectory()) {
+      process.stderr.write(`Error: ${options.path} is not a directory.\n`);
+      process.exit(2);
+    }
+  } catch {
+    process.stderr.write(`Error: no such directory: ${options.path}\n`);
+    process.exit(2);
+  }
 
-  if (options.format === "json") {
-    if (explicitDetectorIds.length > 0) {
-      renderJson(
-        buildDetectorJsonPayload(result, explicitDetectorIds),
-        process.stdout,
-      );
-    } else {
-      renderJson(result as unknown as Record<string, unknown>, process.stdout);
-    }
+  const explicitDetectorIds = resolveExplicitDetectorIds(options);
+  const result =
+    explicitDetectorIds.length > 0
+      ? await scanRepo(options.path, { detectors: explicitDetectorIds })
+      : await scanRepo(options.path);
+
+  if (options.json) {
+    renderJson(result as unknown as Record<string, unknown>, process.stdout);
   } else {
-    if (explicitDetectorIds.length > 0) {
-      renderDetectorTablePayload(result, explicitDetectorIds, process.stdout);
-    } else {
-      renderTable(result, process.stdout);
-    }
+    renderTable(result, process.stdout);
   }
 };
 

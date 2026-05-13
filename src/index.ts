@@ -1,3 +1,5 @@
+import "./detectors/init";
+
 export type { DetectorId } from "./detectors/catalog";
 export { scanRepo } from "./scanner";
 export type {
@@ -6,6 +8,8 @@ export type {
   ComponentKind,
   Inventory,
   LanguageStats,
+  PartialInventory,
+  PartialRepoScanResult,
   RepoScanResult,
   ScanRepoOptions,
 } from "./types";

@@ -79,7 +79,7 @@ export async function* walkFiles(
   let matcher = options?.ignoreMatcher;
 
   // Check for a .scanignore file in this directory (nested/additive)
-  if (depth > 0 && options?.loadNestedScanignore !== false) {
+  if (options?.loadNestedScanignore !== false) {
     const childRules = await readScanignore(rootPath);
     if (childRules.length > 0) {
       const dirRel = path.relative(relativeRoot, rootPath);
@@ -89,7 +89,9 @@ export async function* walkFiles(
         // No parent matcher — create a fresh one scoped to this directory
         matcher = buildIgnoreMatcher(
           childRules.map((r) =>
-            r.anchored ? { ...r, pattern: `${dirRel}/${r.pattern}` } : r,
+            r.anchored && dirRel
+              ? { ...r, pattern: `${dirRel}/${r.pattern}` }
+              : r,
           ),
         );
       }
@@ -113,8 +115,8 @@ export async function* walkFiles(
           continue;
         }
       }
-      // Check .scanignore rules
-      if (matcher?.ignores(relativePath, true)) continue;
+      const dirIgnored = matcher?.ignores(relativePath, true) ?? false;
+      if (dirIgnored && !matcher?.mightReincludeUnder(relativePath)) continue;
 
       yield* walkFiles(
         fullPath,

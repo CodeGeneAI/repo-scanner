@@ -49,6 +49,7 @@ const COMPONENT_DIRS = [
   "terraform",
   "deploy",
   "tools",
+  "tooling",
   "scripts",
   "e2e",
   "crates",
@@ -101,6 +102,66 @@ registerDetector({
         const compPath = projPath.split("/").slice(0, -1).join("/");
         if (compPath && !componentHints.some((c) => c.path === compPath)) {
           componentHints.push({ path: compPath, name: projName });
+        }
+      }
+    }
+
+    // Parse pnpm-workspace.yaml `packages:` globs into components
+    if (index.hasFile("pnpm-workspace.yaml")) {
+      const yamlText = await readText(
+        path.join(rootPath, "pnpm-workspace.yaml"),
+      );
+      if (yamlText) {
+        for (const glob of parsePnpmWorkspaceGlobs(yamlText)) {
+          if (glob.startsWith("!")) continue;
+          const isLiteral = !glob.includes("*");
+          if (isLiteral) {
+            const manifestFile = index
+              .getByNamePrimary("package.json")
+              .find((f) => f.relativePath === `${glob}/package.json`);
+            if (manifestFile) {
+              const pkg = await readJson<PackageJson>(manifestFile.path);
+              if (!componentHints.some((c) => c.path === glob)) {
+                componentHints.push({
+                  path: glob,
+                  name: pkg?.name ?? glob.split("/").pop()!,
+                  description: pkg?.description,
+                  manifestPath: manifestFile.path,
+                  manifestName: "package.json",
+                });
+              }
+            }
+          } else {
+            const parentDir = glob.split("/")[0]!;
+            if (parentDir && parentDir !== "*") {
+              for (const comp of await discoverComponents(index, parentDir)) {
+                if (!componentHints.some((c) => c.path === comp.path)) {
+                  componentHints.push(comp);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Parse go.work `use (...)` block into components
+    if (index.hasFile("go.work")) {
+      const goWork = await readText(path.join(rootPath, "go.work"));
+      if (goWork) {
+        for (const usePath of parseGoWorkUseDirective(goWork)) {
+          if (componentHints.some((c) => c.path === usePath)) continue;
+          const goModRel = `${usePath}/go.mod`;
+          const goModFile = index
+            .getByNamePrimary("go.mod")
+            .find((f) => f.relativePath === goModRel);
+          componentHints.push({
+            path: usePath,
+            name: usePath.split("/").pop() ?? usePath,
+            ...(goModFile
+              ? { manifestPath: goModFile.path, manifestName: "go.mod" }
+              : {}),
+          });
         }
       }
     }
@@ -350,3 +411,46 @@ registerDetector({
     };
   },
 });
+
+function parseGoWorkUseDirective(text: string): string[] {
+  const out: string[] = [];
+  const blockMatch = text.match(/use\s*\(([^)]*)\)/);
+  if (blockMatch) {
+    for (const raw of blockMatch[1]!.split("\n")) {
+      const line = raw.replace(/\/\/.*$/, "").trim();
+      if (!line) continue;
+      out.push(line.replace(/^\.\//, ""));
+    }
+    return out;
+  }
+  for (const raw of text.split("\n")) {
+    const line = raw.replace(/\/\/.*$/, "").trim();
+    const m = line.match(/^use\s+(\S+)$/);
+    if (m) out.push(m[1]!.replace(/^\.\//, ""));
+  }
+  return out;
+}
+
+function parsePnpmWorkspaceGlobs(yamlText: string): string[] {
+  const lines = yamlText.split("\n");
+  const out: string[] = [];
+  let inPackages = false;
+  for (const raw of lines) {
+    const line = raw.replace(/#.*$/, "");
+    if (/^\s*packages\s*:/.test(line)) {
+      inPackages = true;
+      continue;
+    }
+    if (inPackages) {
+      const m = line.match(/^\s*-\s*['"]?([^'"\s]+)['"]?\s*$/);
+      if (m) {
+        out.push(m[1]!);
+        continue;
+      }
+      if (/^\S/.test(line) && line.trim().length > 0) {
+        inPackages = false;
+      }
+    }
+  }
+  return out;
+}

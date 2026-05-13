@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
+import { scanRepo } from "../index";
 import { FileIndex } from "../utils/file-index";
 import "./init";
 import { getDetectors } from "./registry";
@@ -269,6 +270,73 @@ members = ["packages/*"]
     expect(compPaths).toContain("packages/lib-a");
   });
 
+  it("discovers tooling/* packages declared in pnpm-workspace.yaml", async () => {
+    await writeFile(
+      path.join(tmpDir, "pnpm-workspace.yaml"),
+      `packages:\n  - 'apps/*'\n  - 'packages/*'\n  - 'tooling/*'\n`,
+    );
+    await writeFile(path.join(tmpDir, "package.json"), "{}");
+    for (const sub of ["apps/web", "packages/ui", "tooling/eslint-config"]) {
+      await mkdir(path.join(tmpDir, sub), { recursive: true });
+      await writeFile(
+        path.join(tmpDir, sub, "package.json"),
+        JSON.stringify({ name: sub.split("/").pop() }),
+      );
+    }
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const res = await detector.detect(tmpDir, index);
+    const paths = (res.componentHints ?? []).map((c) => c.path).sort();
+    expect(paths).toContain("apps/web");
+    expect(paths).toContain("packages/ui");
+    expect(paths).toContain("tooling/eslint-config");
+  });
+
+  it("populates components from go.work use() directive", async () => {
+    await writeFile(
+      path.join(tmpDir, "go.work"),
+      "go 1.22\n\nuse (\n  ./svc-a\n  ./svc-b\n)\n",
+    );
+    for (const sub of ["svc-a", "svc-b"]) {
+      await mkdir(path.join(tmpDir, sub), { recursive: true });
+      await writeFile(
+        path.join(tmpDir, sub, "go.mod"),
+        `module example.com/${sub}\n\ngo 1.22\n`,
+      );
+      await writeFile(path.join(tmpDir, sub, "main.go"), "package main\n");
+    }
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const res = await detector.detect(tmpDir, index);
+    expect(res.findings.some((f) => f.value === "Go workspaces")).toBe(true);
+    const paths = (res.componentHints ?? []).map((c) => c.path).sort();
+    expect(paths).toEqual(["svc-a", "svc-b"]);
+  });
+
+  it("go.work use() directive components survive classification (full scan)", async () => {
+    await writeFile(
+      path.join(tmpDir, "go.work"),
+      "go 1.22\n\nuse (\n  ./svc-a\n  ./svc-b\n)\n",
+    );
+    for (const sub of ["svc-a", "svc-b"]) {
+      await mkdir(path.join(tmpDir, sub), { recursive: true });
+      await writeFile(
+        path.join(tmpDir, sub, "go.mod"),
+        `module example.com/${sub}\n\ngo 1.22\n`,
+      );
+      await writeFile(path.join(tmpDir, sub, "main.go"), "package main\n");
+    }
+    const result = await scanRepo(tmpDir);
+    expect(result.architecture.monorepo).toBe(true);
+    expect(result.architecture.toolName).toBe("Go workspaces");
+    const paths = result.architecture.components.map((c) => c.path).sort();
+    expect(paths).toEqual(["svc-a", "svc-b"]);
+    // After R2-1: classifier defaults to "package" for hints with manifestPath.
+    expect(
+      result.architecture.components.every((c) => c.kind === "package"),
+    ).toBe(true);
+  });
+
   it("returns no findings for a non-monorepo", async () => {
     await writeFile(
       path.join(tmpDir, "package.json"),
@@ -282,4 +350,25 @@ members = ["packages/*"]
 
     expect(result.findings).toHaveLength(0);
   });
+});
+
+async function runMonorepo(dir: string): Promise<DetectorResult> {
+  const detector = findDetector("monorepo");
+  const index = await FileIndex.build(dir);
+  return detector.detect(dir, index);
+}
+
+test("convention scan picks up tooling/ even without a workspace manifest", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "rs-tooling-"));
+  for (const sub of ["tooling/a", "tooling/b"]) {
+    await mkdir(path.join(dir, sub), { recursive: true });
+    await writeFile(
+      path.join(dir, sub, "package.json"),
+      JSON.stringify({ name: sub.split("/").pop() }),
+    );
+  }
+  const res = await runMonorepo(dir);
+  const paths = (res.componentHints ?? []).map((c) => c.path).sort();
+  expect(paths).toEqual(["tooling/a", "tooling/b"]);
+  await rm(dir, { recursive: true, force: true });
 });

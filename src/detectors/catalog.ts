@@ -2,6 +2,10 @@ export const DETECTOR_CATALOG = [
   { id: "framework", description: "Framework and library detection" },
   { id: "language", description: "Language and LOC detection" },
   { id: "monorepo", description: "Monorepo structure and components" },
+  {
+    id: "packageManager",
+    description: "Package manager detection from lockfiles and manifests",
+  },
 ] as const;
 
 export type DetectorCatalogEntry = (typeof DETECTOR_CATALOG)[number];

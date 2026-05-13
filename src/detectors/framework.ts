@@ -11,7 +11,7 @@ import {
 } from "./shared";
 import type { DetectorResult } from "./types";
 
-/** npm package → framework name. Only actual frameworks/platforms, not libraries. */
+/** npm package → framework or notable library name. */
 const NPM_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["react", "React"],
   ["react-dom", "React"],
@@ -40,6 +40,18 @@ const NPM_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["storybook", "Storybook"],
   ["@storybook/react", "Storybook"],
   ["elysia", "Elysia"],
+  ["@trpc/server", "tRPC"],
+  ["@trpc/client", "tRPC"],
+  ["@trpc/react-query", "tRPC"],
+  ["@trpc/tanstack-react-query", "tRPC"],
+  ["drizzle-orm", "Drizzle"],
+  ["drizzle-kit", "Drizzle"],
+  ["drizzle-zod", "Drizzle"],
+  ["better-auth", "Better Auth"],
+  ["@tanstack/react-query", "TanStack Query"],
+  ["@tanstack/react-form", "TanStack Form"],
+  ["@tanstack/react-router", "TanStack Router"],
+  ["@tanstack/react-start", "TanStack Start"],
 ]);
 
 /** Config file → framework name (build tools excluded — those go in build detector). */
@@ -78,6 +90,15 @@ const PYTHON_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["tensorflow", "TensorFlow"],
   ["torch", "PyTorch"],
   ["scikit-learn", "scikit-learn"],
+  ["werkzeug", "Werkzeug"],
+  ["jinja2", "Jinja2"],
+  ["markupsafe", "MarkupSafe"],
+  ["blinker", "Blinker"],
+  ["itsdangerous", "ItsDangerous"],
+  ["click", "Click"],
+  ["asgiref", "ASGI (asgiref)"],
+  ["uvicorn", "Uvicorn"],
+  ["gunicorn", "Gunicorn"],
 ]);
 
 /** Go module → framework name. */
@@ -196,6 +217,7 @@ registerDetector({
       addFinding,
       0.95,
       "Go dep",
+      { excludeLinePrefixes: ["module "] },
     );
 
     // 5. Check Cargo.toml for Rust frameworks (primary only)

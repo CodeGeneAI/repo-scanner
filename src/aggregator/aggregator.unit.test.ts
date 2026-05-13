@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import type { DetectorId } from "../detectors/catalog";
 import type { DetectorResult } from "../detectors/types";
 import { aggregate } from "./aggregator";
+
+const detectorSet = (...ids: DetectorId[]): ReadonlySet<DetectorId> =>
+  new Set<DetectorId>(ids);
 
 describe("aggregate", async () => {
   const rootPath = "/tmp/test-repo";
@@ -13,6 +17,14 @@ describe("aggregate", async () => {
           { value: "TypeScript", confidence: 1.0, evidence: ["10 files"] },
           { value: "Python", confidence: 0.8, evidence: ["3 files"] },
         ],
+        metadata: {
+          totalFiles: 13,
+          totalLines: 650,
+          perLanguage: [
+            { language: "TypeScript", files: 10, lines: 500, percentage: 76.9 },
+            { language: "Python", files: 3, lines: 150, percentage: 23.1 },
+          ],
+        },
       },
       {
         detectorId: "framework",
@@ -37,6 +49,13 @@ describe("aggregate", async () => {
           { value: "TypeScript", confidence: 1.0, evidence: ["ext"] },
           { value: "TypeScript", confidence: 0.8, evidence: ["manifest"] },
         ],
+        metadata: {
+          totalFiles: 10,
+          totalLines: 500,
+          perLanguage: [
+            { language: "TypeScript", files: 10, lines: 500, percentage: 100 },
+          ],
+        },
       },
     ];
 
@@ -48,7 +67,7 @@ describe("aggregate", async () => {
     ).toHaveLength(1);
   });
 
-  it("filters low-confidence language findings", async () => {
+  it("only surfaces languages present in languageStats.perLanguage", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -56,6 +75,13 @@ describe("aggregate", async () => {
           { value: "TypeScript", confidence: 1.0, evidence: ["10 files"] },
           { value: "Lua", confidence: 0.5, evidence: ["1 file"] },
         ],
+        metadata: {
+          totalFiles: 10,
+          totalLines: 500,
+          perLanguage: [
+            { language: "TypeScript", files: 10, lines: 500, percentage: 100 },
+          ],
+        },
       },
     ];
 
@@ -117,6 +143,15 @@ describe("aggregate", async () => {
           { value: "Go", confidence: 0.8, evidence: [] },
           { value: "TypeScript", confidence: 1.0, evidence: [] },
         ],
+        metadata: {
+          totalFiles: 15,
+          totalLines: 750,
+          perLanguage: [
+            { language: "Python", files: 5, lines: 250, percentage: 33.3 },
+            { language: "Go", files: 5, lines: 250, percentage: 33.3 },
+            { language: "TypeScript", files: 5, lines: 250, percentage: 33.3 },
+          ],
+        },
       },
     ];
 
@@ -173,5 +208,255 @@ describe("aggregate", async () => {
     expect(result.languageStats.perLanguage).toEqual([]);
     expect(result.languageStats.totalFiles).toBe(0);
     expect(result.languageStats.totalLines).toBe(0);
+  });
+
+  it("inventory.packageManagers is an empty array by default", async () => {
+    const result = await aggregate(rootPath, []);
+    expect(result.inventory.packageManagers).toEqual([]);
+  });
+
+  it("inventory.languages mirrors languageStats.perLanguage", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [
+          { value: "Rust", confidence: 1.0, evidence: [] },
+          { value: "Ruby", confidence: 0.05, evidence: [] },
+        ],
+        metadata: {
+          totalFiles: 101,
+          totalLines: 10000,
+          perLanguage: [
+            { language: "Rust", files: 100, lines: 9900, percentage: 99 },
+            { language: "Ruby", files: 1, lines: 100, percentage: 1 },
+          ],
+        },
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.languages.slice().sort()).toEqual(["Ruby", "Rust"]);
+    expect(
+      result.languageStats.perLanguage.map((e) => e.language).sort(),
+    ).toEqual(result.inventory.languages.slice().sort());
+  });
+
+  it("architecture.toolName is set from the first named monorepo finding", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "monorepo",
+        findings: [
+          {
+            value: "Turborepo",
+            confidence: 1.0,
+            evidence: ["found turbo.json"],
+          },
+          {
+            value: "pnpm workspaces",
+            confidence: 1.0,
+            evidence: ["found pnpm-workspace.yaml"],
+          },
+          { value: "monorepo", confidence: 1.0, evidence: ["detected"] },
+        ],
+        componentHints: [],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.architecture.monorepo).toBe(true);
+    expect(result.architecture.toolName).toBe("Turborepo");
+  });
+});
+
+describe("aggregate: schema slicing under detector filter", () => {
+  const rootPath = "/tmp/test-repo";
+
+  const fullDetectorResults: DetectorResult[] = [
+    {
+      detectorId: "language",
+      findings: [{ value: "TypeScript", confidence: 1.0, evidence: [] }],
+      metadata: {
+        totalFiles: 1,
+        totalLines: 10,
+        perLanguage: [
+          { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+        ],
+      },
+    },
+    {
+      detectorId: "framework",
+      findings: [{ value: "Next.js", confidence: 1.0, evidence: [] }],
+    },
+    {
+      detectorId: "monorepo",
+      findings: [
+        { value: "Turborepo", confidence: 1.0, evidence: [] },
+        { value: "monorepo", confidence: 1.0, evidence: [] },
+      ],
+      componentHints: [],
+    },
+    {
+      detectorId: "packageManager",
+      findings: [{ value: "pnpm", confidence: 1.0, evidence: [] }],
+    },
+  ];
+
+  it("no filter → full canonical shape (unchanged behavior)", async () => {
+    const r = await aggregate(rootPath, fullDetectorResults);
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({
+      languages: ["TypeScript"],
+      frameworks: ["Next.js"],
+      packageManagers: ["pnpm"],
+    });
+  });
+
+  it("filter=[monorepo] → only architecture + metadata", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "monorepo"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("monorepo"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect((r as any).inventory).toBeUndefined();
+    expect((r as any).languageStats).toBeUndefined();
+    expect(r.architecture).toBeDefined();
+  });
+
+  it("filter=[language] → inventory.languages + languageStats + metadata", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "language"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("language"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({ languages: ["TypeScript"] });
+    expect(Object.keys(r.inventory!)).toEqual(["languages"]);
+    expect((r as any).architecture).toBeUndefined();
+  });
+
+  it("filter=[framework] → inventory.frameworks only (no languageStats)", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "framework"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("framework"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({ frameworks: ["Next.js"] });
+  });
+
+  it("filter=[packageManager] → inventory.packageManagers only", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "packageManager"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("packageManager"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({ packageManagers: ["pnpm"] });
+  });
+
+  it("filter=[language,framework] → both inventory sub-keys + languageStats", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter(
+        (d) => d.detectorId === "language" || d.detectorId === "framework",
+      ),
+      undefined,
+      { selectedDetectors: detectorSet("language", "framework") },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(r.inventory!).sort()).toEqual([
+      "frameworks",
+      "languages",
+    ]);
+  });
+
+  it("filter=[framework,monorepo] → inventory.frameworks + architecture, no languageStats", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter(
+        (d) => d.detectorId === "framework" || d.detectorId === "monorepo",
+      ),
+      undefined,
+      { selectedDetectors: detectorSet("framework", "monorepo") },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(r.inventory!)).toEqual(["frameworks"]);
+  });
+
+  it("empty filter set → metadata only", async () => {
+    const r = await aggregate(rootPath, [], undefined, {
+      selectedDetectors: new Set<DetectorId>(),
+    });
+    expect(Object.keys(r).sort()).toEqual(["rootPath", "scannedAt"]);
+    expect((r as any).inventory).toBeUndefined();
+    expect((r as any).architecture).toBeUndefined();
+    expect((r as any).languageStats).toBeUndefined();
+  });
+
+  it("filter with all four detectors → identical to unfiltered shape", async () => {
+    const r = await aggregate(rootPath, fullDetectorResults, undefined, {
+      selectedDetectors: detectorSet(
+        "language",
+        "framework",
+        "monorepo",
+        "packageManager",
+      ),
+    });
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(r.inventory!).sort()).toEqual([
+      "frameworks",
+      "languages",
+      "packageManagers",
+    ]);
   });
 });

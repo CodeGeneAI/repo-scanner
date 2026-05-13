@@ -99,6 +99,53 @@ describe("framework detector", () => {
     expect(values).toContain("ZIO");
   });
 
+  // Python
+  it("detects Werkzeug and Jinja2 from pyproject.toml deps", async () => {
+    await writeFile(
+      path.join(tmpDir, "pyproject.toml"),
+      `[project]\nname = "myapp"\ndependencies = [\n  "werkzeug>=3",\n  "jinja2",\n  "markupsafe",\n]\n`,
+    );
+    const { result } = await runFrameworkDetector(tmpDir);
+    const names = result.findings.map((f) => f.value);
+    expect(names).toContain("Werkzeug");
+    expect(names).toContain("Jinja2");
+    expect(names).toContain("MarkupSafe");
+  });
+
+  // tRPC / Drizzle / Better Auth / TanStack
+  it("detects tRPC, Drizzle, Better Auth, and TanStack Query from package.json deps", async () => {
+    await writeFile(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({
+        dependencies: {
+          "@trpc/server": "^11",
+          "@trpc/client": "^11",
+          "drizzle-orm": "^0.30",
+          "better-auth": "^1",
+          "@tanstack/react-query": "^5",
+        },
+      }),
+    );
+    const { result } = await runFrameworkDetector(tmpDir);
+    const names = result.findings.map((f) => f.value);
+    expect(names).toContain("tRPC");
+    expect(names).toContain("Drizzle");
+    expect(names).toContain("Better Auth");
+    expect(names).toContain("TanStack Query");
+  });
+
+  // TanStack Start
+  it("detects @tanstack/react-start as TanStack Start", async () => {
+    await writeFile(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({
+        dependencies: { "@tanstack/react-start": "^1" },
+      }),
+    );
+    const { values } = await runFrameworkDetector(tmpDir);
+    expect(values).toContain("TanStack Start");
+  });
+
   // Dedup
   it("deduplicates Spring Boot from Gradle and Maven", async () => {
     await writeFile(
