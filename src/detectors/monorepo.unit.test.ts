@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
+import { scanRepo } from "../index";
 import { FileIndex } from "../utils/file-index";
 import "./init";
 import { getDetectors } from "./registry";
@@ -310,6 +311,30 @@ members = ["packages/*"]
     expect(res.findings.some((f) => f.value === "Go workspaces")).toBe(true);
     const paths = (res.componentHints ?? []).map((c) => c.path).sort();
     expect(paths).toEqual(["svc-a", "svc-b"]);
+  });
+
+  it("go.work use() directive components survive classification (full scan)", async () => {
+    await writeFile(
+      path.join(tmpDir, "go.work"),
+      "go 1.22\n\nuse (\n  ./svc-a\n  ./svc-b\n)\n",
+    );
+    for (const sub of ["svc-a", "svc-b"]) {
+      await mkdir(path.join(tmpDir, sub), { recursive: true });
+      await writeFile(
+        path.join(tmpDir, sub, "go.mod"),
+        `module example.com/${sub}\n\ngo 1.22\n`,
+      );
+      await writeFile(path.join(tmpDir, sub, "main.go"), "package main\n");
+    }
+    const result = await scanRepo(tmpDir);
+    expect(result.architecture.monorepo).toBe(true);
+    expect(result.architecture.toolName).toBe("Go workspaces");
+    const paths = result.architecture.components.map((c) => c.path).sort();
+    expect(paths).toEqual(["svc-a", "svc-b"]);
+    // After R2-1: classifier defaults to "package" for hints with manifestPath.
+    expect(
+      result.architecture.components.every((c) => c.kind === "package"),
+    ).toBe(true);
   });
 
   it("returns no findings for a non-monorepo", async () => {

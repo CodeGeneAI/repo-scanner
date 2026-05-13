@@ -150,12 +150,18 @@ registerDetector({
       const goWork = await readText(path.join(rootPath, "go.work"));
       if (goWork) {
         for (const usePath of parseGoWorkUseDirective(goWork)) {
-          if (!componentHints.some((c) => c.path === usePath)) {
-            componentHints.push({
-              path: usePath,
-              name: usePath.split("/").pop() ?? usePath,
-            });
-          }
+          if (componentHints.some((c) => c.path === usePath)) continue;
+          const goModRel = `${usePath}/go.mod`;
+          const goModFile = index
+            .getByNamePrimary("go.mod")
+            .find((f) => f.relativePath === goModRel);
+          componentHints.push({
+            path: usePath,
+            name: usePath.split("/").pop() ?? usePath,
+            ...(goModFile
+              ? { manifestPath: goModFile.path, manifestName: "go.mod" }
+              : {}),
+          });
         }
       }
     }
