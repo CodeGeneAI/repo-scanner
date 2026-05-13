@@ -236,8 +236,16 @@ describe("aggregate", async () => {
       {
         detectorId: "monorepo",
         findings: [
-          { value: "Turborepo", confidence: 1.0, evidence: ["found turbo.json"] },
-          { value: "pnpm workspaces", confidence: 1.0, evidence: ["found pnpm-workspace.yaml"] },
+          {
+            value: "Turborepo",
+            confidence: 1.0,
+            evidence: ["found turbo.json"],
+          },
+          {
+            value: "pnpm workspaces",
+            confidence: 1.0,
+            evidence: ["found pnpm-workspace.yaml"],
+          },
           { value: "monorepo", confidence: 1.0, evidence: ["detected"] },
         ],
         componentHints: [],

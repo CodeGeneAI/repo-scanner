@@ -108,7 +108,9 @@ registerDetector({
 
     // Parse pnpm-workspace.yaml `packages:` globs into components
     if (index.hasFile("pnpm-workspace.yaml")) {
-      const yamlText = await readText(path.join(rootPath, "pnpm-workspace.yaml"));
+      const yamlText = await readText(
+        path.join(rootPath, "pnpm-workspace.yaml"),
+      );
       if (yamlText) {
         for (const glob of parsePnpmWorkspaceGlobs(yamlText)) {
           if (glob.startsWith("!")) continue;

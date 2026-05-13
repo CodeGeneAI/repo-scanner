@@ -137,11 +137,18 @@ test("walker re-includes child of an ignored directory via negation", async () =
   await writeFile(path.join(dir, "src/a.js"), "1\n");
   await writeFile(path.join(dir, "tools/critical-tool/c.js"), "1\n");
   await writeFile(path.join(dir, "tools/other/d.js"), "1\n");
-  await writeFile(path.join(dir, ".scanignore"), "tools/\n!tools/critical-tool/\n");
+  await writeFile(
+    path.join(dir, ".scanignore"),
+    "tools/\n!tools/critical-tool/\n",
+  );
   const files: string[] = [];
   for await (const f of walkFiles(dir, { rootForRelative: dir })) {
     files.push(path.relative(dir, f));
   }
   files.sort();
-  expect(files).toEqual([".scanignore", "src/a.js", "tools/critical-tool/c.js"]);
+  expect(files).toEqual([
+    ".scanignore",
+    "src/a.js",
+    "tools/critical-tool/c.js",
+  ]);
 });

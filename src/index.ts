@@ -1,4 +1,5 @@
 import "./detectors/init";
+
 export type { DetectorId } from "./detectors/catalog";
 export { scanRepo } from "./scanner";
 export type {
