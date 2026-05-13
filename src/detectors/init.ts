@@ -20,7 +20,6 @@ import "./large-file";
 import "./todo";
 import "./cross-package-deps";
 import "./dead-export";
-import "./code-duplication";
 import "./solid-health";
 import "./deployment-platform";
 import "./external-services";

@@ -417,37 +417,6 @@ export const renderTable = (
       }
     }
 
-    // Code Duplication
-    if (result.inventory.codeDuplication) {
-      const cd = result.inventory.codeDuplication;
-      w(section("Code Duplication"));
-      w(
-        `  Duplication: ${YELLOW}${cd.stats.duplicationPercentage}%${RESET}  ${DIM}(${cd.stats.duplicatedLines.toLocaleString()} lines in ${cd.stats.duplicateGroups} group${cd.stats.duplicateGroups !== 1 ? "s" : ""})${RESET}\n`,
-      );
-      w(
-        `  Files scanned: ${cd.stats.filesScanned.toLocaleString()}  Tokens: ${cd.stats.totalTokens.toLocaleString()}\n`,
-      );
-      if (cd.groups.length > 0) {
-        const MAX_SHOWN = 10;
-        const shown = cd.groups.slice(0, MAX_SHOWN);
-        for (const g of shown) {
-          w(
-            `\n  ${BOLD}Group #${g.id}${RESET} ${DIM}(${g.lineCount} lines, ${g.tokenCount} tokens)${RESET}\n`,
-          );
-          for (const inst of g.instances) {
-            w(
-              `    ${DIM}${inst.file}:${inst.startLine}-${inst.endLine}${RESET}\n`,
-            );
-          }
-        }
-        if (cd.groups.length > MAX_SHOWN) {
-          w(
-            `\n  ${DIM}... +${cd.groups.length - MAX_SHOWN} more groups${RESET}\n`,
-          );
-        }
-      }
-    }
-
     // SOLID Health
     if (result.inventory.solidHealth) {
       const sh = result.inventory.solidHealth;

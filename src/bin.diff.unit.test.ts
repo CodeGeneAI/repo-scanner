@@ -38,30 +38,6 @@ describe("repo-scanner bin diff", () => {
     expect(stdout).not.toContain("Build & Test");
   });
 
-  it("enables diff dry-check when --fail-on-new-duplication-pct is provided", async () => {
-    const repoPath = await createGitDiffFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--diff",
-        "HEAD~1",
-        "--fail-on-new-duplication-pct",
-        "100",
-        "--format",
-        "json",
-      ]);
-
-      expect(result.exitCode).toBe(0);
-      const payload = JSON.parse(decode(result.stdout));
-      expect(payload.diffScan).toBeDefined();
-      expect(payload.diffScan.newDuplication).toBeDefined();
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
   it("enables diff env-check when --fail-on-new-env-vars is provided", async () => {
     const repoPath = await createGitDiffFixtureRepo();
 

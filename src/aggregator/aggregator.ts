@@ -4,7 +4,6 @@ import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
   CallGraph,
-  CodeDuplicationResult,
   ComplexityHotspot,
   Component,
   CrossPackageDependencyGraph,
@@ -76,7 +75,6 @@ export const aggregate = async (
   let todoAnnotations: readonly TodoAnnotation[] | undefined;
   let crossPackageDeps: CrossPackageDependencyGraph | undefined;
   let deadExports: readonly DeadExport[] | undefined;
-  let codeDuplication: CodeDuplicationResult | undefined;
   let solidHealth: SolidHealthResult | undefined;
   let complexityHotspots: readonly ComplexityHotspot[] | undefined;
   let externalServices: readonly ExternalService[] | undefined;
@@ -261,18 +259,6 @@ export const aggregate = async (
       }
     }
 
-    // Extract code duplication
-    if (
-      result.detectorId === "code-duplication" &&
-      result.metadata?.codeDuplication
-    ) {
-      const duplication = result.metadata
-        .codeDuplication as CodeDuplicationResult;
-      if (duplication.stats.duplicateGroups > 0) {
-        codeDuplication = duplication;
-      }
-    }
-
     // Extract SOLID health
     if (result.detectorId === "solid-health" && result.metadata?.solidHealth) {
       solidHealth = result.metadata.solidHealth as SolidHealthResult;
@@ -404,7 +390,6 @@ export const aggregate = async (
       largeFiles,
       todoAnnotations,
       deadExports,
-      codeDuplication,
       solidHealth,
       complexityHotspots,
       externalServices,

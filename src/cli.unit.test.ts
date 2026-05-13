@@ -5,12 +5,7 @@ describe("parseArgs", () => {
   it("parses default values", () => {
     const result = parseArgs(["bun", "repo-scanner"]);
 
-    expect(result.dryCheck).toBeFalse();
     expect(result.format).toBe("table");
-    expect(result.extensions).toEqual([]);
-    expect(result.minUniqueRatio).toBe(0.1);
-    expect(result.maxLiteralRatio).toBe(0.5);
-    expect(result.ignoreBarrelExports).toBeTrue();
     expect(result.scanArchitecture).toBeFalse();
     expect(result.scanInventory).toBeFalse();
     expect(result.scanExternalServices).toBeFalse();
@@ -28,7 +23,6 @@ describe("parseArgs", () => {
     expect(result.largeFile).toBeFalse();
     expect(result.todo).toBeFalse();
     expect(result.deadExport).toBeFalse();
-    expect(result.codeDuplication).toBeFalse();
     expect(result.complexityHotspots).toBeFalse();
     expect(result.languageDetector).toBeFalse();
     expect(result.languageStatsDetector).toBeFalse();
@@ -131,7 +125,6 @@ describe("parseArgs", () => {
     expect(result.languageDetector).toBeTrue();
     expect(result.frameworkDetector).toBeTrue();
     expect(result.codeQualityDetector).toBeTrue();
-    expect(result.codeDuplication).toBeTrue();
   });
 
   it("emits warnings for duplicate detector selection via mixed presets", () => {
@@ -326,21 +319,6 @@ describe("parseArgs", () => {
     ).toThrow(CliParseError);
   });
 
-  it("parses --diff --cached with --diff-dry-check and threshold", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "--cached",
-      "--diff-dry-check",
-      "--fail-on-new-duplication-pct",
-      "20",
-    ]);
-    expect(result.diff).toBe("--cached");
-    expect(result.diffDryCheck).toBeTrue();
-    expect(result.failOnNewDuplicationPct).toBe(20);
-  });
-
   it("parses --diff --staged with --diff-env-check", () => {
     const result = parseArgs([
       "bun",
@@ -353,123 +331,10 @@ describe("parseArgs", () => {
     expect(result.diffEnvCheck).toBeTrue();
   });
 
-  it("parses dry-check compatibility flags", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--dry-check",
-      "--extensions",
-      "ts,py",
-      "--min-unique-ratio",
-      "0.2",
-      "--max-literal-ratio",
-      "0.8",
-      "--no-barrel-filter",
-    ]);
-
-    expect(result.dryCheck).toBeTrue();
-    expect(result.extensions).toEqual([".ts", ".py"]);
-    expect(result.minUniqueRatio).toBe(0.2);
-    expect(result.maxLiteralRatio).toBe(0.8);
-    expect(result.ignoreBarrelExports).toBeFalse();
-  });
-
   it("defaults diff pre-commit flags to false/undefined", () => {
     const result = parseArgs(["bun", "repo-scanner"]);
-    expect(result.diffDryCheck).toBeFalse();
-    expect(result.diffDryIncludeTests).toBeFalse();
     expect(result.diffEnvCheck).toBeFalse();
-    expect(result.failOnNewDuplicationPct).toBeUndefined();
     expect(result.failOnNewEnvVars).toBeFalse();
-  });
-
-  it("parses --diff-dry-check and --diff-env-check flags", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--diff-dry-check",
-      "--diff-env-check",
-    ]);
-    expect(result.diffDryCheck).toBeTrue();
-    expect(result.diffEnvCheck).toBeTrue();
-    expect(result.diffDryIncludeTests).toBeFalse();
-  });
-
-  it("parses --diff-dry-include-tests flag", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--diff-dry-check",
-      "--diff-dry-include-tests",
-    ]);
-    expect(result.diffDryCheck).toBeTrue();
-    expect(result.diffDryIncludeTests).toBeTrue();
-  });
-
-  it("parses --fail-on-new-duplication-pct with integer value", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--fail-on-new-duplication-pct",
-      "15",
-    ]);
-    expect(result.failOnNewDuplicationPct).toBe(15);
-    expect(result.diffDryCheck).toBeTrue();
-  });
-
-  it("parses --fail-on-new-duplication-pct with zero", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--fail-on-new-duplication-pct",
-      "0",
-    ]);
-    expect(result.failOnNewDuplicationPct).toBe(0);
-    expect(result.diffDryCheck).toBeTrue();
-  });
-
-  it("parses --fail-on-new-duplication-pct with decimal value", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--fail-on-new-duplication-pct",
-      "5.5",
-    ]);
-    expect(result.failOnNewDuplicationPct).toBe(5.5);
-    expect(result.diffDryCheck).toBeTrue();
-  });
-
-  it("throws CliParseError for --fail-on-new-duplication-pct without value", () => {
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--fail-on-new-duplication-pct"]),
-    ).toThrow(CliParseError);
-  });
-
-  it("throws CliParseError for --fail-on-new-duplication-pct with negative value", () => {
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--fail-on-new-duplication-pct", "-5"]),
-    ).toThrow(CliParseError);
-  });
-
-  it("throws CliParseError for --fail-on-new-duplication-pct with non-numeric value", () => {
-    expect(() =>
-      parseArgs([
-        "bun",
-        "repo-scanner",
-        "--fail-on-new-duplication-pct",
-        "abc",
-      ]),
-    ).toThrow(CliParseError);
   });
 
   it("parses --fail-on-new-env-vars flag", () => {
@@ -486,31 +351,10 @@ describe("parseArgs", () => {
 
   it("throws CliParseError for diff-only flags without --diff", () => {
     expect(() =>
-      parseArgs(["bun", "repo-scanner", "--diff-dry-check"]),
-    ).toThrow(CliParseError);
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--diff-dry-include-tests"]),
-    ).toThrow(CliParseError);
-    expect(() =>
       parseArgs(["bun", "repo-scanner", "--diff-env-check"]),
     ).toThrow(CliParseError);
     expect(() =>
-      parseArgs(["bun", "repo-scanner", "--fail-on-new-duplication-pct", "1"]),
-    ).toThrow(CliParseError);
-    expect(() =>
       parseArgs(["bun", "repo-scanner", "--fail-on-new-env-vars"]),
-    ).toThrow(CliParseError);
-  });
-
-  it("throws CliParseError for --diff-dry-include-tests without --diff-dry-check", () => {
-    expect(() =>
-      parseArgs([
-        "bun",
-        "repo-scanner",
-        "--diff",
-        "HEAD",
-        "--diff-dry-include-tests",
-      ]),
     ).toThrow(CliParseError);
   });
 
@@ -520,18 +364,11 @@ describe("parseArgs", () => {
       "repo-scanner",
       "--diff",
       "HEAD",
-      "--diff-dry-check",
-      "--diff-dry-include-tests",
       "--diff-env-check",
-      "--fail-on-new-duplication-pct",
-      "15",
       "--fail-on-new-env-vars",
     ]);
     expect(result.diff).toBe("HEAD");
-    expect(result.diffDryCheck).toBeTrue();
-    expect(result.diffDryIncludeTests).toBeTrue();
     expect(result.diffEnvCheck).toBeTrue();
-    expect(result.failOnNewDuplicationPct).toBe(15);
     expect(result.failOnNewEnvVars).toBeTrue();
   });
 });

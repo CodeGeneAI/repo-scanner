@@ -46,12 +46,8 @@ Core output profile:
                                       Presets: @inventory,@quality,@architecture
 
 Specialized scans:
-  --dry-check                        Duplication-only scan with dry-check output
   --diff <git-range>                 Diff-focused scan (e.g. HEAD~1, main...feature)
-  --diff-dry-check                   Run duplication scan for changed files
-  --diff-dry-include-tests           Include tests in diff duplication scan
   --diff-env-check                   Check net-new env vars in changed files
-  --fail-on-new-duplication-pct <n>  Exit 1 if diff duplication percentage exceeds n
   --fail-on-new-env-vars             Exit 1 if diff introduces new env vars
   --topology                         Generate mermaid topology diagrams
   --topology-diagrams <list>         architecture|dependency|dataflow|api-topology|erd|call-graph
@@ -62,12 +58,6 @@ General:
   -f, --format <table|json>          Output format (default: table)
   --env-include-tests                Include test files in env-var detection
   --large-file-threshold <n>         Large-file threshold in lines (default: 500)
-  --min-tokens <n>                   Duplication token window (default: 50)
-  --min-lines <n>                    Minimum duplicate lines (default: 6)
-  --extensions <list>                Duplication file extensions (comma-separated)
-  --min-unique-ratio <f>             Duplication distinct token floor (0..1, default: 0.10)
-  --max-literal-ratio <f>            Duplication literal token ceiling (0..1, default: 0.50)
-  --no-barrel-filter                 Disable barrel re-export duplication filtering
   --solid                            Enable SOLID analysis detector
   --solid-threshold <n>              SOLID score threshold (default: 80)
   --version, -v                      Show version
@@ -82,20 +72,12 @@ Examples:
   repo-scanner completion zsh > _repo-scanner
   repo-scanner completion install fish
   repo-scanner completion uninstall fish
-  repo-scanner --diff main...HEAD --diff-dry-check --diff-env-check
+  repo-scanner --diff main...HEAD --diff-env-check
 `;
 
 const parsePositiveInteger = (raw: string): number | undefined => {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed < 1) {
-    return undefined;
-  }
-  return parsed;
-};
-
-const parseUnitInterval = (raw: string): number | undefined => {
-  const parsed = Number.parseFloat(raw);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
     return undefined;
   }
   return parsed;
@@ -172,14 +154,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let scanExternalServices = false;
   let scanBuildAndTest = false;
   let allDetectors = false;
-  let dryCheck = false;
   let largeFileThreshold = 500;
-  let minTokens = 50;
-  let minLines = 6;
-  let extensions: string[] = [];
-  let minUniqueRatio = 0.1;
-  let maxLiteralRatio = 0.5;
-  let ignoreBarrelExports = true;
   let solid = false;
   let callGraph = false;
   let solidThreshold = 80;
@@ -188,10 +163,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let topologyDiagrams: DiagramKind[] | undefined;
   let topologyOutput: string | undefined;
   let diff: string | undefined;
-  let diffDryCheck = false;
-  let diffDryIncludeTests = false;
   let diffEnvCheck = false;
-  let failOnNewDuplicationPct: number | undefined;
   let failOnNewEnvVars = false;
   let dbSchema = false;
   let env = false;
@@ -200,7 +172,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let largeFile = false;
   let todo = false;
   let deadExport = false;
-  let codeDuplication = false;
   let complexityHotspots = false;
   let languageDetector = false;
   let languageStatsDetector = false;
@@ -248,9 +219,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "codebase-size":
         codebaseSizeDetector = true;
-        return;
-      case "code-duplication":
-        codeDuplication = true;
         return;
       case "code-quality":
         codeQualityDetector = true;
@@ -417,9 +385,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         format = fmt as "table" | "json";
         break;
       }
-      case "--dry-check":
-        dryCheck = true;
-        break;
       case "--detectors": {
         const detectorIds = parseCommaSeparatedValues(args[++i], "--detectors");
         const detectorSources = new Map<string, string[]>();
@@ -470,43 +435,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
           args[++i],
           "--large-file-threshold",
         );
-        break;
-      case "--min-tokens":
-        minTokens = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--min-tokens",
-        );
-        break;
-      case "--min-lines":
-        minLines = parseRequiredPositiveIntegerOption(args[++i], "--min-lines");
-        break;
-      case "--extensions":
-        extensions = (args[++i] ?? "")
-          .split(",")
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0)
-          .map((value) => (value.startsWith(".") ? value : `.${value}`));
-        break;
-      case "--min-unique-ratio": {
-        const raw = args[++i] ?? "";
-        minUniqueRatio =
-          parseUnitInterval(raw) ??
-          failCliParse(
-            `Error: invalid min-unique-ratio "${raw}". Value must be between 0 and 1.`,
-          );
-        break;
-      }
-      case "--max-literal-ratio": {
-        const raw = args[++i] ?? "";
-        maxLiteralRatio =
-          parseUnitInterval(raw) ??
-          failCliParse(
-            `Error: invalid max-literal-ratio "${raw}". Value must be between 0 and 1.`,
-          );
-        break;
-      }
-      case "--no-barrel-filter":
-        ignoreBarrelExports = false;
         break;
       case "--env-include-tests":
         envIncludeTests = true;
@@ -566,37 +494,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
         diff = value;
         break;
       }
-      case "--diff-dry-check":
-        diffDryCheck = true;
-        break;
-      case "--diff-dry-include-tests":
-        diffDryIncludeTests = true;
-        break;
       case "--diff-env-check":
         diffEnvCheck = true;
         break;
-      case "--fail-on-new-duplication-pct": {
-        const raw =
-          args[++i] ??
-          failCliParse(
-            "Error: --fail-on-new-duplication-pct requires a numeric value.",
-          );
-        if (isFlagToken(raw)) {
-          failCliParse(
-            "Error: --fail-on-new-duplication-pct requires a numeric value.",
-          );
-        }
-        const parsed = Number.parseFloat(raw);
-        if (!Number.isFinite(parsed) || parsed < 0) {
-          failCliParse(
-            `Error: invalid fail-on-new-duplication-pct "${raw}". Value must be a non-negative number.`,
-          );
-        }
-        failOnNewDuplicationPct = parsed;
-        // Threshold checks require diff dry-check payload generation.
-        diffDryCheck = true;
-        break;
-      }
       case "--fail-on-new-env-vars":
         failOnNewEnvVars = true;
         // Env-var failure checks require diff env-check payload generation.
@@ -615,19 +515,11 @@ export const parseArgs = (argv: string[]): CliOptions => {
     }
   }
 
-  const usesDiffOnlyFlags =
-    diffDryCheck ||
-    diffDryIncludeTests ||
-    diffEnvCheck ||
-    failOnNewDuplicationPct !== undefined ||
-    failOnNewEnvVars;
+  const usesDiffOnlyFlags = diffEnvCheck || failOnNewEnvVars;
   if (usesDiffOnlyFlags && !diff) {
     failCliParse(
-      "Error: --diff is required when using diff-only flags (--diff-dry-check, --diff-dry-include-tests, --diff-env-check, --fail-on-new-duplication-pct, --fail-on-new-env-vars).",
+      "Error: --diff is required when using diff-only flags (--diff-env-check, --fail-on-new-env-vars).",
     );
-  }
-  if (diffDryIncludeTests && !diffDryCheck) {
-    failCliParse("Error: --diff-dry-include-tests requires --diff-dry-check.");
   }
 
   return {
@@ -646,14 +538,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     scanExternalServices,
     scanBuildAndTest,
     allDetectors,
-    dryCheck,
     largeFileThreshold,
-    minTokens,
-    minLines,
-    extensions,
-    minUniqueRatio,
-    maxLiteralRatio,
-    ignoreBarrelExports,
     solid,
     callGraph,
     solidThreshold,
@@ -662,10 +547,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     topologyDiagrams,
     topologyOutput,
     diff,
-    diffDryCheck,
-    diffDryIncludeTests,
     diffEnvCheck,
-    failOnNewDuplicationPct,
     failOnNewEnvVars,
     dbSchema,
     env,
@@ -674,7 +556,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     largeFile,
     todo,
     deadExport,
-    codeDuplication,
     complexityHotspots,
     languageDetector,
     languageStatsDetector,

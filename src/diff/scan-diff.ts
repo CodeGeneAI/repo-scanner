@@ -1,11 +1,5 @@
-import type { DryCheckResult } from "../code-duplication/types";
 import { classifyCase } from "../detectors/naming-convention/case-classifier";
-import type {
-  DiffDuplicationResult,
-  DiffScanResult,
-  EnvVarInfo,
-  RepoScanResult,
-} from "../types";
+import type { DiffScanResult, EnvVarInfo, RepoScanResult } from "../types";
 
 const CONVENTION_CONFIDENCE_THRESHOLD = 60;
 const DEFAULT_IGNORED_PATH_SEGMENTS = [
@@ -291,7 +285,6 @@ export const buildDiffScanResult = (
     readonly historyBaselines?: Readonly<
       Record<string, ComponentHistoryConventionBaseline>
     >;
-    readonly dryCheck?: DryCheckResult;
     readonly envCheck?: boolean;
     readonly addedLines?: ReadonlyMap<string, ReadonlySet<number>>;
   },
@@ -354,13 +347,6 @@ export const buildDiffScanResult = (
     ...new Set([...changedFiles, ...testFilesToUpdate]),
   ];
 
-  const newDuplication: DiffDuplicationResult | undefined = options?.dryCheck
-    ? {
-        stats: options.dryCheck.stats,
-        groups: options.dryCheck.groups,
-      }
-    : undefined;
-
   const newEnvVars =
     options?.envCheck && result.inventory.envVars
       ? computeNetNewEnvVars(
@@ -379,7 +365,6 @@ export const buildDiffScanResult = (
     newTodos,
     newDeadExports,
     suggestedReviewFocus,
-    newDuplication,
     newEnvVars,
   };
 };

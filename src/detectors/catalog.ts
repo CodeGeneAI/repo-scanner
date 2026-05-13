@@ -5,7 +5,6 @@ export const DETECTOR_CATALOG = [
   { id: "call-graph", description: "Static call graph extraction" },
   { id: "ci", description: "CI provider and workflow detection" },
   { id: "codebase-size", description: "Total file and LOC summary" },
-  { id: "code-duplication", description: "Token-level duplication analysis" },
   { id: "code-quality", description: "Quality gate and scanner detection" },
   { id: "complexity-hotspots", description: "Complexity hotspot detection" },
   { id: "components", description: "Repository component inventory" },
@@ -81,7 +80,6 @@ export const DETECTOR_PRESETS = {
   ],
   "@quality": [
     "code-quality",
-    "code-duplication",
     "complexity-hotspots",
     "dead-export",
     "large-file",

@@ -2,8 +2,6 @@
 import fs from "fs";
 import path from "path";
 import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
-import { scanForDuplicates } from "./code-duplication/scanner";
-import type { DryCheckResult } from "./code-duplication/types";
 import {
   DETECTOR_CATALOG,
   DETECTOR_IDS,
@@ -14,12 +12,10 @@ import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
 import { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
 import { getAddedLines, getChangedFiles } from "./diff/git";
-import { buildDiffScanResult, isLikelyTestFile } from "./diff/scan-diff";
+import { buildDiffScanResult } from "./diff/scan-diff";
 import "./detectors/init";
-import { setDuplicationOptions } from "./detectors/code-duplication";
 import { setLargeFileThreshold } from "./detectors/large-file";
 import { setSolidOptions } from "./detectors/solid-health";
-import { renderDryCheckJson, renderDryCheckTable } from "./output/dry-check";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import { generateTopology } from "./output/topology";
@@ -31,26 +27,11 @@ import {
 } from "./scan-profile";
 import { scanRepo } from "./scanner";
 import type { RepoScanResult } from "./types";
-import { FileIndex } from "./utils/file-index";
 
 const flushWritable = async (stream: NodeJS.WritableStream): Promise<void> => {
   await new Promise<void>((resolve) => {
     stream.write("", () => resolve());
   });
-};
-
-const resolveValidDirectory = (rawPath: string): string => {
-  const resolvedPath = path.resolve(rawPath);
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(resolvedPath);
-  } catch {
-    throw new Error(`path does not exist: ${resolvedPath}`);
-  }
-  if (!stat.isDirectory()) {
-    throw new Error(`path is not a directory: ${resolvedPath}`);
-  }
-  return resolvedPath;
 };
 
 const renderDetectorsOutput = (
@@ -349,11 +330,6 @@ const resolveDetectorOutputEntry = (
           totalLinesOfCode: result.inventory.totalLinesOfCode,
         },
       };
-    case "code-duplication":
-      return {
-        key: "codeDuplication",
-        value: result.inventory.codeDuplication ?? null,
-      };
     case "code-quality":
       return { key: "codeQuality", value: result.inventory.codeQuality };
     case "complexity-hotspots":
@@ -537,51 +513,11 @@ const hasExplicitDiffOutputFlags = (
   options: ReturnType<typeof parseArgs>,
 ): boolean => !!options.diff && options.diff.length > 0;
 
-const isDiffDryCheckOnly = (
-  options: ReturnType<typeof parseArgs>,
-  scanProfile: ReturnType<typeof resolveScanProfile>,
-): boolean =>
-  !!options.diff &&
-  options.diffDryCheck &&
-  !options.allDetectors &&
-  !options.topology &&
-  !options.dryCheck &&
-  !options.diffEnvCheck &&
-  !options.failOnNewEnvVars &&
-  !hasExplicitSectionOutputFlags(options) &&
-  scanProfile.explicitDetectorOutputIds.length === 0;
-
-const runDiffDuplicationScan = async (
-  scanPath: string,
-  changedFiles: readonly string[],
-  options: ReturnType<typeof parseArgs>,
-): Promise<DryCheckResult | undefined> => {
-  const dryCheckFiles = options.diffDryIncludeTests
-    ? changedFiles
-    : changedFiles.filter((f) => !isLikelyTestFile(f));
-
-  if (dryCheckFiles.length === 0) return undefined;
-
-  const diffIndex = FileIndex.fromPaths(scanPath, dryCheckFiles);
-  return scanForDuplicates(scanPath, diffIndex, {
-    minTokens: options.minTokens,
-    minLines: options.minLines,
-    extensions:
-      options.extensions.length > 0 ? new Set(options.extensions) : undefined,
-    filters: {
-      minUniqueRatio: options.minUniqueRatio,
-      maxLiteralRatio: options.maxLiteralRatio,
-      ignoreBarrelExports: options.ignoreBarrelExports,
-    },
-  });
-};
-
 const hasAnyScanOutputSelectors = (
   options: ReturnType<typeof parseArgs>,
   scanProfile: ReturnType<typeof resolveScanProfile>,
 ): boolean =>
   options.allDetectors ||
-  options.dryCheck ||
   options.topology ||
   hasExplicitSectionOutputFlags(options) ||
   hasExplicitDiffOutputFlags(options) ||
@@ -595,17 +531,6 @@ const main = async () => {
     }
   }
   setLargeFileThreshold(options.largeFileThreshold);
-  setDuplicationOptions({
-    minTokens: options.minTokens,
-    minLines: options.minLines,
-    extensions:
-      options.extensions.length > 0 ? new Set(options.extensions) : undefined,
-    filters: {
-      minUniqueRatio: options.minUniqueRatio,
-      maxLiteralRatio: options.maxLiteralRatio,
-      ignoreBarrelExports: options.ignoreBarrelExports,
-    },
-  });
   const allDetectorsEnabled = options.allDetectors;
   setSolidOptions({
     enabled: options.solid || allDetectorsEnabled,
@@ -693,73 +618,6 @@ const main = async () => {
     process.exit(0);
   }
 
-  if (options.dryCheck) {
-    const validScanPath = resolveValidDirectory(options.path);
-    const index = await FileIndex.build(validScanPath);
-    const result = await scanForDuplicates(validScanPath, index, {
-      minTokens: options.minTokens,
-      minLines: options.minLines,
-      extensions:
-        options.extensions.length > 0 ? new Set(options.extensions) : undefined,
-      filters: {
-        minUniqueRatio: options.minUniqueRatio,
-        maxLiteralRatio: options.maxLiteralRatio,
-        ignoreBarrelExports: options.ignoreBarrelExports,
-      },
-    });
-
-    if (options.format === "json") {
-      renderDryCheckJson(result, process.stdout);
-    } else {
-      renderDryCheckTable(result, process.stdout);
-    }
-
-    return;
-  }
-
-  // Fast path: diff-scoped duplication check only (no full repo scan needed)
-  if (isDiffDryCheckOnly(options, scanProfile)) {
-    const validScanPath = resolveValidDirectory(options.path);
-    const changedFiles = await getChangedFiles(validScanPath, options.diff!);
-    const duplicationResult = await runDiffDuplicationScan(
-      validScanPath,
-      changedFiles,
-      options,
-    );
-
-    if (!duplicationResult) {
-      return;
-    }
-
-    if (options.format === "json") {
-      const jsonPayload = {
-        diffScan: {
-          changedFiles,
-          newDuplication: {
-            stats: duplicationResult.stats,
-            groups: duplicationResult.groups,
-          },
-        },
-      };
-      process.stdout.write(JSON.stringify(jsonPayload, null, 2));
-    } else {
-      renderDryCheckTable(duplicationResult, process.stdout);
-    }
-
-    if (
-      options.failOnNewDuplicationPct !== undefined &&
-      duplicationResult.stats.duplicationPercentage >
-        options.failOnNewDuplicationPct
-    ) {
-      process.stderr.write(
-        `diff-dry-check: duplication ${duplicationResult.stats.duplicationPercentage}% exceeds threshold ${options.failOnNewDuplicationPct}%\n`,
-      );
-      await flushWritable(process.stdout);
-      process.exit(1);
-    }
-    return;
-  }
-
   const result = await scanRepo(options.path, {
     enabledDetectorIds: scanProfile.enabledDetectorIds,
   });
@@ -788,23 +646,12 @@ const main = async () => {
                 )
               : undefined;
 
-          // Diff-scoped duplication scan (changed files only, test files excluded by default)
-          const duplicationResult =
-            options.diffDryCheck && changedFiles.length > 0
-              ? await runDiffDuplicationScan(
-                  options.path,
-                  changedFiles,
-                  options,
-                )
-              : undefined;
-
           const addedLines = options.diffEnvCheck
             ? await getAddedLines(options.path, diffRange)
             : undefined;
 
           return buildDiffScanResult(result, changedFiles, {
             historyBaselines,
-            dryCheck: duplicationResult,
             envCheck: options.diffEnvCheck,
             addedLines,
           });
@@ -909,23 +756,6 @@ const main = async () => {
     } else if (options.format !== "json") {
       const content = renderTopologyToString(topology, "markdown");
       process.stdout.write(includeReportOutput ? `\n${content}` : content);
-    }
-  }
-
-  // Diff-scan threshold checks
-  if (
-    diffScan?.newDuplication &&
-    options.failOnNewDuplicationPct !== undefined
-  ) {
-    if (
-      diffScan.newDuplication.stats.duplicationPercentage >
-      options.failOnNewDuplicationPct
-    ) {
-      process.stderr.write(
-        `diff-dry-check: duplication ${diffScan.newDuplication.stats.duplicationPercentage}% exceeds threshold ${options.failOnNewDuplicationPct}%\n`,
-      );
-      await flushWritable(process.stdout);
-      process.exit(1);
     }
   }
 

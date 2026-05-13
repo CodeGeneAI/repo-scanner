@@ -1,5 +1,4 @@
 import type { SolidHealthResult } from "./ast/solid/types";
-import type { DryCheckStats, DuplicateGroup } from "./code-duplication/types";
 import type { DatabaseSchema } from "./detectors/db-schema/types";
 
 export type { SolidHealthResult } from "./ast/solid/types";
@@ -140,7 +139,6 @@ export interface RepoScanResult {
     readonly largeFiles?: readonly LargeFileInfo[];
     readonly todoAnnotations?: readonly TodoAnnotation[];
     readonly deadExports?: readonly DeadExport[];
-    readonly codeDuplication?: CodeDuplicationResult;
     readonly solidHealth?: SolidHealthResult;
     readonly complexityHotspots?: readonly ComplexityHotspot[];
     readonly externalServices?: readonly ExternalService[];
@@ -271,32 +269,6 @@ export interface ApiSurface {
   readonly frameworksUsed: readonly string[];
 }
 
-export interface CodeDuplicationInstance {
-  readonly file: string;
-  readonly startLine: number;
-  readonly endLine: number;
-}
-
-export interface CodeDuplicationGroup {
-  readonly id: number;
-  readonly instances: readonly CodeDuplicationInstance[];
-  readonly tokenCount: number;
-  readonly lineCount: number;
-}
-
-export interface CodeDuplicationStats {
-  readonly filesScanned: number;
-  readonly totalTokens: number;
-  readonly duplicateGroups: number;
-  readonly duplicatedLines: number;
-  readonly duplicationPercentage: number;
-}
-
-export interface CodeDuplicationResult {
-  readonly groups: readonly CodeDuplicationGroup[];
-  readonly stats: CodeDuplicationStats;
-}
-
 export interface LayerViolation {
   readonly from: string;
   readonly to: string;
@@ -359,11 +331,6 @@ export interface DiffConventionViolation {
   readonly violation: string;
 }
 
-export interface DiffDuplicationResult {
-  readonly stats: DryCheckStats;
-  readonly groups: readonly DuplicateGroup[];
-}
-
 export interface DiffScanResult {
   readonly changedFiles: readonly string[];
   readonly affectedComponents: readonly string[];
@@ -374,7 +341,6 @@ export interface DiffScanResult {
   readonly newDeadExports: readonly DeadExport[];
   readonly suggestedReviewFocus: readonly string[];
   readonly warnings?: readonly string[];
-  readonly newDuplication?: DiffDuplicationResult;
   readonly newEnvVars?: readonly EnvVarInfo[];
 }
 
@@ -408,14 +374,7 @@ export interface CliOptions {
   readonly scanExternalServices: boolean;
   readonly scanBuildAndTest: boolean;
   readonly allDetectors: boolean;
-  readonly dryCheck: boolean;
   readonly largeFileThreshold: number;
-  readonly minTokens: number;
-  readonly minLines: number;
-  readonly extensions: readonly string[];
-  readonly minUniqueRatio: number;
-  readonly maxLiteralRatio: number;
-  readonly ignoreBarrelExports: boolean;
   readonly solid: boolean;
   readonly solidThreshold: number;
   readonly envIncludeTests: boolean;
@@ -423,10 +382,7 @@ export interface CliOptions {
   readonly topologyDiagrams?: readonly DiagramKind[];
   readonly topologyOutput?: string;
   readonly diff?: string;
-  readonly diffDryCheck: boolean;
-  readonly diffDryIncludeTests: boolean;
   readonly diffEnvCheck: boolean;
-  readonly failOnNewDuplicationPct?: number;
   readonly failOnNewEnvVars: boolean;
   readonly callGraph: boolean;
   readonly dbSchema: boolean;
@@ -436,7 +392,6 @@ export interface CliOptions {
   readonly largeFile: boolean;
   readonly todo: boolean;
   readonly deadExport: boolean;
-  readonly codeDuplication: boolean;
   readonly complexityHotspots: boolean;
   readonly languageDetector: boolean;
   readonly languageStatsDetector: boolean;

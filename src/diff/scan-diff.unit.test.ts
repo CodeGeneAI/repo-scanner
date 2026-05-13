@@ -597,32 +597,9 @@ describe("computeNetNewEnvVars", () => {
   });
 });
 
-describe("buildDiffScanResult with dryCheck and envCheck", () => {
+describe("buildDiffScanResult with envCheck", () => {
   afterEach(() => {
     resetDiffConventionOptions();
-  });
-
-  it("attaches newDuplication when dryCheck is provided", () => {
-    const dryCheck = {
-      scanPath: "/tmp/repo",
-      durationMs: 10,
-      groups: [],
-      stats: {
-        filesScanned: 2,
-        totalTokens: 100,
-        duplicateGroups: 0,
-        duplicatedLines: 0,
-        duplicationPercentage: 0,
-      },
-    };
-    const diff = buildDiffScanResult(
-      baseResult,
-      ["packages/a/src/service.ts"],
-      { dryCheck },
-    );
-    expect(diff.newDuplication).toBeDefined();
-    expect(diff.newDuplication!.stats.filesScanned).toBe(2);
-    expect(diff.newDuplication!.groups).toEqual([]);
   });
 
   it("attaches newEnvVars when envCheck is enabled", () => {
@@ -658,36 +635,12 @@ describe("buildDiffScanResult with dryCheck and envCheck", () => {
     expect(diff.newEnvVars![0]!.name).toBe("NEW_API_KEY");
   });
 
-  it("omits newDuplication and newEnvVars when options not provided", () => {
+  it("omits newEnvVars when options not provided", () => {
     const diff = buildDiffScanResult(baseResult, ["packages/a/src/service.ts"]);
-    expect(diff.newDuplication).toBeUndefined();
     expect(diff.newEnvVars).toBeUndefined();
   });
 
-  it("threshold comparison uses strictly-greater (equal does not exceed)", () => {
-    const dryCheck = {
-      scanPath: "/tmp/repo",
-      durationMs: 10,
-      groups: [],
-      stats: {
-        filesScanned: 2,
-        totalTokens: 100,
-        duplicateGroups: 1,
-        duplicatedLines: 10,
-        duplicationPercentage: 10,
-      },
-    };
-    const diff = buildDiffScanResult(
-      baseResult,
-      ["packages/a/src/service.ts"],
-      { dryCheck },
-    );
-    // duplicationPercentage is 10; a threshold of 10 means > 10 triggers failure
-    // This confirms the result carries the exact percentage for external threshold checks
-    expect(diff.newDuplication!.stats.duplicationPercentage).toBe(10);
-  });
-
-  it("omits newEnvVars when envCheck is true but envVars is empty", () => {
+  it("returns empty newEnvVars when envCheck is true but envVars is empty", () => {
     const diff = buildDiffScanResult(
       baseResult,
       ["packages/a/src/service.ts"],

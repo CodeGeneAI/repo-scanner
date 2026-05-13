@@ -130,17 +130,17 @@ describe("resolveScanProfile", () => {
         "bun",
         "repo-scanner",
         "--detectors",
-        "runtime,todo,code-duplication",
+        "runtime,todo,large-file",
       ]),
     );
 
     expect(profile.allDetectors).toBeFalse();
     expect(profile.selectedSections).toEqual([]);
     expect(profile.enabledDetectorIds).toEqual(
-      expect.arrayContaining(["runtime", "todo", "code-duplication"]),
+      expect.arrayContaining(["runtime", "todo", "large-file"]),
     );
     expect(profile.explicitDetectorOutputIds).toEqual(
-      expect.arrayContaining(["runtime", "todo", "code-duplication"]),
+      expect.arrayContaining(["runtime", "todo", "large-file"]),
     );
   });
 
@@ -179,7 +179,7 @@ describe("resolveScanProfile", () => {
         "repo-scanner",
         "--inventory",
         "--detectors",
-        "naming-convention,runtime,large-file,todo,dead-export,code-duplication,complexity-hotspots",
+        "naming-convention,runtime,large-file,todo,dead-export,complexity-hotspots",
       ]),
     );
 
@@ -188,7 +188,6 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("large-file");
     expect(profile.enabledDetectorIds).toContain("todo");
     expect(profile.enabledDetectorIds).toContain("dead-export");
-    expect(profile.enabledDetectorIds).toContain("code-duplication");
     expect(profile.enabledDetectorIds).toContain("complexity-hotspots");
   });
 

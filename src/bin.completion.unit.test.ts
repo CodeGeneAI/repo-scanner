@@ -8,30 +8,7 @@ import {
   runRepoScanner,
 } from "./bin.unit.test.helpers";
 
-describe("repo-scanner bin completion and dry-check", () => {
-  it("emits dry-check compatibility json when --dry-check is enabled", async () => {
-    const repoPath = await createCliFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--dry-check",
-        "--format",
-        "json",
-      ]);
-
-      expect(result.exitCode).toBe(0);
-      const payload = JSON.parse(new TextDecoder().decode(result.stdout));
-      expect(payload.scanPath).toBeDefined();
-      expect(payload.stats).toBeDefined();
-      expect(Array.isArray(payload.groups)).toBeTrue();
-      expect(payload.inventory).toBeUndefined();
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
+describe("repo-scanner bin completion", () => {
   it("prints detector catalog for detectors subcommand", () => {
     const result = runRepoScanner(["detectors"]);
     const stdout = decode(result.stdout);

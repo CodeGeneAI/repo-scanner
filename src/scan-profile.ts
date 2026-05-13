@@ -58,7 +58,6 @@ const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   "call-graph": ["call-graph"],
   ci: ["ci"],
   "codebase-size": ["language"],
-  "code-duplication": ["code-duplication"],
   "code-quality": ["code-quality"],
   "complexity-hotspots": ["complexity-hotspots"],
   components: ["monorepo"],
@@ -135,7 +134,6 @@ const resolveExplicitDetectorOutputIds = (
     | "largeFile"
     | "todo"
     | "deadExport"
-    | "codeDuplication"
     | "complexityHotspots"
     | "languageDetector"
     | "languageStatsDetector"
@@ -177,7 +175,6 @@ const resolveExplicitDetectorOutputIds = (
   if (options.largeFile) ids.add("large-file");
   if (options.todo) ids.add("todo");
   if (options.deadExport) ids.add("dead-export");
-  if (options.codeDuplication) ids.add("code-duplication");
   if (options.complexityHotspots) ids.add("complexity-hotspots");
   if (options.languageDetector) ids.add("language");
   if (options.languageStatsDetector) ids.add("language-stats");

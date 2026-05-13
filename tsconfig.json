@@ -20,10 +20,5 @@
     "types": ["bun"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
-  "exclude": [
-    "**/node_modules",
-    "dist",
-    "coverage",
-    "src/code-duplication/__fixtures__"
-  ]
+  "exclude": ["**/node_modules", "dist", "coverage"]
 }
