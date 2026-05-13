@@ -1,12 +1,7 @@
 import { version as PACKAGE_VERSION } from "../package.json" with {
   type: "json",
 };
-import {
-  DETECTOR_IDS,
-  DETECTOR_PRESETS,
-  type DetectorId,
-  type DetectorPreset,
-} from "./detectors/catalog";
+import { DETECTOR_IDS, type DetectorId } from "./detectors/catalog";
 import type { CliOptions } from "./types";
 
 export class CliParseError extends Error {
@@ -35,38 +30,26 @@ Commands:
 Core output profile:
   --architecture                     Render Architecture section only
   --inventory                        Render Inventory section only
-  --external-services                Render External Services section only
-  --build-and-test                   Render Build & Test section only
-  --all-detectors, --full-scan       Enable all detectors and Signals output
+  --all-detectors, --full-scan       Enable all detectors
   --detectors <list>                 Comma-separated detector IDs (advanced)
                                       Valid: ${VALID_DETECTOR_IDS_TEXT}
-                                      Presets: @inventory,@quality,@architecture
 
 General:
   -p, --path <dir>                   Directory to scan (default: cwd)
   -f, --format <table|json>          Output format (default: table)
-  --large-file-threshold <n>         Large-file threshold in lines (default: 500)
   --version, -v                      Show version
   --help, -h                         Show help
   --schema                           JSON schema payload mode for detectors JSON output
 
 Examples:
   repo-scanner --inventory
-  repo-scanner --detectors @inventory,@quality
+  repo-scanner --detectors language,framework
   repo-scanner detectors
   repo-scanner detectors --format json --schema
   repo-scanner completion zsh > _repo-scanner
   repo-scanner completion install fish
   repo-scanner completion uninstall fish
 `;
-
-const parsePositiveInteger = (raw: string): number | undefined => {
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return undefined;
-  }
-  return parsed;
-};
 
 const parseCommaSeparatedValues = (
   raw: string | undefined,
@@ -98,26 +81,6 @@ const failCliParse = (message: string): never => {
   throw new CliParseError(message);
 };
 
-const parseRequiredPositiveIntegerOption = (
-  raw: string | undefined,
-  optionName: string,
-): number => {
-  const value =
-    raw ??
-    failCliParse(`Error: ${optionName} requires a positive integer value.`);
-
-  if (isFlagToken(value)) {
-    failCliParse(`Error: ${optionName} requires a positive integer value.`);
-  }
-
-  return (
-    parsePositiveInteger(value) ??
-    failCliParse(
-      `Error: invalid ${optionName.replace(/^--/, "")} "${value}". Value must be a positive integer.`,
-    )
-  );
-};
-
 export const parseArgs = (argv: string[]): CliOptions => {
   const args = argv.slice(2);
   let pathArg = process.cwd();
@@ -132,111 +95,20 @@ export const parseArgs = (argv: string[]): CliOptions => {
   const detectorSelectionWarnings: string[] = [];
   let scanArchitecture = false;
   let scanInventory = false;
-  let scanExternalServices = false;
-  let scanBuildAndTest = false;
   let allDetectors = false;
-  let largeFileThreshold = 500;
-  let runtime = false;
-  let largeFile = false;
-  let todo = false;
-  let complexityHotspots = false;
   let languageDetector = false;
-  let languageStatsDetector = false;
-  let codebaseSizeDetector = false;
   let frameworkDetector = false;
   let monorepoDetector = false;
-  let dependencyManagerDetector = false;
-  let ciDetector = false;
-  let containerizationDetector = false;
-  let iacDetector = false;
-  let testingDetector = false;
-  let datastoreDetector = false;
-  let lintingDetector = false;
-  let buildDetector = false;
-  let buildCommandsDetector = false;
-  let testCommandsDetector = false;
-  let lintCommandsDetector = false;
-  let repoToolsDetector = false;
-  let codeQualityDetector = false;
-  let deploymentPlatformDetector = false;
-  let externalServicesDetector = false;
-  let vcs = false;
   const enableDetector = (detectorId: DetectorId): void => {
     switch (detectorId) {
-      case "build":
-        buildDetector = true;
-        return;
-      case "build-commands":
-        buildCommandsDetector = true;
-        return;
-      case "ci":
-        ciDetector = true;
-        return;
-      case "codebase-size":
-        codebaseSizeDetector = true;
-        return;
-      case "code-quality":
-        codeQualityDetector = true;
-        return;
-      case "complexity-hotspots":
-        complexityHotspots = true;
-        return;
-      case "containerization":
-        containerizationDetector = true;
-        return;
-      case "datastore":
-        datastoreDetector = true;
-        return;
-      case "dependency-manager":
-        dependencyManagerDetector = true;
-        return;
-      case "deployment-platform":
-        deploymentPlatformDetector = true;
-        return;
-      case "external-services":
-        externalServicesDetector = true;
-        return;
       case "framework":
         frameworkDetector = true;
-        return;
-      case "iac":
-        iacDetector = true;
-        return;
-      case "language-stats":
-        languageStatsDetector = true;
         return;
       case "language":
         languageDetector = true;
         return;
-      case "large-file":
-        largeFile = true;
-        return;
-      case "linting":
-        lintingDetector = true;
-        return;
-      case "lint-commands":
-        lintCommandsDetector = true;
-        return;
       case "monorepo":
         monorepoDetector = true;
-        return;
-      case "repo-tools":
-        repoToolsDetector = true;
-        return;
-      case "runtime":
-        runtime = true;
-        return;
-      case "testing":
-        testingDetector = true;
-        return;
-      case "test-commands":
-        testCommandsDetector = true;
-        return;
-      case "todo":
-        todo = true;
-        return;
-      case "vcs":
-        vcs = true;
         return;
     }
   };
@@ -284,12 +156,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--inventory":
         scanInventory = true;
         break;
-      case "--external-services":
-        scanExternalServices = true;
-        break;
-      case "--build-and-test":
-        scanBuildAndTest = true;
-        break;
       case "--all-detectors":
       case "--full-scan":
         allDetectors = true;
@@ -313,34 +179,21 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "--detectors": {
         const detectorIds = parseCommaSeparatedValues(args[++i], "--detectors");
         const detectorSources = new Map<string, string[]>();
-        const expandedDetectorIds = detectorIds.flatMap((detectorId) => {
-          if (detectorId.startsWith("@")) {
-            const preset = DETECTOR_PRESETS[detectorId as DetectorPreset];
-            if (preset) {
-              for (const resolvedId of preset) {
-                const sources = detectorSources.get(resolvedId) ?? [];
-                sources.push(detectorId);
-                detectorSources.set(resolvedId, sources);
-              }
-              return [...preset];
-            }
-            return [detectorId];
-          }
+        for (const detectorId of detectorIds) {
           const sources = detectorSources.get(detectorId) ?? [];
           sources.push("explicit");
           detectorSources.set(detectorId, sources);
-          return [detectorId];
-        });
-        const invalid = expandedDetectorIds.filter(
+        }
+        const invalid = detectorIds.filter(
           (detectorId) => !VALID_DETECTOR_ID_SET.has(detectorId),
         );
         if (invalid.length > 0) {
           failCliParse(
-            `Error: invalid detector ids "${invalid.join(",")}". Use one of ${VALID_DETECTOR_IDS_TEXT} or presets @inventory,@quality,@architecture.`,
+            `Error: invalid detector ids "${invalid.join(",")}". Use one of ${VALID_DETECTOR_IDS_TEXT}.`,
           );
         }
 
-        for (const detectorId of expandedDetectorIds) {
+        for (const detectorId of detectorIds) {
           enableDetector(detectorId as DetectorId);
         }
 
@@ -354,15 +207,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       }
       case "--schema":
         detectorsSchema = true;
-        break;
-      case "--large-file-threshold":
-        largeFileThreshold = parseRequiredPositiveIntegerOption(
-          args[++i],
-          "--large-file-threshold",
-        );
-        break;
-      case "--vcs":
-        vcs = true;
         break;
       default:
         if (arg.startsWith("-")) {
@@ -387,35 +231,10 @@ export const parseArgs = (argv: string[]): CliOptions => {
     detectorSelectionWarnings,
     scanArchitecture,
     scanInventory,
-    scanExternalServices,
-    scanBuildAndTest,
     allDetectors,
-    largeFileThreshold,
-    runtime,
-    largeFile,
-    todo,
-    complexityHotspots,
     languageDetector,
-    languageStatsDetector,
-    codebaseSizeDetector,
     frameworkDetector,
     monorepoDetector,
-    dependencyManagerDetector,
-    ciDetector,
-    containerizationDetector,
-    iacDetector,
-    testingDetector,
-    datastoreDetector,
-    lintingDetector,
-    buildDetector,
-    buildCommandsDetector,
-    testCommandsDetector,
-    lintCommandsDetector,
-    repoToolsDetector,
-    codeQualityDetector,
-    deploymentPlatformDetector,
-    externalServicesDetector,
-    vcs,
   };
 };
 

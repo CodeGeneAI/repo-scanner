@@ -6,12 +6,7 @@ import {
 } from "./bin.unit.test.helpers";
 import { DETECTOR_IDS } from "./detectors/catalog";
 
-const DETECTOR_SCOPE_GROUP_INDEX = 1;
-const detectorIds = DETECTOR_IDS.filter(
-  (_, index) => index % 4 === DETECTOR_SCOPE_GROUP_INDEX,
-);
-
-describe("repo-scanner bin detector selector scoping group 2", () => {
+describe("repo-scanner bin detector selector scoping", () => {
   let repoPath = "";
 
   beforeAll(async () => {
@@ -24,7 +19,7 @@ describe("repo-scanner bin detector selector scoping group 2", () => {
     }
   });
 
-  for (const detectorId of detectorIds) {
+  for (const detectorId of DETECTOR_IDS) {
     it(`scopes selector for ${detectorId} to one payload key`, () => {
       assertDetectorSelectorScoping(repoPath, detectorId);
     });

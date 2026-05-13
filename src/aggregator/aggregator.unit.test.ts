@@ -6,7 +6,7 @@ describe("aggregate", async () => {
   const scanPath = "/tmp/test-repo";
   const durationMs = 42;
 
-  it("merges findings from multiple detectors into correct categories", async () => {
+  it("merges findings from language and framework detectors into correct categories", async () => {
     const results: DetectorResult[] = [
       {
         detectorId: "language",
@@ -21,16 +21,6 @@ describe("aggregate", async () => {
           { value: "React", confidence: 1.0, evidence: ["react dep"] },
         ],
       },
-      {
-        detectorId: "ci",
-        findings: [
-          {
-            value: "GitHub Actions",
-            confidence: 1.0,
-            evidence: [".github/workflows"],
-          },
-        ],
-      },
     ];
 
     const result = await aggregate(scanPath, durationMs, results);
@@ -38,7 +28,6 @@ describe("aggregate", async () => {
     expect(result.inventory.languages).toContain("TypeScript");
     expect(result.inventory.languages).toContain("Python");
     expect(result.inventory.frameworks).toContain("React");
-    expect(result.buildAndTest.ciSystems).toContain("GitHub Actions");
   });
 
   it("deduplicates values within a category", async () => {
@@ -60,103 +49,21 @@ describe("aggregate", async () => {
     ).toHaveLength(1);
   });
 
-  it("sets signals correctly from detector signals", async () => {
+  it("filters low-confidence language findings", async () => {
     const results: DetectorResult[] = [
       {
-        detectorId: "ci",
+        detectorId: "language",
         findings: [
-          {
-            value: "GitHub Actions",
-            confidence: 1.0,
-            evidence: ["workflows"],
-          },
-        ],
-        signals: { hasCi: true },
-      },
-      {
-        detectorId: "repo-tools",
-        findings: [],
-        signals: { hasReadme: true },
-      },
-    ];
-
-    const result = await aggregate(scanPath, durationMs, results);
-
-    expect(result.signals.hasCi).toBe(true);
-    expect(result.signals.hasReadme).toBe(true);
-    expect(result.signals.hasContainerization).toBe(false);
-    expect(result.signals.hasIaC).toBe(false);
-  });
-
-  it("derives hasCi from ci detector findings", async () => {
-    const results: DetectorResult[] = [
-      {
-        detectorId: "ci",
-        findings: [
-          { value: "GitLab CI", confidence: 1.0, evidence: ["found"] },
+          { value: "TypeScript", confidence: 1.0, evidence: ["10 files"] },
+          { value: "Lua", confidence: 0.5, evidence: ["1 file"] },
         ],
       },
     ];
 
     const result = await aggregate(scanPath, durationMs, results);
-    expect(result.signals.hasCi).toBe(true);
-  });
 
-  it("derives hasContainerization from containerization signals", async () => {
-    const results: DetectorResult[] = [
-      {
-        detectorId: "containerization",
-        findings: [
-          { value: "Docker", confidence: 1.0, evidence: ["Dockerfile"] },
-        ],
-        signals: { hasContainerization: true },
-      },
-    ];
-
-    const result = await aggregate(scanPath, durationMs, results);
-    expect(result.signals.hasContainerization).toBe(true);
-  });
-
-  it("derives hasDeploymentPlatform from deployment-platform signals", async () => {
-    const results: DetectorResult[] = [
-      {
-        detectorId: "deployment-platform",
-        findings: [
-          { value: "Vercel", confidence: 1.0, evidence: ["vercel.json"] },
-        ],
-        signals: { hasDeploymentPlatform: true },
-      },
-    ];
-
-    const result = await aggregate(scanPath, durationMs, results);
-    expect(result.signals.hasDeploymentPlatform).toBe(true);
-    expect(result.inventory.deploymentPlatforms).toContain("Vercel");
-  });
-
-  it("merges commands from multiple detectors", async () => {
-    const results: DetectorResult[] = [
-      {
-        detectorId: "build",
-        findings: [],
-        commands: {
-          build: ["npm run build"],
-          test: ["npm test"],
-        },
-      },
-      {
-        detectorId: "testing",
-        findings: [],
-        commands: {
-          test: ["bun test"],
-        },
-      },
-    ];
-
-    const result = await aggregate(scanPath, durationMs, results);
-
-    expect(result.buildAndTest.buildCommands).toContain("npm run build");
-    expect(result.buildAndTest.testCommands).toContain("npm test");
-    expect(result.buildAndTest.testCommands).toContain("bun test");
+    expect(result.inventory.languages).toContain("TypeScript");
+    expect(result.inventory.languages).not.toContain("Lua");
   });
 
   it("sets monorepo flag from monorepo detector findings", async () => {
@@ -268,25 +175,5 @@ describe("aggregate", async () => {
     expect(result.inventory.languageStats).toEqual([]);
     expect(result.inventory.totalFiles).toBe(0);
     expect(result.inventory.totalLinesOfCode).toBe(0);
-  });
-
-  it("uses OR semantics for signals across detectors", async () => {
-    const results: DetectorResult[] = [
-      {
-        detectorId: "language",
-        findings: [],
-        signals: { hasTests: false },
-      },
-      {
-        detectorId: "testing",
-        findings: [
-          { value: "Bun Test", confidence: 1.0, evidence: ["bunfig.toml"] },
-        ],
-        signals: { hasTests: true },
-      },
-    ];
-
-    const result = await aggregate(scanPath, durationMs, results);
-    expect(result.signals.hasTests).toBe(true);
   });
 });

@@ -5,9 +5,6 @@ export type {
   Component,
   ComponentKind,
   LanguageStats,
-  LargeFileInfo,
   RepoScanResult,
-  RuntimeInfo,
   ScanRepoOptions,
-  TodoAnnotation,
 } from "./types";

@@ -27,29 +27,22 @@ describe("repo-scanner bin output selectors", () => {
     }
   });
 
-  it("supports single-section output for --external-services", async () => {
+  it("supports single-section output for --architecture", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--external-services",
-      ]);
+      const result = runRepoScanner(["--path", repoPath, "--architecture"]);
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("External Services");
-      expect(stdout).not.toContain("Architecture");
+      expect(stdout).toContain("Architecture");
       expect(stdout).not.toContain("Inventory");
-      expect(stdout).not.toContain("Build & Test");
-      expect(stdout).not.toContain("Signals");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
   });
 
-  it("supports multi-section output for --architecture --build-and-test", async () => {
+  it("supports multi-section output for --architecture --inventory", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -57,16 +50,13 @@ describe("repo-scanner bin output selectors", () => {
         "--path",
         repoPath,
         "--architecture",
-        "--build-and-test",
+        "--inventory",
       ]);
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
       expect(stdout).toContain("Architecture");
-      expect(stdout).toContain("Build & Test");
-      expect(stdout).not.toContain("Inventory");
-      expect(stdout).not.toContain("External Services");
-      expect(stdout).not.toContain("Signals");
+      expect(stdout).toContain("Inventory");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -80,15 +70,14 @@ describe("repo-scanner bin output selectors", () => {
         "--path",
         repoPath,
         "--detectors",
-        "todo",
+        "framework",
       ]);
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("todoAnnotations");
+      expect(stdout).toContain("frameworks");
       expect(stdout).not.toContain("Inventory");
       expect(stdout).not.toContain("Architecture");
-      expect(stdout).not.toContain("Build & Test");
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -102,7 +91,7 @@ describe("repo-scanner bin output selectors", () => {
         "--path",
         repoPath,
         "--detectors",
-        "todo",
+        "framework",
         "--format",
         "json",
       ]);
@@ -114,9 +103,9 @@ describe("repo-scanner bin output selectors", () => {
         "scanPath",
         "timestamp",
         "durationMs",
-        "todoAnnotations",
+        "frameworks",
       ]);
-      expect(payload.todoAnnotations).toBeArray();
+      expect(payload.frameworks).toBeArray();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -148,7 +137,7 @@ describe("repo-scanner bin output selectors", () => {
     }
   });
 
-  it("splits language outputs into language, language-stats, and codebase-size selectors", async () => {
+  it("emits language selector output", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -167,40 +156,6 @@ describe("repo-scanner bin output selectors", () => {
         "timestamp",
         "durationMs",
         "languages",
-      ]);
-
-      const languageStats = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "language-stats",
-        "--format",
-        "json",
-      ]);
-      expect(languageStats.exitCode).toBe(0);
-      const statsPayload = JSON.parse(decode(languageStats.stdout));
-      expectTopLevelKeys(statsPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "languageStats",
-      ]);
-
-      const codebaseSize = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "codebase-size",
-        "--format",
-        "json",
-      ]);
-      expect(codebaseSize.exitCode).toBe(0);
-      const sizePayload = JSON.parse(decode(codebaseSize.stdout));
-      expectTopLevelKeys(sizePayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "codebaseSize",
       ]);
     } finally {
       await rm(repoPath, { recursive: true, force: true });
@@ -238,77 +193,6 @@ describe("repo-scanner bin output selectors", () => {
     }
   });
 
-  it("splits build outputs into tools and command selectors", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
-
-    try {
-      const build = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "build",
-        "--format",
-        "json",
-      ]);
-      expect(build.exitCode).toBe(0);
-      const buildPayload = JSON.parse(decode(build.stdout));
-      expectTopLevelKeys(buildPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "buildTools",
-      ]);
-
-      const commandSelectors = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "build-commands,test-commands,lint-commands",
-        "--format",
-        "json",
-      ]);
-      expect(commandSelectors.exitCode).toBe(0);
-      const commandsPayload = JSON.parse(decode(commandSelectors.stdout));
-      expectTopLevelKeys(commandsPayload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "buildCommands",
-        "testCommands",
-        "lintCommands",
-      ]);
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("composes vcs with other detector outputs", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--detectors",
-        "vcs,language",
-        "--format",
-        "json",
-      ]);
-      expect(result.exitCode).toBe(0);
-      const payload = JSON.parse(decode(result.stdout));
-      expectTopLevelKeys(payload, [
-        "scanPath",
-        "timestamp",
-        "durationMs",
-        "vcs",
-        "languages",
-      ]);
-      expect(payload.languages).toBeArray();
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
   it("emits explicit union for mixed section and detector selectors", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
@@ -328,8 +212,6 @@ describe("repo-scanner bin output selectors", () => {
       expect(payload.inventory).toBeDefined();
       expect(payload.monorepo).toBeDefined();
       expect(payload.architecture).toBeUndefined();
-      expect(payload.buildAndTest).toBeUndefined();
-      expect(payload.externalServices).toBeUndefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -367,8 +249,6 @@ describe("repo-scanner bin output selectors", () => {
       });
 
       expect(normalize(fullPayload)).toEqual(normalize(allPayload));
-      expect(decode(allDetectors.stdout)).toContain('"signals"');
-      expect(decode(fullScan.stdout)).toContain('"signals"');
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

@@ -1,21 +1,3 @@
-// Register all detectors — import this file to initialize the registry.
+import "./framework";
 import "./language";
 import "./monorepo";
-import "./dependency-manager";
-import "./ci";
-import "./framework";
-import "./containerization";
-import "./iac";
-import "./testing";
-import "./datastore";
-import "./linting";
-import "./build";
-import "./repo-tools";
-import "./runtime";
-import "./code-quality";
-import "./large-file";
-import "./todo";
-import "./deployment-platform";
-import "./external-services";
-import "./complexity-hotspots";
-import "./vcs";

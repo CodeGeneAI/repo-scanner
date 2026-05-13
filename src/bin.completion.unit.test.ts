@@ -30,8 +30,8 @@ describe("repo-scanner bin completion", () => {
 
     expect(result.exitCode).toBe(0);
     expect(payload.version).toBe(1);
-    expect(payload.detectors.length).toBeGreaterThan(0);
-    expect(payload.presets["@inventory"].length).toBeGreaterThan(0);
+    expect(payload.detectors.length).toBe(3);
+    expect(payload.presets).toBeUndefined();
   });
 
   it("prints bash completion script for completion subcommand", () => {
@@ -181,13 +181,12 @@ describe("repo-scanner bin completion", () => {
         "--path",
         repoPath,
         "--detectors",
-        "@inventory,language,@quality,code-quality",
+        "language,framework,language",
       ]);
       const stderr = decode(result.stderr);
 
       expect(result.exitCode).toBe(0);
       expect(stderr).toContain('[detectors] warning: detector "language"');
-      expect(stderr).toContain('[detectors] warning: detector "code-quality"');
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }

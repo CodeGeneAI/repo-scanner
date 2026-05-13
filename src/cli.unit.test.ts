@@ -8,8 +8,6 @@ describe("parseArgs", () => {
     expect(result.format).toBe("table");
     expect(result.scanArchitecture).toBeFalse();
     expect(result.scanInventory).toBeFalse();
-    expect(result.scanExternalServices).toBeFalse();
-    expect(result.scanBuildAndTest).toBeFalse();
     expect(result.allDetectors).toBeFalse();
     expect(result.showDetectors).toBeFalse();
     expect(result.completionShell).toBeUndefined();
@@ -17,30 +15,9 @@ describe("parseArgs", () => {
     expect(result.completionUninstall).toBeFalse();
     expect(result.detectorsSchema).toBeFalse();
     expect(result.detectorSelectionWarnings).toEqual([]);
-    expect(result.runtime).toBeFalse();
-    expect(result.largeFile).toBeFalse();
-    expect(result.todo).toBeFalse();
-    expect(result.complexityHotspots).toBeFalse();
     expect(result.languageDetector).toBeFalse();
-    expect(result.languageStatsDetector).toBeFalse();
-    expect(result.codebaseSizeDetector).toBeFalse();
     expect(result.frameworkDetector).toBeFalse();
     expect(result.monorepoDetector).toBeFalse();
-    expect(result.dependencyManagerDetector).toBeFalse();
-    expect(result.ciDetector).toBeFalse();
-    expect(result.containerizationDetector).toBeFalse();
-    expect(result.iacDetector).toBeFalse();
-    expect(result.testingDetector).toBeFalse();
-    expect(result.datastoreDetector).toBeFalse();
-    expect(result.lintingDetector).toBeFalse();
-    expect(result.buildDetector).toBeFalse();
-    expect(result.buildCommandsDetector).toBeFalse();
-    expect(result.testCommandsDetector).toBeFalse();
-    expect(result.lintCommandsDetector).toBeFalse();
-    expect(result.repoToolsDetector).toBeFalse();
-    expect(result.codeQualityDetector).toBeFalse();
-    expect(result.deploymentPlatformDetector).toBeFalse();
-    expect(result.externalServicesDetector).toBeFalse();
   });
 
   it("parses section profile flags", () => {
@@ -49,14 +26,10 @@ describe("parseArgs", () => {
       "repo-scanner",
       "--architecture",
       "--inventory",
-      "--external-services",
-      "--build-and-test",
     ]);
 
     expect(result.scanArchitecture).toBeTrue();
     expect(result.scanInventory).toBeTrue();
-    expect(result.scanExternalServices).toBeTrue();
-    expect(result.scanBuildAndTest).toBeTrue();
     expect(result.allDetectors).toBeFalse();
   });
 
@@ -70,61 +43,44 @@ describe("parseArgs", () => {
       "bun",
       "repo-scanner",
       "--detectors",
-      "language,todo,external-services,vcs",
-    ]);
-
-    expect(result.languageDetector).toBeTrue();
-    expect(result.todo).toBeTrue();
-    expect(result.externalServicesDetector).toBeTrue();
-    expect(result.vcs).toBeTrue();
-  });
-
-  it("parses expanded split selectors", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--detectors",
-      "language-stats,codebase-size,build-commands,test-commands,lint-commands",
-    ]);
-
-    expect(result.languageStatsDetector).toBeTrue();
-    expect(result.codebaseSizeDetector).toBeTrue();
-    expect(result.buildCommandsDetector).toBeTrue();
-    expect(result.testCommandsDetector).toBeTrue();
-    expect(result.lintCommandsDetector).toBeTrue();
-  });
-
-  it("expands detector presets in --detectors", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--detectors",
-      "@inventory,@quality",
+      "language,framework,monorepo",
     ]);
 
     expect(result.languageDetector).toBeTrue();
     expect(result.frameworkDetector).toBeTrue();
-    expect(result.codeQualityDetector).toBeTrue();
+    expect(result.monorepoDetector).toBeTrue();
   });
 
-  it("emits warnings for duplicate detector selection via mixed presets", () => {
+  it("emits warnings for duplicate detector selection", () => {
     const result = parseArgs([
       "bun",
       "repo-scanner",
       "--detectors",
-      "@inventory,language,@quality,code-quality",
+      "language,framework,language",
     ]);
 
     expect(result.detectorSelectionWarnings.length).toBeGreaterThan(0);
     expect(result.detectorSelectionWarnings.join(" ")).toContain("language");
-    expect(result.detectorSelectionWarnings.join(" ")).toContain(
-      "code-quality",
-    );
   });
 
   it("rejects invalid detector id in --detectors", () => {
     expect(() =>
       parseArgs(["bun", "repo-scanner", "--detectors", "env,not-real"]),
+    ).toThrow(/invalid detector ids/i);
+  });
+
+  it("rejects removed preset selectors in --detectors", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--detectors", "@inventory"]),
+    ).toThrow(/invalid detector ids/i);
+  });
+
+  it("rejects removed legacy detector ids in --detectors", () => {
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--detectors", "ci"]),
+    ).toThrow(/invalid detector ids/i);
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--detectors", "todo"]),
     ).toThrow(/invalid detector ids/i);
   });
 
@@ -161,6 +117,12 @@ describe("parseArgs", () => {
       /unknown option/i,
     );
     expect(() => parseArgs(["bun", "repo-scanner", "--env"])).toThrow(
+      /unknown option/i,
+    );
+    expect(() =>
+      parseArgs(["bun", "repo-scanner", "--external-services"]),
+    ).toThrow(/unknown option/i);
+    expect(() => parseArgs(["bun", "repo-scanner", "--vcs"])).toThrow(
       /unknown option/i,
     );
   });

@@ -14,23 +14,27 @@ const createTempRepo = async (): Promise<string> => {
   return repoPath;
 };
 
-const createBuildAndCiRepo = async (): Promise<string> => {
+const createReactFixtureRepo = async (): Promise<string> => {
   const repoPath = await createTempRepo();
-  await mkdir(path.join(repoPath, ".github", "workflows"), { recursive: true });
+  await mkdir(path.join(repoPath, "src"), { recursive: true });
+  await writeFile(path.join(repoPath, "src", "App.tsx"), "export default 1;\n");
   await writeFile(
-    path.join(repoPath, ".github", "workflows", "ci.yml"),
-    "name: ci\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n",
+    path.join(repoPath, "src", "index.ts"),
+    "export const x = 1;\n",
   );
+  await writeFile(
+    path.join(repoPath, "src", "util.ts"),
+    "export const y = 2;\n",
+  );
+  await writeFile(path.join(repoPath, "tsconfig.json"), "{}\n");
   await writeFile(
     path.join(repoPath, "package.json"),
     JSON.stringify(
       {
         name: "fixture",
         version: "1.0.0",
-        scripts: {
-          build: "tsc -p tsconfig.json",
-          test: "bun test",
-          lint: "biome check .",
+        dependencies: {
+          react: "^18.0.0",
         },
       },
       null,
@@ -55,27 +59,21 @@ describe("scanRepo", () => {
   });
 
   it("filters detectors when enabledDetectorIds are provided", async () => {
-    const repoPath = await createBuildAndCiRepo();
+    const repoPath = await createReactFixtureRepo();
     const result = await scanRepo(repoPath, {
       enabledDetectorIds: ["language"],
     });
 
-    expect(result.buildAndTest.ciSystems).toEqual([]);
-    expect(result.buildAndTest.buildCommands).toEqual([]);
-    expect(result.buildAndTest.testCommands).toEqual([]);
-    expect(result.buildAndTest.lintCommands).toEqual([]);
-    expect(result.inventory.languages.length).toBeGreaterThanOrEqual(0);
+    expect(result.inventory.frameworks).toEqual([]);
   });
 
   it("includes selected detector results when enabledDetectorIds match", async () => {
-    const repoPath = await createBuildAndCiRepo();
+    const repoPath = await createReactFixtureRepo();
     const result = await scanRepo(repoPath, {
-      enabledDetectorIds: ["build", "ci"],
+      enabledDetectorIds: ["language", "framework"],
     });
 
-    expect(result.buildAndTest.ciSystems).toContain("GitHub Actions");
-    expect(result.buildAndTest.buildCommands.length).toBeGreaterThan(0);
-    expect(result.buildAndTest.testCommands.length).toBeGreaterThan(0);
-    expect(result.buildAndTest.lintCommands.length).toBeGreaterThan(0);
+    expect(result.inventory.languages.length).toBeGreaterThan(0);
+    expect(result.inventory.frameworks).toContain("React");
   });
 });

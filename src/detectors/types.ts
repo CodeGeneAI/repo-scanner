@@ -9,12 +9,6 @@ export interface Finding {
 export interface DetectorResult {
   readonly detectorId: string;
   readonly findings: readonly Finding[];
-  /** Optional commands extracted (build, test, lint). */
-  readonly commands?: {
-    readonly build?: readonly string[];
-    readonly test?: readonly string[];
-    readonly lint?: readonly string[];
-  };
   /** Optional component hints for the aggregator. */
   readonly componentHints?: readonly {
     readonly path: string;
@@ -24,17 +18,6 @@ export interface DetectorResult {
   }[];
   /** Optional structured metadata for the aggregator. */
   readonly metadata?: Record<string, unknown>;
-  /** Optional signal overrides. */
-  readonly signals?: Partial<{
-    readonly hasReadme: boolean;
-    readonly hasCi: boolean;
-    readonly hasContainerization: boolean;
-    readonly hasIaC: boolean;
-    readonly hasTests: boolean;
-    readonly hasTypedContracts: boolean;
-    readonly hasQualityGates: boolean;
-    readonly hasDeploymentPlatform: boolean;
-  }>;
 }
 
 export interface Detector {

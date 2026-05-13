@@ -5,11 +5,9 @@ import { CliParseError, getHelpText, getVersion, parseArgs } from "./cli";
 import {
   DETECTOR_CATALOG,
   DETECTOR_IDS,
-  DETECTOR_PRESETS,
   type DetectorId,
 } from "./detectors/catalog";
 import "./detectors/init";
-import { setLargeFileThreshold } from "./detectors/large-file";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
 import {
@@ -31,16 +29,12 @@ const renderDetectorsOutput = (
         {
           version: 1,
           detectors: DETECTOR_CATALOG,
-          presets: DETECTOR_PRESETS,
         },
         stream,
       );
       return;
     }
-    renderJson(
-      { detectors: DETECTOR_CATALOG, presets: DETECTOR_PRESETS },
-      stream,
-    );
+    renderJson({ detectors: DETECTOR_CATALOG }, stream);
     return;
   }
 
@@ -48,9 +42,8 @@ const renderDetectorsOutput = (
   for (const detector of DETECTOR_CATALOG) {
     stream.write(`  - ${detector.id.padEnd(20)} ${detector.description}\n`);
   }
-  stream.write(`\nPresets: ${Object.keys(DETECTOR_PRESETS).join(", ")}\n`);
   stream.write(
-    `Use with: repo-scanner --detectors ${DETECTOR_IDS.slice(0, 3).join(",")}\n`,
+    `\nUse with: repo-scanner --detectors ${DETECTOR_IDS.join(",")}\n`,
   );
 };
 
@@ -247,12 +240,6 @@ const buildSectionJsonPayload = (
   if (sectionSet.has("inventory")) {
     payload.inventory = result.inventory;
   }
-  if (sectionSet.has("external-services")) {
-    payload.externalServices = result.inventory.externalServices ?? [];
-  }
-  if (sectionSet.has("build-and-test")) {
-    payload.buildAndTest = result.buildAndTest;
-  }
 
   return payload;
 };
@@ -287,80 +274,12 @@ const resolveDetectorOutputEntry = (
   detectorId: DetectorId,
 ): DetectorOutputEntry => {
   switch (detectorId) {
-    case "build":
-      return { key: "buildTools", value: result.inventory.buildTools };
-    case "build-commands":
-      return { key: "buildCommands", value: result.buildAndTest.buildCommands };
-    case "ci":
-      return { key: "ciSystems", value: result.buildAndTest.ciSystems };
-    case "codebase-size":
-      return {
-        key: "codebaseSize",
-        value: {
-          totalFiles: result.inventory.totalFiles,
-          totalLinesOfCode: result.inventory.totalLinesOfCode,
-        },
-      };
-    case "code-quality":
-      return { key: "codeQuality", value: result.inventory.codeQuality };
-    case "complexity-hotspots":
-      return {
-        key: "complexityHotspots",
-        value: result.inventory.complexityHotspots ?? [],
-      };
-    case "containerization":
-      return {
-        key: "containerization",
-        value: result.inventory.containerization,
-      };
-    case "datastore":
-      return { key: "datastores", value: result.inventory.datastores };
-    case "dependency-manager":
-      return {
-        key: "dependencyManagers",
-        value: result.inventory.dependencyManagers,
-      };
-    case "deployment-platform":
-      return {
-        key: "deploymentPlatforms",
-        value: result.inventory.deploymentPlatforms,
-      };
-    case "external-services":
-      return {
-        key: "externalServices",
-        value: result.inventory.externalServices ?? [],
-      };
     case "framework":
       return { key: "frameworks", value: result.inventory.frameworks };
-    case "iac":
-      return { key: "iac", value: result.inventory.iac };
     case "language":
       return { key: "languages", value: resolveLanguageSelectorOutput(result) };
-    case "language-stats":
-      return { key: "languageStats", value: result.inventory.languageStats };
-    case "large-file":
-      return { key: "largeFiles", value: result.inventory.largeFiles ?? [] };
-    case "lint-commands":
-      return { key: "lintCommands", value: result.buildAndTest.lintCommands };
-    case "linting":
-      return { key: "linting", value: result.inventory.linting };
     case "monorepo":
       return { key: "monorepo", value: result.architecture.monorepo };
-    case "repo-tools":
-      return { key: "repoTools", value: result.inventory.repoTools };
-    case "runtime":
-      return { key: "runtimes", value: result.inventory.runtimes };
-    case "test-commands":
-      return { key: "testCommands", value: result.buildAndTest.testCommands };
-    case "testing":
-      return { key: "testing", value: result.inventory.testing };
-    case "todo":
-      return {
-        key: "todoAnnotations",
-        value: result.inventory.todoAnnotations ?? [],
-      };
-    case "vcs":
-      return { key: "vcs", value: result.vcs ?? null };
   }
 };
 
@@ -407,11 +326,7 @@ const renderDetectorTablePayload = (
 
 const hasExplicitSectionOutputFlags = (
   options: ReturnType<typeof parseArgs>,
-): boolean =>
-  options.scanArchitecture ||
-  options.scanInventory ||
-  options.scanExternalServices ||
-  options.scanBuildAndTest;
+): boolean => options.scanArchitecture || options.scanInventory;
 
 const hasAnyScanOutputSelectors = (
   options: ReturnType<typeof parseArgs>,
@@ -428,7 +343,6 @@ const main = async () => {
       process.stderr.write(`[detectors] warning: ${warning}\n`);
     }
   }
-  setLargeFileThreshold(options.largeFileThreshold);
 
   if (options.showVersion) {
     process.stdout.write(`${getVersion()}\n`);
@@ -554,7 +468,6 @@ const main = async () => {
           : includeSectionOutput
             ? renderedSections
             : [],
-        includeSignals: scanProfile.allDetectors,
       });
       renderedMainTable = true;
     }
