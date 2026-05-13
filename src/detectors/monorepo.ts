@@ -105,6 +105,43 @@ registerDetector({
       }
     }
 
+    // Parse pnpm-workspace.yaml `packages:` globs into components
+    if (index.hasFile("pnpm-workspace.yaml")) {
+      const yamlText = await readText(path.join(rootPath, "pnpm-workspace.yaml"));
+      if (yamlText) {
+        for (const glob of parsePnpmWorkspaceGlobs(yamlText)) {
+          if (glob.startsWith("!")) continue;
+          const isLiteral = !glob.includes("*");
+          if (isLiteral) {
+            const manifestFile = index
+              .getByNamePrimary("package.json")
+              .find((f) => f.relativePath === `${glob}/package.json`);
+            if (manifestFile) {
+              const pkg = await readJson<PackageJson>(manifestFile.path);
+              if (!componentHints.some((c) => c.path === glob)) {
+                componentHints.push({
+                  path: glob,
+                  name: pkg?.name ?? glob.split("/").pop()!,
+                  description: pkg?.description,
+                  manifestPath: manifestFile.path,
+                  manifestName: "package.json",
+                });
+              }
+            }
+          } else {
+            const parentDir = glob.split("/")[0]!;
+            if (parentDir && parentDir !== "*") {
+              for (const comp of await discoverComponents(index, parentDir)) {
+                if (!componentHints.some((c) => c.path === comp.path)) {
+                  componentHints.push(comp);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Check package.json workspaces
     const rootPkg = await readJson<PackageJson>(
       path.join(rootPath, "package.json"),
@@ -350,3 +387,27 @@ registerDetector({
     };
   },
 });
+
+function parsePnpmWorkspaceGlobs(yamlText: string): string[] {
+  const lines = yamlText.split("\n");
+  const out: string[] = [];
+  let inPackages = false;
+  for (const raw of lines) {
+    const line = raw.replace(/#.*$/, "");
+    if (/^\s*packages\s*:/.test(line)) {
+      inPackages = true;
+      continue;
+    }
+    if (inPackages) {
+      const m = line.match(/^\s*-\s*['"]?([^'"\s]+)['"]?\s*$/);
+      if (m) {
+        out.push(m[1]!);
+        continue;
+      }
+      if (/^\S/.test(line) && line.trim().length > 0) {
+        inPackages = false;
+      }
+    }
+  }
+  return out;
+}

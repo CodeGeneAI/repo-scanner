@@ -269,6 +269,28 @@ members = ["packages/*"]
     expect(compPaths).toContain("packages/lib-a");
   });
 
+  it("discovers tooling/* packages declared in pnpm-workspace.yaml", async () => {
+    await writeFile(
+      path.join(tmpDir, "pnpm-workspace.yaml"),
+      `packages:\n  - 'apps/*'\n  - 'packages/*'\n  - 'tooling/*'\n`,
+    );
+    await writeFile(path.join(tmpDir, "package.json"), "{}");
+    for (const sub of ["apps/web", "packages/ui", "tooling/eslint-config"]) {
+      await mkdir(path.join(tmpDir, sub), { recursive: true });
+      await writeFile(
+        path.join(tmpDir, sub, "package.json"),
+        JSON.stringify({ name: sub.split("/").pop() }),
+      );
+    }
+    const detector = findDetector("monorepo");
+    const index = await FileIndex.build(tmpDir);
+    const res = await detector.detect(tmpDir, index);
+    const paths = (res.componentHints ?? []).map((c) => c.path).sort();
+    expect(paths).toContain("apps/web");
+    expect(paths).toContain("packages/ui");
+    expect(paths).toContain("tooling/eslint-config");
+  });
+
   it("returns no findings for a non-monorepo", async () => {
     await writeFile(
       path.join(tmpDir, "package.json"),
