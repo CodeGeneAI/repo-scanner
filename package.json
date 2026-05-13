@@ -42,7 +42,6 @@
   "scripts": {
     "start": "bun src/bin.ts",
     "typecheck": "bun x tsgo --noEmit",
-    "perf:drift-report": "bun src/perf/drift-report.ts",
     "test:unit": "files=$(find . -type f \\( -name '*.unit.spec.ts' -o -name '*.unit.spec.tsx' -o -name '*.unit.test.ts' -o -name '*.unit.test.tsx' \\)); if [ -n \"$files\" ]; then bun test $files; else echo 'No unit tests found'; fi",
     "lint": "biome check --write --diagnostic-level=error",
     "prepublishOnly": "bun run typecheck && bun run test:unit",

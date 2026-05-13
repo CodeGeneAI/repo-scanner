@@ -1,6 +1,4 @@
 export type { DetectorResult, Finding } from "./detectors/types";
-export { generatePerfDriftReport } from "./perf/drift-report";
-export { recordPerfTrend } from "./perf/trend-history";
 export { scanRepo } from "./scanner";
 export type {
   ApiEndpoint,

@@ -1,5 +1,0 @@
-{
-  "budgetMultiplier": 1.2,
-  "diffScanLargeSetMs": 1200,
-  "callGraphLargeFixtureMs": 8000
-}
