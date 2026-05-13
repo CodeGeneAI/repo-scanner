@@ -301,18 +301,14 @@ const main = async () => {
   }
 
   const explicitDetectorIds = resolveExplicitDetectorIds(options);
+  const result =
+    explicitDetectorIds.length > 0
+      ? await scanRepo(options.path, { detectors: explicitDetectorIds })
+      : await scanRepo(options.path);
 
   if (options.format === "json") {
-    // JSON path: apply detector filtering → returns PartialRepoScanResult when detectors are selected.
-    const result =
-      explicitDetectorIds.length > 0
-        ? await scanRepo(options.path, { detectors: explicitDetectorIds })
-        : await scanRepo(options.path);
     renderJson(result as unknown as Record<string, unknown>, process.stdout);
   } else {
-    // Table path: always run a full scan — SL-4 will add partial-aware guards to the
-    // table renderer; until then, the table requires all fields to be present.
-    const result = await scanRepo(options.path);
     renderTable(result, process.stdout);
   }
 };
