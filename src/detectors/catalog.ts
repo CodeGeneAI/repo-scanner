@@ -2,7 +2,6 @@ export const DETECTOR_CATALOG = [
   { id: "api-surface", description: "API endpoint and protocol detection" },
   { id: "build", description: "Build systems and commands" },
   { id: "build-commands", description: "Build command extraction" },
-  { id: "call-graph", description: "Static call graph extraction" },
   { id: "ci", description: "CI provider and workflow detection" },
   { id: "codebase-size", description: "Total file and LOC summary" },
   { id: "code-quality", description: "Quality gate and scanner detection" },
@@ -96,7 +95,6 @@ export const DETECTOR_PRESETS = {
     "high-impact-components",
     "api-surface",
     "external-services",
-    "call-graph",
   ],
 } as const satisfies Record<string, readonly DetectorId[]>;
 

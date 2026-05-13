@@ -3,7 +3,6 @@ import type { DatabaseSchema } from "../detectors/db-schema/types";
 import type { DetectorResult } from "../detectors/types";
 import type {
   ApiSurface,
-  CallGraph,
   ComplexityHotspot,
   Component,
   CrossPackageDependencyGraph,
@@ -79,7 +78,6 @@ export const aggregate = async (
   let complexityHotspots: readonly ComplexityHotspot[] | undefined;
   let externalServices: readonly ExternalService[] | undefined;
   let databaseSchema: DatabaseSchema | undefined;
-  let callGraph: CallGraph | undefined;
   let vcsInfo: VcsInfo | undefined;
   let namingConventions:
     | readonly {
@@ -304,14 +302,6 @@ export const aggregate = async (
       }
     }
 
-    // Extract call graph
-    if (result.detectorId === "call-graph" && result.metadata?.callGraph) {
-      const graph = result.metadata.callGraph as CallGraph;
-      if (graph.nodes.length > 0) {
-        callGraph = graph;
-      }
-    }
-
     // Extract VCS info
     if (result.detectorId === "vcs" && result.metadata?.vcsInfo) {
       vcsInfo = result.metadata.vcsInfo as VcsInfo;
@@ -394,7 +384,6 @@ export const aggregate = async (
       complexityHotspots,
       externalServices,
       databaseSchema,
-      callGraph,
     },
     architecture: {
       monorepo: isMonorepo,

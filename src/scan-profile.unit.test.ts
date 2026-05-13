@@ -66,44 +66,6 @@ describe("resolveScanProfile", () => {
     expect(profile.enabledDetectorIds).toContain("db-schema");
   });
 
-  it("adds topology-required detectors when section flags narrow report output", () => {
-    const profile = resolveScanProfile(
-      parseArgs([
-        "bun",
-        "repo-scanner",
-        "--inventory",
-        "--topology-diagrams",
-        "api-topology,erd",
-      ]),
-    );
-
-    expect(profile.allDetectors).toBeFalse();
-    expect(profile.selectedSections).toEqual(["inventory"]);
-    expect(profile.enabledDetectorIds).toContain("monorepo");
-    expect(profile.enabledDetectorIds).toContain("api-surface");
-    expect(profile.enabledDetectorIds).toContain("db-schema");
-  });
-
-  it("adds call-graph detector when call-graph topology is requested", () => {
-    const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--topology-diagrams", "call-graph"]),
-    );
-
-    expect(profile.allDetectors).toBeFalse();
-    expect(profile.enabledDetectorIds).toContain("call-graph");
-  });
-
-  it("runs topology-only profiles without default section detector execution", () => {
-    const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--topology-diagrams", "erd"]),
-    );
-
-    expect(profile.allDetectors).toBeFalse();
-    expect(profile.selectedSections).toEqual([]);
-    expect(profile.enabledDetectorIds).toEqual(["db-schema"]);
-    expect(profile.explicitDetectorOutputIds).toEqual([]);
-  });
-
   it("runs env-only mode via --detectors without section flags", () => {
     const profile = resolveScanProfile(
       parseArgs(["bun", "repo-scanner", "--detectors", "env"]),

@@ -234,67 +234,9 @@ describe("parseArgs", () => {
     expect(result.detectorsSchema).toBeTrue();
   });
 
-  it("parses topology defaults", () => {
-    const result = parseArgs(["bun", "repo-scanner"]);
-    expect(result.topology).toBeFalse();
-    expect(result.topologyDiagrams).toBeUndefined();
-    expect(result.topologyOutput).toBeUndefined();
-  });
-
-  it("parses --topology flag", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--topology"]);
-    expect(result.topology).toBeTrue();
-  });
-
-  it("parses --topology-diagrams", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--topology-diagrams",
-      "architecture,dataflow",
-    ]);
-    expect(result.topology).toBeTrue();
-    expect(result.topologyDiagrams).toEqual(["architecture", "dataflow"]);
-  });
-
-  it("rejects invalid --topology-diagrams with erd in valid list", () => {
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--topology-diagrams", "invalid-type"]),
-    ).toThrow(
-      /Use one of architecture,dependency,dataflow,api-topology,erd,call-graph/,
+  it("rejects --topology flag", () => {
+    expect(() => parseArgs(["bun", "repo-scanner", "--topology"])).toThrow(
+      /unknown option "--topology"/,
     );
-  });
-
-  it("parses --topology-output", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--topology-output",
-      "./out.md",
-    ]);
-    expect(result.topology).toBeTrue();
-    expect(result.topologyOutput).toBe("./out.md");
-  });
-
-  it("parses --topology-diagrams erd", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--topology-diagrams",
-      "erd",
-    ]);
-    expect(result.topology).toBeTrue();
-    expect(result.topologyDiagrams).toEqual(["erd"]);
-  });
-
-  it("parses --topology-diagrams with erd and other kinds", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--topology-diagrams",
-      "architecture,erd",
-    ]);
-    expect(result.topology).toBeTrue();
-    expect(result.topologyDiagrams).toEqual(["architecture", "erd"]);
   });
 });

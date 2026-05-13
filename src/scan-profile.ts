@@ -1,5 +1,4 @@
 import { DETECTOR_IDS, type DetectorId } from "./detectors/catalog";
-import { ALL_DIAGRAM_KINDS, type DiagramKind } from "./output/topology/types";
 import type { CliOptions } from "./types";
 
 export const SCAN_SECTIONS = [
@@ -36,18 +35,6 @@ const SECTION_DETECTOR_IDS: Record<
   "build-and-test": ["build", "ci"],
 };
 
-const TOPOLOGY_DETECTOR_IDS: Record<
-  DiagramKind,
-  readonly ExecutionDetectorId[]
-> = {
-  architecture: ["monorepo", "cross-package-deps"],
-  dependency: ["monorepo", "cross-package-deps"],
-  dataflow: ["monorepo", "external-services"],
-  "api-topology": ["monorepo", "api-surface"],
-  erd: ["db-schema"],
-  "call-graph": ["call-graph"],
-};
-
 const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   DetectorId,
   readonly ExecutionDetectorId[]
@@ -55,7 +42,6 @@ const SELECTOR_DETECTOR_REQUIREMENTS: Record<
   "api-surface": ["api-surface"],
   build: ["build"],
   "build-commands": ["build"],
-  "call-graph": ["call-graph"],
   ci: ["ci"],
   "codebase-size": ["language"],
   "code-quality": ["code-quality"],
@@ -98,15 +84,6 @@ export interface ResolvedScanProfile {
   readonly explicitDetectorOutputIds: readonly DetectorId[];
 }
 
-const resolveRequestedTopologyKinds = (
-  options: Pick<CliOptions, "topology" | "topologyDiagrams">,
-): readonly DiagramKind[] => {
-  if (!options.topology) {
-    return [];
-  }
-  return options.topologyDiagrams ?? ALL_DIAGRAM_KINDS;
-};
-
 const hasExplicitSectionFlags = (
   options: Pick<
     CliOptions,
@@ -127,7 +104,6 @@ const resolveExplicitDetectorOutputIds = (
     | "env"
     | "vcs"
     | "solid"
-    | "callGraph"
     | "dbSchema"
     | "namingConvention"
     | "runtime"
@@ -168,7 +144,6 @@ const resolveExplicitDetectorOutputIds = (
   if (options.env) ids.add("env");
   if (options.vcs) ids.add("vcs");
   if (options.solid) ids.add("solid-health");
-  if (options.callGraph) ids.add("call-graph");
   if (options.dbSchema) ids.add("db-schema");
   if (options.namingConvention) ids.add("naming-convention");
   if (options.runtime) ids.add("runtime");
@@ -254,11 +229,6 @@ export const resolveScanProfile = (
   options: CliOptions,
 ): ResolvedScanProfile => {
   const explicitDetectorOutputIds = resolveExplicitDetectorOutputIds(options);
-  const topologyKinds = resolveRequestedTopologyKinds(options);
-  const topologyOnlyOutputMode =
-    options.topology &&
-    !hasExplicitSectionFlags(options) &&
-    explicitDetectorOutputIds.length === 0;
 
   if (options.allDetectors) {
     return {
@@ -278,35 +248,11 @@ export const resolveScanProfile = (
     explicitDetectorOutputIds.length > 0 &&
     !hasExplicitSectionFlags(options)
   ) {
-    for (const kind of topologyKinds) {
-      const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
-      for (const detectorId of required) {
-        explicitExecutionDetectors.add(detectorId);
-      }
-    }
-
     return {
       allDetectors: false,
       selectedSections: [],
       enabledDetectorIds: [...explicitExecutionDetectors],
       explicitDetectorOutputIds,
-    };
-  }
-
-  if (topologyOnlyOutputMode) {
-    const topologyExecutionDetectors = new Set<ExecutionDetectorId>();
-    for (const kind of topologyKinds) {
-      const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
-      for (const detectorId of required) {
-        topologyExecutionDetectors.add(detectorId);
-      }
-    }
-
-    return {
-      allDetectors: false,
-      selectedSections: [],
-      enabledDetectorIds: [...topologyExecutionDetectors],
-      explicitDetectorOutputIds: [],
     };
   }
 
@@ -325,15 +271,6 @@ export const resolveScanProfile = (
 
   for (const detectorId of explicitExecutionDetectors) {
     enabledDetectorIds.add(detectorId);
-  }
-
-  // Ensure requested topology diagrams have required detector data even when
-  // section flags narrow report output.
-  for (const kind of topologyKinds) {
-    const required = TOPOLOGY_DETECTOR_IDS[kind] ?? [];
-    for (const detectorId of required) {
-      enabledDetectorIds.add(detectorId);
-    }
   }
 
   return {

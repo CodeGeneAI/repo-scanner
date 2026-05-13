@@ -25,5 +25,4 @@ import "./deployment-platform";
 import "./external-services";
 import "./complexity-hotspots";
 import "./db-schema";
-import "./call-graph";
 import "./vcs";

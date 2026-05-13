@@ -15,8 +15,6 @@ import { setLargeFileThreshold } from "./detectors/large-file";
 import { setSolidOptions } from "./detectors/solid-health";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
-import { generateTopology } from "./output/topology";
-import { renderTopologyToString } from "./output/topology/render";
 import {
   resolveScanProfile,
   SCAN_SECTIONS,
@@ -73,7 +71,7 @@ _repo_scanner()
     COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
     return 0
   fi
-  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors --topology" -- "\${current}") )
+  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors" -- "\${current}") )
 }
 complete -F _repo_scanner repo-scanner
 `;
@@ -309,8 +307,6 @@ const resolveDetectorOutputEntry = (
       return { key: "buildTools", value: result.inventory.buildTools };
     case "build-commands":
       return { key: "buildCommands", value: result.buildAndTest.buildCommands };
-    case "call-graph":
-      return { key: "callGraph", value: result.inventory.callGraph ?? null };
     case "ci":
       return { key: "ciSystems", value: result.buildAndTest.ciSystems };
     case "codebase-size":
@@ -479,7 +475,6 @@ const hasAnyScanOutputSelectors = (
   scanProfile: ReturnType<typeof resolveScanProfile>,
 ): boolean =>
   options.allDetectors ||
-  options.topology ||
   hasExplicitSectionOutputFlags(options) ||
   scanProfile.explicitDetectorOutputIds.length > 0;
 
@@ -497,12 +492,8 @@ const main = async () => {
     threshold: options.solidThreshold,
   });
   setEnvIncludeTestFiles(options.envIncludeTests);
-  // Auto-enable db-schema when ERD topology diagram is requested.
-  const erdRequested = options.topologyDiagrams
-    ? options.topologyDiagrams.includes("erd")
-    : options.topology;
   setDbSchemaOptions({
-    enabled: options.dbSchema || erdRequested || allDetectorsEnabled,
+    enabled: options.dbSchema || allDetectorsEnabled,
   });
 
   if (options.showVersion) {
@@ -582,59 +573,42 @@ const main = async () => {
     enabledDetectorIds: scanProfile.enabledDetectorIds,
   });
 
-  const topology = options.topology
-    ? generateTopology(result, options.topologyDiagrams)
-    : undefined;
-
   const sectionOutputExplicitlyRequested =
     hasExplicitSectionOutputFlags(options) || options.allDetectors;
   const detectorOutputExplicitlyRequested =
     scanProfile.explicitDetectorOutputIds.length > 0;
   const nonSectionOutputExplicitlyRequested = detectorOutputExplicitlyRequested;
-  const nonTopologyOutputExplicitlyRequested =
-    sectionOutputExplicitlyRequested || nonSectionOutputExplicitlyRequested;
-  const topologyOnlyOutput =
-    options.topology && !nonTopologyOutputExplicitlyRequested;
-  const includeReportOutput = !topologyOnlyOutput;
   const includeSectionOutput =
     scanProfile.allDetectors || sectionOutputExplicitlyRequested;
   const includeMetadataEnvelope =
     !scanProfile.allDetectors &&
     !includeSectionOutput &&
-    nonSectionOutputExplicitlyRequested &&
-    !topologyOnlyOutput;
+    nonSectionOutputExplicitlyRequested;
 
   if (options.format === "json") {
     const renderedSections = resolveRenderedSections(
       scanProfile.selectedSections,
     );
-    const jsonPayload: Record<string, unknown> = topologyOnlyOutput
-      ? topology
-        ? { topology }
-        : {}
-      : scanProfile.allDetectors
-        ? ({ ...result } as Record<string, unknown>)
-        : includeSectionOutput
-          ? buildSectionJsonPayload(result, renderedSections)
-          : includeMetadataEnvelope
-            ? {
-                scanPath: result.scanPath,
-                timestamp: result.timestamp,
-                durationMs: result.durationMs,
-              }
-            : {};
+    const jsonPayload: Record<string, unknown> = scanProfile.allDetectors
+      ? ({ ...result } as Record<string, unknown>)
+      : includeSectionOutput
+        ? buildSectionJsonPayload(result, renderedSections)
+        : includeMetadataEnvelope
+          ? {
+              scanPath: result.scanPath,
+              timestamp: result.timestamp,
+              durationMs: result.durationMs,
+            }
+          : {};
 
-    if (!topologyOnlyOutput && detectorOutputExplicitlyRequested) {
+    if (detectorOutputExplicitlyRequested) {
       Object.assign(
         jsonPayload,
         buildDetectorJsonPayload(result, scanProfile.explicitDetectorOutputIds),
       );
     }
-    if (topology) {
-      jsonPayload.topology = topology;
-    }
     renderJson(jsonPayload, process.stdout);
-  } else if (includeReportOutput) {
+  } else {
     let renderedMainTable = false;
     if (scanProfile.allDetectors || includeSectionOutput) {
       const renderedSections = resolveRenderedSections(
@@ -658,16 +632,6 @@ const main = async () => {
         process.stdout,
         !renderedMainTable,
       );
-    }
-  }
-
-  if (topology) {
-    if (options.topologyOutput) {
-      const content = renderTopologyToString(topology, "markdown");
-      fs.writeFileSync(options.topologyOutput, content);
-    } else if (options.format !== "json") {
-      const content = renderTopologyToString(topology, "markdown");
-      process.stdout.write(includeReportOutput ? `\n${content}` : content);
     }
   }
 };

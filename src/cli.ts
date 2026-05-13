@@ -7,10 +7,7 @@ import {
   type DetectorId,
   type DetectorPreset,
 } from "./detectors/catalog";
-import { ALL_DIAGRAM_KINDS } from "./output/topology/types";
-import type { CliOptions, DiagramKind } from "./types";
-
-const VALID_DIAGRAM_KINDS = new Set<DiagramKind>(ALL_DIAGRAM_KINDS);
+import type { CliOptions } from "./types";
 
 export class CliParseError extends Error {
   readonly exitCode: number;
@@ -44,11 +41,6 @@ Core output profile:
   --detectors <list>                 Comma-separated detector IDs (advanced)
                                       Valid: ${VALID_DETECTOR_IDS_TEXT}
                                       Presets: @inventory,@quality,@architecture
-
-Specialized scans:
-  --topology                         Generate mermaid topology diagrams
-  --topology-diagrams <list>         architecture|dependency|dataflow|api-topology|erd|call-graph
-  --topology-output <path>           Write topology markdown to file
 
 General:
   -p, --path <dir>                   Directory to scan (default: cwd)
@@ -148,12 +140,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let allDetectors = false;
   let largeFileThreshold = 500;
   let solid = false;
-  let callGraph = false;
   let solidThreshold = 80;
   let envIncludeTests = false;
-  let topology = false;
-  let topologyDiagrams: DiagramKind[] | undefined;
-  let topologyOutput: string | undefined;
   let dbSchema = false;
   let env = false;
   let namingConvention = false;
@@ -199,9 +187,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "build-commands":
         buildCommandsDetector = true;
-        return;
-      case "call-graph":
-        callGraph = true;
         return;
       case "ci":
         ciDetector = true;
@@ -437,38 +422,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
           "--solid-threshold",
         );
         break;
-      case "--topology":
-        topology = true;
-        break;
-      case "--topology-diagrams": {
-        const tokens = parseCommaSeparatedValues(
-          args[++i],
-          "--topology-diagrams",
-        );
-
-        const invalid = tokens.filter(
-          (value) => !VALID_DIAGRAM_KINDS.has(value as DiagramKind),
-        );
-
-        if (invalid.length > 0) {
-          failCliParse(
-            `Error: invalid diagram types "${invalid.join(",")}". Use one of ${ALL_DIAGRAM_KINDS.join(",")}.`,
-          );
-        }
-
-        topologyDiagrams = [...new Set(tokens)] as DiagramKind[];
-        topology = true;
-        break;
-      }
-      case "--topology-output":
-        topologyOutput =
-          args[++i] ??
-          failCliParse("Error: --topology-output requires a file path.");
-        if (isFlagToken(topologyOutput)) {
-          failCliParse("Error: --topology-output requires a file path.");
-        }
-        topology = true;
-        break;
       case "--vcs":
         vcs = true;
         break;
@@ -500,12 +453,8 @@ export const parseArgs = (argv: string[]): CliOptions => {
     allDetectors,
     largeFileThreshold,
     solid,
-    callGraph,
     solidThreshold,
     envIncludeTests,
-    topology,
-    topologyDiagrams,
-    topologyOutput,
     dbSchema,
     env,
     namingConvention,

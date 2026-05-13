@@ -143,7 +143,6 @@ export interface RepoScanResult {
     readonly complexityHotspots?: readonly ComplexityHotspot[];
     readonly externalServices?: readonly ExternalService[];
     readonly databaseSchema?: DatabaseSchema;
-    readonly callGraph?: CallGraph;
   };
   readonly architecture: {
     readonly monorepo: boolean;
@@ -292,47 +291,11 @@ export interface ComplexityHotspot {
   readonly language: string;
 }
 
-export interface CallGraphNode {
-  readonly id: string;
-  readonly name: string;
-  readonly file: string;
-  readonly line: number;
-}
-
-export interface CallGraphEdge {
-  readonly callerId: string;
-  readonly calleeId: string;
-  readonly line: number;
-  readonly caller: {
-    readonly name: string;
-    readonly file: string;
-  };
-  readonly callee: {
-    readonly name: string;
-    readonly file: string;
-  };
-}
-
-export interface CallGraph {
-  readonly nodes: readonly CallGraphNode[];
-  readonly edges: readonly CallGraphEdge[];
-  readonly truncated?: boolean;
-  readonly warnings?: readonly string[];
-}
-
 export interface ExternalService {
   readonly name: string;
   readonly category: string;
   readonly evidence: readonly string[];
 }
-
-export type {
-  DiagramKind,
-  DiagramOutput,
-  TopologyResult,
-} from "./output/topology/types";
-
-import type { DiagramKind } from "./output/topology/types";
 
 export interface CliOptions {
   readonly path: string;
@@ -354,10 +317,6 @@ export interface CliOptions {
   readonly solid: boolean;
   readonly solidThreshold: number;
   readonly envIncludeTests: boolean;
-  readonly topology: boolean;
-  readonly topologyDiagrams?: readonly DiagramKind[];
-  readonly topologyOutput?: string;
-  readonly callGraph: boolean;
   readonly dbSchema: boolean;
   readonly env: boolean;
   readonly namingConvention: boolean;
