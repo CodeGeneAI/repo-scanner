@@ -49,6 +49,7 @@ const COMPONENT_DIRS = [
   "terraform",
   "deploy",
   "tools",
+  "tooling",
   "scripts",
   "e2e",
   "crates",

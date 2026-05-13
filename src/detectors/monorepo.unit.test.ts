@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
@@ -304,4 +304,25 @@ members = ["packages/*"]
 
     expect(result.findings).toHaveLength(0);
   });
+});
+
+async function runMonorepo(dir: string): Promise<DetectorResult> {
+  const detector = findDetector("monorepo");
+  const index = await FileIndex.build(dir);
+  return detector.detect(dir, index);
+}
+
+test("convention scan picks up tooling/ even without a workspace manifest", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "rs-tooling-"));
+  for (const sub of ["tooling/a", "tooling/b"]) {
+    await mkdir(path.join(dir, sub), { recursive: true });
+    await writeFile(
+      path.join(dir, sub, "package.json"),
+      JSON.stringify({ name: sub.split("/").pop() }),
+    );
+  }
+  const res = await runMonorepo(dir);
+  const paths = (res.componentHints ?? []).map((c) => c.path).sort();
+  expect(paths).toEqual(["tooling/a", "tooling/b"]);
+  await rm(dir, { recursive: true, force: true });
 });
