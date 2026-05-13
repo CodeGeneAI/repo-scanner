@@ -51,6 +51,7 @@ const NPM_FRAMEWORK_MAP: ReadonlyMap<string, string> = new Map([
   ["@tanstack/react-query", "TanStack Query"],
   ["@tanstack/react-form", "TanStack Form"],
   ["@tanstack/react-router", "TanStack Router"],
+  ["@tanstack/react-start", "TanStack Start"],
 ]);
 
 /** Config file → framework name (build tools excluded — those go in build detector). */

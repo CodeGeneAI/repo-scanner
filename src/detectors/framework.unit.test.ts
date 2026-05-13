@@ -134,6 +134,18 @@ describe("framework detector", () => {
     expect(names).toContain("TanStack Query");
   });
 
+  // TanStack Start
+  it("detects @tanstack/react-start as TanStack Start", async () => {
+    await writeFile(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify({
+        dependencies: { "@tanstack/react-start": "^1" },
+      }),
+    );
+    const { values } = await runFrameworkDetector(tmpDir);
+    expect(values).toContain("TanStack Start");
+  });
+
   // Dedup
   it("deduplicates Spring Boot from Gradle and Maven", async () => {
     await writeFile(
