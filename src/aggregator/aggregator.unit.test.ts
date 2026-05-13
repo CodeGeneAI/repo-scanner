@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import type { DetectorId } from "../detectors/catalog";
 import type { DetectorResult } from "../detectors/types";
 import { aggregate } from "./aggregator";
+
+const detectorSet = (...ids: DetectorId[]): ReadonlySet<DetectorId> =>
+  new Set<DetectorId>(ids);
 
 describe("aggregate", async () => {
   const rootPath = "/tmp/test-repo";
@@ -206,6 +210,11 @@ describe("aggregate", async () => {
     expect(result.languageStats.totalLines).toBe(0);
   });
 
+  it("inventory.packageManagers is an empty array by default", async () => {
+    const result = await aggregate(rootPath, []);
+    expect(result.inventory.packageManagers).toEqual([]);
+  });
+
   it("inventory.languages mirrors languageStats.perLanguage", async () => {
     const results: DetectorResult[] = [
       {
@@ -254,5 +263,200 @@ describe("aggregate", async () => {
     const result = await aggregate(rootPath, results);
     expect(result.architecture.monorepo).toBe(true);
     expect(result.architecture.toolName).toBe("Turborepo");
+  });
+});
+
+describe("aggregate: schema slicing under detector filter", () => {
+  const rootPath = "/tmp/test-repo";
+
+  const fullDetectorResults: DetectorResult[] = [
+    {
+      detectorId: "language",
+      findings: [{ value: "TypeScript", confidence: 1.0, evidence: [] }],
+      metadata: {
+        totalFiles: 1,
+        totalLines: 10,
+        perLanguage: [
+          { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+        ],
+      },
+    },
+    {
+      detectorId: "framework",
+      findings: [{ value: "Next.js", confidence: 1.0, evidence: [] }],
+    },
+    {
+      detectorId: "monorepo",
+      findings: [
+        { value: "Turborepo", confidence: 1.0, evidence: [] },
+        { value: "monorepo", confidence: 1.0, evidence: [] },
+      ],
+      componentHints: [],
+    },
+    {
+      detectorId: "packageManager",
+      findings: [{ value: "pnpm", confidence: 1.0, evidence: [] }],
+    },
+  ];
+
+  it("no filter → full canonical shape (unchanged behavior)", async () => {
+    const r = await aggregate(rootPath, fullDetectorResults);
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({
+      languages: ["TypeScript"],
+      frameworks: ["Next.js"],
+      packageManagers: ["pnpm"],
+    });
+  });
+
+  it("filter=[monorepo] → only architecture + metadata", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "monorepo"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("monorepo"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect((r as any).inventory).toBeUndefined();
+    expect((r as any).languageStats).toBeUndefined();
+    expect(r.architecture).toBeDefined();
+  });
+
+  it("filter=[language] → inventory.languages + languageStats + metadata", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "language"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("language"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({ languages: ["TypeScript"] });
+    expect(Object.keys(r.inventory!)).toEqual(["languages"]);
+    expect((r as any).architecture).toBeUndefined();
+  });
+
+  it("filter=[framework] → inventory.frameworks only (no languageStats)", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "framework"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("framework"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({ frameworks: ["Next.js"] });
+  });
+
+  it("filter=[packageManager] → inventory.packageManagers only", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter((d) => d.detectorId === "packageManager"),
+      undefined,
+      {
+        selectedDetectors: detectorSet("packageManager"),
+      },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(r.inventory).toEqual({ packageManagers: ["pnpm"] });
+  });
+
+  it("filter=[language,framework] → both inventory sub-keys + languageStats", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter(
+        (d) => d.detectorId === "language" || d.detectorId === "framework",
+      ),
+      undefined,
+      { selectedDetectors: detectorSet("language", "framework") },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(r.inventory!).sort()).toEqual([
+      "frameworks",
+      "languages",
+    ]);
+  });
+
+  it("filter=[framework,monorepo] → inventory.frameworks + architecture, no languageStats", async () => {
+    const r = await aggregate(
+      rootPath,
+      fullDetectorResults.filter(
+        (d) => d.detectorId === "framework" || d.detectorId === "monorepo",
+      ),
+      undefined,
+      { selectedDetectors: detectorSet("framework", "monorepo") },
+    );
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(r.inventory!)).toEqual(["frameworks"]);
+  });
+
+  it("empty filter set → metadata only", async () => {
+    const r = await aggregate(rootPath, [], undefined, {
+      selectedDetectors: new Set<DetectorId>(),
+    });
+    expect(Object.keys(r).sort()).toEqual(["rootPath", "scannedAt"]);
+    expect((r as any).inventory).toBeUndefined();
+    expect((r as any).architecture).toBeUndefined();
+    expect((r as any).languageStats).toBeUndefined();
+  });
+
+  it("filter with all four detectors → identical to unfiltered shape", async () => {
+    const r = await aggregate(rootPath, fullDetectorResults, undefined, {
+      selectedDetectors: detectorSet(
+        "language",
+        "framework",
+        "monorepo",
+        "packageManager",
+      ),
+    });
+    expect(Object.keys(r).sort()).toEqual([
+      "architecture",
+      "inventory",
+      "languageStats",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(r.inventory!).sort()).toEqual([
+      "frameworks",
+      "languages",
+      "packageManagers",
+    ]);
   });
 });

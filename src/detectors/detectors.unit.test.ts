@@ -15,19 +15,25 @@ function findDetector(id: string): Detector {
 }
 
 describe("detector catalog", () => {
-  it("exposes exactly three detector ids", () => {
+  it("exposes exactly four detector ids", () => {
     expect([...DETECTOR_IDS].sort()).toEqual([
       "framework",
       "language",
       "monorepo",
+      "packageManager",
     ]);
   });
 
-  it("registers exactly three detectors via init", () => {
+  it("registers exactly four detectors via init", () => {
     const registeredIds = getDetectors()
       .map((detector) => detector.id)
       .sort();
-    expect(registeredIds).toEqual(["framework", "language", "monorepo"]);
+    expect(registeredIds).toEqual([
+      "framework",
+      "language",
+      "monorepo",
+      "packageManager",
+    ]);
   });
 });
 

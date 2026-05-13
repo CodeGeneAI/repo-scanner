@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Writable } from "stream";
-import type { RepoScanResult } from "../types";
+import type { PartialRepoScanResult, RepoScanResult } from "../types";
 import { renderTable } from "./table";
 
 const capture = (result: RepoScanResult): string => {
@@ -18,7 +18,7 @@ const capture = (result: RepoScanResult): string => {
 const baseResult = (over: Partial<RepoScanResult> = {}): RepoScanResult => ({
   scannedAt: "2026-05-13T00:00:00Z",
   rootPath: "/x",
-  inventory: { languages: [], frameworks: [] },
+  inventory: { languages: [], frameworks: [], packageManagers: [] },
   architecture: { monorepo: false, components: [] },
   languageStats: { totalFiles: 0, totalLines: 0, perLanguage: [] },
   ...over,
@@ -44,5 +44,116 @@ describe("renderTable monorepo line", () => {
       }),
     );
     expect(out).toMatch(/Monorepo[\s\S]*yes[\s\S]*Turborepo/);
+  });
+});
+
+test("renders Package managers section with detected entries", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: ["Bun", "pnpm"],
+      },
+    }),
+  );
+  expect(out).toMatch(/Package managers/);
+  expect(out).toMatch(/Bun.*pnpm|pnpm.*Bun/);
+});
+
+test("renders Package managers section with (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/Package managers/);
+  expect(out).toMatch(/Package managers[\s\S]*\(none\)/);
+});
+
+const capturePartial = (result: PartialRepoScanResult): string => {
+  let out = "";
+  const stream = new Writable({
+    write(chunk, _enc, cb) {
+      out += chunk.toString();
+      cb();
+    },
+  });
+  renderTable(result, stream as NodeJS.WritableStream);
+  return out;
+};
+
+describe("renderTable slicing", () => {
+  test("only Monorepo + Components sections when only architecture is present", () => {
+    const out = capturePartial({
+      scannedAt: "2026-05-13T00:00:00Z",
+      rootPath: "/x",
+      architecture: {
+        monorepo: true,
+        toolName: "Cargo workspace",
+        components: [],
+      },
+    });
+    expect(out).toMatch(/Monorepo[\s\S]*yes[\s\S]*Cargo workspace/);
+    expect(out).toMatch(/Components/);
+    expect(out).not.toMatch(/Languages/);
+    expect(out).not.toMatch(/Frameworks/);
+    expect(out).not.toMatch(/Package managers/);
+  });
+
+  test("only Languages section when only languageStats + inventory.languages present", () => {
+    const out = capturePartial({
+      scannedAt: "2026-05-13T00:00:00Z",
+      rootPath: "/x",
+      inventory: { languages: ["TypeScript"] },
+      languageStats: {
+        totalFiles: 1,
+        totalLines: 10,
+        perLanguage: [
+          { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+        ],
+      },
+    });
+    expect(out).toMatch(/Languages/);
+    expect(out).toMatch(/TypeScript/);
+    expect(out).not.toMatch(/Frameworks/);
+    expect(out).not.toMatch(/Monorepo/);
+    expect(out).not.toMatch(/Components/);
+    expect(out).not.toMatch(/Package managers/);
+  });
+
+  test("only Frameworks section when only inventory.frameworks present", () => {
+    const out = capturePartial({
+      scannedAt: "2026-05-13T00:00:00Z",
+      rootPath: "/x",
+      inventory: { frameworks: ["Next.js"] },
+    });
+    expect(out).toMatch(/Frameworks/);
+    expect(out).toMatch(/Next\.js/);
+    expect(out).not.toMatch(/Languages/);
+    expect(out).not.toMatch(/Monorepo/);
+    expect(out).not.toMatch(/Package managers/);
+  });
+
+  test("only Package managers section when only inventory.packageManagers present", () => {
+    const out = capturePartial({
+      scannedAt: "2026-05-13T00:00:00Z",
+      rootPath: "/x",
+      inventory: { packageManagers: ["pnpm"] },
+    });
+    expect(out).toMatch(/Package managers/);
+    expect(out).toMatch(/pnpm/);
+    expect(out).not.toMatch(/Languages/);
+    expect(out).not.toMatch(/Frameworks/);
+    expect(out).not.toMatch(/Monorepo/);
+  });
+
+  test("metadata-only partial result renders only the scanned header", () => {
+    const out = capturePartial({
+      scannedAt: "2026-05-13T00:00:00Z",
+      rootPath: "/x",
+    });
+    expect(out).toMatch(/scanned \/x/);
+    expect(out).not.toMatch(/Languages/);
+    expect(out).not.toMatch(/Frameworks/);
+    expect(out).not.toMatch(/Monorepo/);
+    expect(out).not.toMatch(/Package managers/);
+    expect(out).not.toMatch(/Components/);
   });
 });

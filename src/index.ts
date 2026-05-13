@@ -8,6 +8,8 @@ export type {
   ComponentKind,
   Inventory,
   LanguageStats,
+  PartialInventory,
+  PartialRepoScanResult,
   RepoScanResult,
   ScanRepoOptions,
 } from "./types";
