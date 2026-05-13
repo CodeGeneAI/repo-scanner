@@ -36,4 +36,13 @@ describe("renderTable monorepo line", () => {
     const out = capture(baseResult());
     expect(out).toMatch(/Monorepo[\s\S]*no/);
   });
+
+  test("appends toolName when set", () => {
+    const out = capture(
+      baseResult({
+        architecture: { monorepo: true, toolName: "Turborepo", components: [] },
+      }),
+    );
+    expect(out).toMatch(/Monorepo[\s\S]*yes[\s\S]*Turborepo/);
+  });
 });

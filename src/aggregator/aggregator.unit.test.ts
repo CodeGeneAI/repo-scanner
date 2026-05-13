@@ -230,4 +230,21 @@ describe("aggregate", async () => {
       result.languageStats.perLanguage.map((e) => e.language).sort(),
     ).toEqual(result.inventory.languages.slice().sort());
   });
+
+  it("architecture.toolName is set from the first named monorepo finding", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1.0, evidence: ["found turbo.json"] },
+          { value: "pnpm workspaces", confidence: 1.0, evidence: ["found pnpm-workspace.yaml"] },
+          { value: "monorepo", confidence: 1.0, evidence: ["detected"] },
+        ],
+        componentHints: [],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.architecture.monorepo).toBe(true);
+    expect(result.architecture.toolName).toBe("Turborepo");
+  });
 });

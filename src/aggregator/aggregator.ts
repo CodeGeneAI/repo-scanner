@@ -22,6 +22,7 @@ export const aggregate = async (
   const componentMap = new Map<string, Component>();
   let languageStats: LanguageStats = EMPTY_LANGUAGE_STATS;
   let isMonorepo = false;
+  let monorepoToolName: string | undefined;
 
   const categoryMap: Record<string, Set<string>> = {
     framework: frameworks,
@@ -79,6 +80,8 @@ export const aggregate = async (
     // Special: monorepo detection
     if (result.detectorId === "monorepo") {
       isMonorepo = result.findings.length > 0;
+      const named = result.findings.find((f) => f.value !== "monorepo");
+      if (named) monorepoToolName = named.value;
     }
   }
 
@@ -95,6 +98,7 @@ export const aggregate = async (
     },
     architecture: {
       monorepo: isMonorepo,
+      ...(monorepoToolName ? { toolName: monorepoToolName } : {}),
       components,
     },
     languageStats,

@@ -23,6 +23,7 @@ export interface Inventory {
 
 export interface Architecture {
   readonly monorepo: boolean;
+  readonly toolName?: string;
   readonly components: readonly Component[];
 }
 

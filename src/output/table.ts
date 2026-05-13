@@ -42,7 +42,11 @@ export const renderTable = (
   w(`  ${list(result.inventory.frameworks)}\n`);
 
   w(section("Monorepo"));
-  w(`  ${result.architecture.monorepo ? "yes" : "no"}\n`);
+  const flag = result.architecture.monorepo ? "yes" : "no";
+  const suffix = result.architecture.toolName
+    ? ` ${DIM}(${result.architecture.toolName})${RESET}`
+    : "";
+  w(`  ${flag}${suffix}\n`);
 
   w(section("Components"));
   if (result.architecture.components.length > 0) {
