@@ -10,30 +10,14 @@ import {
 import "./detectors/init";
 import { renderJson } from "./output/json";
 import { renderTable } from "./output/table";
-import {
-  resolveScanProfile,
-  SCAN_SECTIONS,
-  type ScanSection,
-} from "./scan-profile";
 import { scanRepo } from "./scanner";
 import type { RepoScanResult } from "./types";
 
 const renderDetectorsOutput = (
   format: "table" | "json",
-  schema: boolean,
   stream: NodeJS.WritableStream,
 ): void => {
   if (format === "json") {
-    if (schema) {
-      renderJson(
-        {
-          version: 1,
-          detectors: DETECTOR_CATALOG,
-        },
-        stream,
-      );
-      return;
-    }
     renderJson({ detectors: DETECTOR_CATALOG }, stream);
     return;
   }
@@ -223,35 +207,6 @@ const resolveCompletionInstallPath = (
   );
 };
 
-const buildSectionJsonPayload = (
-  result: RepoScanResult,
-  selectedSections: readonly ScanSection[],
-): Record<string, unknown> => {
-  const sectionSet = new Set(selectedSections);
-  const payload: Record<string, unknown> = {
-    scanPath: result.scanPath,
-    timestamp: result.timestamp,
-    durationMs: result.durationMs,
-  };
-
-  if (sectionSet.has("architecture")) {
-    payload.architecture = result.architecture;
-  }
-  if (sectionSet.has("inventory")) {
-    payload.inventory = result.inventory;
-  }
-
-  return payload;
-};
-
-const resolveRenderedSections = (
-  selectedSections: readonly ScanSection[],
-  options?: { fallbackToCoreSections?: boolean },
-): readonly ScanSection[] =>
-  selectedSections.length > 0 || options?.fallbackToCoreSections === false
-    ? selectedSections
-    : SCAN_SECTIONS;
-
 type DetectorOutputEntry = {
   readonly key: string;
   readonly value: unknown;
@@ -287,7 +242,11 @@ const buildDetectorJsonPayload = (
   result: RepoScanResult,
   detectorIds: readonly DetectorId[],
 ): Record<string, unknown> => {
-  const payload: Record<string, unknown> = {};
+  const payload: Record<string, unknown> = {
+    scanPath: result.scanPath,
+    timestamp: result.timestamp,
+    durationMs: result.durationMs,
+  };
   for (const detectorId of detectorIds) {
     const entry = resolveDetectorOutputEntry(result, detectorId);
     payload[entry.key] = entry.value;
@@ -299,14 +258,11 @@ const renderDetectorTablePayload = (
   result: RepoScanResult,
   detectorIds: readonly DetectorId[],
   stream: NodeJS.WritableStream,
-  includeHeader: boolean,
 ): void => {
   if (detectorIds.length === 0) return;
-  if (includeHeader) {
-    stream.write(
-      `repo-scanner — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
-    );
-  }
+  stream.write(
+    `repo-scanner — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
+  );
 
   for (const detectorId of detectorIds) {
     const { key, value } = resolveDetectorOutputEntry(result, detectorId);
@@ -324,17 +280,15 @@ const renderDetectorTablePayload = (
   }
 };
 
-const hasExplicitSectionOutputFlags = (
+const resolveExplicitDetectorIds = (
   options: ReturnType<typeof parseArgs>,
-): boolean => options.scanArchitecture || options.scanInventory;
-
-const hasAnyScanOutputSelectors = (
-  options: ReturnType<typeof parseArgs>,
-  scanProfile: ReturnType<typeof resolveScanProfile>,
-): boolean =>
-  options.allDetectors ||
-  hasExplicitSectionOutputFlags(options) ||
-  scanProfile.explicitDetectorOutputIds.length > 0;
+): readonly DetectorId[] => {
+  const ids: DetectorId[] = [];
+  if (options.languageDetector) ids.push("language");
+  if (options.frameworkDetector) ids.push("framework");
+  if (options.monorepoDetector) ids.push("monorepo");
+  return ids;
+};
 
 const main = async () => {
   const options = parseArgs(process.argv);
@@ -355,11 +309,7 @@ const main = async () => {
   }
 
   if (options.showDetectors) {
-    renderDetectorsOutput(
-      options.format,
-      options.detectorsSchema,
-      process.stdout,
-    );
+    renderDetectorsOutput(options.format, process.stdout);
     process.exit(0);
   }
 
@@ -411,74 +361,26 @@ const main = async () => {
     process.exit(0);
   }
 
-  const scanProfile = resolveScanProfile(options);
-  if (!hasAnyScanOutputSelectors(options, scanProfile)) {
-    process.stdout.write(getHelpText());
-    process.exit(0);
-  }
-
+  const explicitDetectorIds = resolveExplicitDetectorIds(options);
   const result = await scanRepo(options.path, {
-    enabledDetectorIds: scanProfile.enabledDetectorIds,
+    enabledDetectorIds:
+      explicitDetectorIds.length > 0 ? explicitDetectorIds : undefined,
   });
 
-  const sectionOutputExplicitlyRequested =
-    hasExplicitSectionOutputFlags(options) || options.allDetectors;
-  const detectorOutputExplicitlyRequested =
-    scanProfile.explicitDetectorOutputIds.length > 0;
-  const nonSectionOutputExplicitlyRequested = detectorOutputExplicitlyRequested;
-  const includeSectionOutput =
-    scanProfile.allDetectors || sectionOutputExplicitlyRequested;
-  const includeMetadataEnvelope =
-    !scanProfile.allDetectors &&
-    !includeSectionOutput &&
-    nonSectionOutputExplicitlyRequested;
-
   if (options.format === "json") {
-    const renderedSections = resolveRenderedSections(
-      scanProfile.selectedSections,
-    );
-    const jsonPayload: Record<string, unknown> = scanProfile.allDetectors
-      ? ({ ...result } as Record<string, unknown>)
-      : includeSectionOutput
-        ? buildSectionJsonPayload(result, renderedSections)
-        : includeMetadataEnvelope
-          ? {
-              scanPath: result.scanPath,
-              timestamp: result.timestamp,
-              durationMs: result.durationMs,
-            }
-          : {};
-
-    if (detectorOutputExplicitlyRequested) {
-      Object.assign(
-        jsonPayload,
-        buildDetectorJsonPayload(result, scanProfile.explicitDetectorOutputIds),
-      );
-    }
-    renderJson(jsonPayload, process.stdout);
-  } else {
-    let renderedMainTable = false;
-    if (scanProfile.allDetectors || includeSectionOutput) {
-      const renderedSections = resolveRenderedSections(
-        scanProfile.selectedSections,
-      );
-      renderTable(result, process.stdout, {
-        selectedSections: scanProfile.allDetectors
-          ? undefined
-          : includeSectionOutput
-            ? renderedSections
-            : [],
-      });
-      renderedMainTable = true;
-    }
-
-    if (detectorOutputExplicitlyRequested) {
-      renderDetectorTablePayload(
-        result,
-        scanProfile.explicitDetectorOutputIds,
+    if (explicitDetectorIds.length > 0) {
+      renderJson(
+        buildDetectorJsonPayload(result, explicitDetectorIds),
         process.stdout,
-        !renderedMainTable,
       );
+    } else {
+      renderJson(result as unknown as Record<string, unknown>, process.stdout);
+    }
+  } else {
+    if (explicitDetectorIds.length > 0) {
+      renderDetectorTablePayload(result, explicitDetectorIds, process.stdout);
+    } else {
+      renderTable(result, process.stdout);
     }
   }
 };

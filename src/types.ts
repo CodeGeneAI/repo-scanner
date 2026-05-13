@@ -50,11 +50,7 @@ export interface CliOptions {
   readonly completionShell?: "bash" | "zsh" | "fish";
   readonly completionInstall: boolean;
   readonly completionUninstall: boolean;
-  readonly detectorsSchema: boolean;
   readonly detectorSelectionWarnings: readonly string[];
-  readonly scanArchitecture: boolean;
-  readonly scanInventory: boolean;
-  readonly allDetectors: boolean;
   readonly languageDetector: boolean;
   readonly frameworkDetector: boolean;
   readonly monorepoDetector: boolean;

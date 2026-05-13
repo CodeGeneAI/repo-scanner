@@ -27,11 +27,8 @@ Commands:
   completion install <shell>         Install completion script for your shell
   completion uninstall <shell>       Remove installed completion script for your shell
 
-Core output profile:
-  --architecture                     Render Architecture section only
-  --inventory                        Render Inventory section only
-  --all-detectors, --full-scan       Enable all detectors
-  --detectors <list>                 Comma-separated detector IDs (advanced)
+Detector selection:
+  --detectors <list>                 Comma-separated detector IDs
                                       Valid: ${VALID_DETECTOR_IDS_TEXT}
 
 General:
@@ -39,13 +36,11 @@ General:
   -f, --format <table|json>          Output format (default: table)
   --version, -v                      Show version
   --help, -h                         Show help
-  --schema                           JSON schema payload mode for detectors JSON output
 
 Examples:
-  repo-scanner --inventory
   repo-scanner --detectors language,framework
+  repo-scanner --detectors monorepo --format json
   repo-scanner detectors
-  repo-scanner detectors --format json --schema
   repo-scanner completion zsh > _repo-scanner
   repo-scanner completion install fish
   repo-scanner completion uninstall fish
@@ -91,11 +86,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let completionShell: "bash" | "zsh" | "fish" | undefined;
   let completionInstall = false;
   let completionUninstall = false;
-  let detectorsSchema = false;
   const detectorSelectionWarnings: string[] = [];
-  let scanArchitecture = false;
-  let scanInventory = false;
-  let allDetectors = false;
   let languageDetector = false;
   let frameworkDetector = false;
   let monorepoDetector = false;
@@ -150,16 +141,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
       case "-h":
         showHelp = true;
         break;
-      case "--architecture":
-        scanArchitecture = true;
-        break;
-      case "--inventory":
-        scanInventory = true;
-        break;
-      case "--all-detectors":
-      case "--full-scan":
-        allDetectors = true;
-        break;
       case "-p":
       case "--path":
         pathArg = args[++i] ?? pathArg;
@@ -205,9 +186,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         }
         break;
       }
-      case "--schema":
-        detectorsSchema = true;
-        break;
       default:
         if (arg.startsWith("-")) {
           failCliParse(`Error: unknown option "${arg}". Use --help for usage.`);
@@ -227,11 +205,7 @@ export const parseArgs = (argv: string[]): CliOptions => {
     completionShell,
     completionInstall,
     completionUninstall,
-    detectorsSchema,
     detectorSelectionWarnings,
-    scanArchitecture,
-    scanInventory,
-    allDetectors,
     languageDetector,
     frameworkDetector,
     monorepoDetector,

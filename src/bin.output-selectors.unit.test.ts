@@ -3,7 +3,6 @@ import { mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import {
-  createAllDetectorsFixtureRepo,
   createCoreProfileFixtureRepo,
   decode,
   expectTopLevelKeys,
@@ -11,7 +10,7 @@ import {
 } from "./bin.unit.test.helpers";
 
 describe("repo-scanner bin output selectors", () => {
-  it("prints help output when no scan selectors are provided", async () => {
+  it("renders full table output when no --detectors is provided", async () => {
     const repoPath = await createCoreProfileFixtureRepo();
 
     try {
@@ -19,44 +18,25 @@ describe("repo-scanner bin output selectors", () => {
       const stdout = decode(result.stdout);
 
       expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("Usage: repo-scanner [command] [options]");
-      expect(stdout).toContain("Core output profile:");
-      expect(stdout).not.toContain("repo-scanner — scanned");
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("supports single-section output for --architecture", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
-
-    try {
-      const result = runRepoScanner(["--path", repoPath, "--architecture"]);
-      const stdout = decode(result.stdout);
-
-      expect(result.exitCode).toBe(0);
-      expect(stdout).toContain("Architecture");
-      expect(stdout).not.toContain("Inventory");
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("supports multi-section output for --architecture --inventory", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--architecture",
-        "--inventory",
-      ]);
-      const stdout = decode(result.stdout);
-
-      expect(result.exitCode).toBe(0);
+      expect(stdout).toContain("repo-scanner");
       expect(stdout).toContain("Architecture");
       expect(stdout).toContain("Inventory");
+    } finally {
+      await rm(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it("renders full JSON output when no --detectors is provided", async () => {
+    const repoPath = await createCoreProfileFixtureRepo();
+
+    try {
+      const result = runRepoScanner(["--path", repoPath, "--format", "json"]);
+
+      expect(result.exitCode).toBe(0);
+      const payload = JSON.parse(decode(result.stdout));
+      expect(payload.architecture).toBeDefined();
+      expect(payload.inventory).toBeDefined();
+      expect(payload.scanPath).toBeDefined();
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
@@ -188,67 +168,6 @@ describe("repo-scanner bin output selectors", () => {
         "languages",
       ]);
       expect(payload.languages).toContain("TypeScript");
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("emits explicit union for mixed section and detector selectors", async () => {
-    const repoPath = await createCoreProfileFixtureRepo();
-
-    try {
-      const result = runRepoScanner([
-        "--path",
-        repoPath,
-        "--inventory",
-        "--detectors",
-        "monorepo",
-        "--format",
-        "json",
-      ]);
-
-      expect(result.exitCode).toBe(0);
-      const payload = JSON.parse(decode(result.stdout));
-      expect(payload.inventory).toBeDefined();
-      expect(payload.monorepo).toBeDefined();
-      expect(payload.architecture).toBeUndefined();
-    } finally {
-      await rm(repoPath, { recursive: true, force: true });
-    }
-  });
-
-  it("treats --full-scan as an alias for --all-detectors", async () => {
-    const repoPath = await createAllDetectorsFixtureRepo();
-
-    try {
-      const allDetectors = runRepoScanner([
-        "--path",
-        repoPath,
-        "--all-detectors",
-        "--format",
-        "json",
-      ]);
-      const fullScan = runRepoScanner([
-        "--path",
-        repoPath,
-        "--full-scan",
-        "--format",
-        "json",
-      ]);
-
-      expect(allDetectors.exitCode).toBe(0);
-      expect(fullScan.exitCode).toBe(0);
-
-      const allPayload = JSON.parse(decode(allDetectors.stdout));
-      const fullPayload = JSON.parse(decode(fullScan.stdout));
-
-      const normalize = (payload: Record<string, unknown>) => ({
-        ...payload,
-        timestamp: "",
-        durationMs: 0,
-      });
-
-      expect(normalize(fullPayload)).toEqual(normalize(allPayload));
     } finally {
       await rm(repoPath, { recursive: true, force: true });
     }
