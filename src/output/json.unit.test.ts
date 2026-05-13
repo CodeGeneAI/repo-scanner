@@ -56,6 +56,63 @@ describe("renderJson EPIPE handling", () => {
     }) as typeof stream.write;
     expect(() => renderJson({ a: 1 }, stream)).toThrow(/disk full/);
   });
+
+  test("swallows EPIPE delivered via the write callback (async path)", () => {
+    const stream = new Writable({
+      write(_chunk, _enc, cbk) {
+        cbk();
+      },
+    }) as NodeJS.WritableStream;
+    stream.write = ((_chunk: unknown, cb?: (err?: Error | null) => void) => {
+      if (cb) {
+        const err = new Error("EPIPE") as NodeJS.ErrnoException;
+        err.code = "EPIPE";
+        cb(err);
+      }
+      return true;
+    }) as typeof stream.write;
+    expect(() => renderJson({ a: 1 }, stream)).not.toThrow();
+  });
+});
+
+describe("renderJson non-finite numbers", () => {
+  test("NaN serialises as null (matching JSON.stringify)", () => {
+    const out = capture((w) =>
+      renderJson({ x: Number.NaN }, w, { color: false }),
+    );
+    expect(JSON.parse(out)).toEqual({ x: null });
+  });
+
+  test("Infinity serialises as null", () => {
+    const out = capture((w) =>
+      renderJson({ x: Number.POSITIVE_INFINITY }, w, { color: false }),
+    );
+    expect(JSON.parse(out)).toEqual({ x: null });
+  });
+
+  test("-Infinity serialises as null", () => {
+    const out = capture((w) =>
+      renderJson({ x: Number.NEGATIVE_INFINITY }, w, { color: false }),
+    );
+    expect(JSON.parse(out)).toEqual({ x: null });
+  });
+
+  test("colored non-finite renders BOLD null, not the bare token", () => {
+    const out = capture((w) =>
+      renderJson({ x: Number.NaN }, w, { color: true }),
+    );
+    // Should not contain bare 'NaN' as a token
+    expect(stripAnsi(out)).not.toContain("NaN");
+    // Should be parseable JSON after strip
+    expect(JSON.parse(stripAnsi(out))).toEqual({ x: null });
+    // Should be colorized as null (BOLD + null + RESET)
+    expect(out).toContain("null");
+  });
+
+  test("finite numbers still serialise as themselves", () => {
+    const out = capture((w) => renderJson({ a: 0, b: 1.5, c: -42 }, w));
+    expect(JSON.parse(out)).toEqual({ a: 0, b: 1.5, c: -42 });
+  });
 });
 
 describe("renderJson", () => {

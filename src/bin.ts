@@ -222,6 +222,15 @@ const resolveExplicitDetectorIds = (
   return ids;
 };
 
+// Swallow EPIPE from process.stdout — happens when a downstream consumer
+// (e.g. `repo-scanner --json | head -5`) closes the pipe early. Without this
+// handler, Node emits an unhandled 'error' event and crashes with a stack
+// trace. Other stdout errors still propagate normally.
+process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EPIPE") process.exit(0);
+  throw err;
+});
+
 const main = async () => {
   const options = parseArgs(process.argv);
   if (options.detectorSelectionWarnings.length > 0) {

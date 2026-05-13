@@ -15,8 +15,13 @@ export const renderJson = (
   out.push("\n");
   // Buffer everything into a single write so a broken pipe (e.g. `| head -5`)
   // produces at most one EPIPE we can ignore, instead of crashing mid-stream.
+  // Handle both sync throw and async callback-delivered EPIPE here. The
+  // separately-emitted 'error' event path is handled in bin.ts at the
+  // process.stdout level so library consumers can manage their own streams.
   try {
-    stream.write(out.join(""));
+    stream.write(out.join(""), (err) => {
+      if (err && (err as NodeJS.ErrnoException).code !== "EPIPE") throw err;
+    });
   } catch (err) {
     if ((err as NodeJS.ErrnoException)?.code !== "EPIPE") throw err;
   }
@@ -37,6 +42,12 @@ const writeValue = (
     return;
   }
   if (typeof v === "number") {
+    // Match JSON.stringify: NaN / Infinity / -Infinity aren't valid JSON,
+    // so emit `null` rather than the bare token.
+    if (!Number.isFinite(v)) {
+      out.push(color ? `${ANSI.BOLD}null${ANSI.RESET}` : "null");
+      return;
+    }
     out.push(color ? `${ANSI.YELLOW}${v}${ANSI.RESET}` : String(v));
     return;
   }
