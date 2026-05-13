@@ -118,55 +118,6 @@ export const runRepoScanner = (
     env: buildRepoScannerEnv(envOverrides),
   });
 
-const runGit = (repoPath: string, args: readonly string[]): void => {
-  const result = Bun.spawnSync(["git", ...args], {
-    cwd: repoPath,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      ...process.env,
-      GIT_CONFIG_GLOBAL: "/dev/null",
-      GIT_CONFIG_SYSTEM: "/dev/null",
-    },
-  });
-
-  if (result.exitCode !== 0) {
-    throw new Error(
-      `git ${args.join(" ")} failed: ${decode(result.stderr).trim()}`,
-    );
-  }
-};
-
-export const createGitDiffFixtureRepo = async (): Promise<string> => {
-  const repoPath = await mkdtemp(path.join(os.tmpdir(), "repo-scanner-diff-"));
-
-  await writeFile(path.join(repoPath, "README.md"), "# diff fixture\n");
-  await writeFile(
-    path.join(repoPath, "package.json"),
-    JSON.stringify({ name: "diff-fixture", version: "1.0.0" }, null, 2),
-  );
-  await mkdir(path.join(repoPath, "src"), { recursive: true });
-  await writeFile(
-    path.join(repoPath, "src", "index.ts"),
-    "export const x = 1;\n",
-  );
-
-  runGit(repoPath, ["init"]);
-  runGit(repoPath, ["config", "user.email", "repo-scanner-tests@example.com"]);
-  runGit(repoPath, ["config", "user.name", "Repo Scanner Tests"]);
-  runGit(repoPath, ["add", "."]);
-  runGit(repoPath, ["commit", "-m", "base"]);
-
-  await writeFile(
-    path.join(repoPath, "src", "index.ts"),
-    "export const x = 2;\n",
-  );
-  runGit(repoPath, ["add", "."]);
-  runGit(repoPath, ["commit", "-m", "change"]);
-
-  return repoPath;
-};
-
 export const assertDetectorSelectorScoping = (
   repoPath: string,
   detectorId: string,

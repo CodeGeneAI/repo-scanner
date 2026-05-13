@@ -10,9 +10,6 @@ import {
 } from "./detectors/catalog";
 import { setDbSchemaOptions } from "./detectors/db-schema";
 import { setEnvIncludeTestFiles } from "./detectors/env";
-import { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
-import { getAddedLines, getChangedFiles } from "./diff/git";
-import { buildDiffScanResult } from "./diff/scan-diff";
 import "./detectors/init";
 import { setLargeFileThreshold } from "./detectors/large-file";
 import { setSolidOptions } from "./detectors/solid-health";
@@ -27,12 +24,6 @@ import {
 } from "./scan-profile";
 import { scanRepo } from "./scanner";
 import type { RepoScanResult } from "./types";
-
-const flushWritable = async (stream: NodeJS.WritableStream): Promise<void> => {
-  await new Promise<void>((resolve) => {
-    stream.write("", () => resolve());
-  });
-};
 
 const renderDetectorsOutput = (
   format: "table" | "json",
@@ -82,7 +73,7 @@ _repo_scanner()
     COMPREPLY=( $(compgen -W "${detectorIds}" -- "\${current}") )
     return 0
   fi
-  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors --topology --diff" -- "\${current}") )
+  COMPREPLY=( $(compgen -W "--help --version --path --format --detectors --topology" -- "\${current}") )
 }
 complete -F _repo_scanner repo-scanner
 `;
@@ -475,32 +466,6 @@ const renderDetectorTablePayload = (
   }
 };
 
-const renderNamedTablePayload = (
-  result: RepoScanResult,
-  key: string,
-  value: unknown,
-  stream: NodeJS.WritableStream,
-  includeHeader: boolean,
-): void => {
-  if (includeHeader) {
-    stream.write(
-      `repo-scanner — scanned ${result.scanPath} in ${result.durationMs}ms\n`,
-    );
-  }
-
-  stream.write(`\n${key}\n`);
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    value === null
-  ) {
-    stream.write(`  ${String(value)}\n`);
-    return;
-  }
-  stream.write(`${JSON.stringify(value, null, 2)}\n`);
-};
-
 const hasExplicitSectionOutputFlags = (
   options: ReturnType<typeof parseArgs>,
 ): boolean =>
@@ -509,10 +474,6 @@ const hasExplicitSectionOutputFlags = (
   options.scanExternalServices ||
   options.scanBuildAndTest;
 
-const hasExplicitDiffOutputFlags = (
-  options: ReturnType<typeof parseArgs>,
-): boolean => !!options.diff && options.diff.length > 0;
-
 const hasAnyScanOutputSelectors = (
   options: ReturnType<typeof parseArgs>,
   scanProfile: ReturnType<typeof resolveScanProfile>,
@@ -520,7 +481,6 @@ const hasAnyScanOutputSelectors = (
   options.allDetectors ||
   options.topology ||
   hasExplicitSectionOutputFlags(options) ||
-  hasExplicitDiffOutputFlags(options) ||
   scanProfile.explicitDetectorOutputIds.length > 0;
 
 const main = async () => {
@@ -625,46 +585,12 @@ const main = async () => {
   const topology = options.topology
     ? generateTopology(result, options.topologyDiagrams)
     : undefined;
-  const diffScan =
-    options.diff && options.diff.length > 0
-      ? await (async () => {
-          const diffRange = options.diff!;
-          const changedFiles = await getChangedFiles(options.path, diffRange);
-          const affectedComponents = result.architecture.components.filter(
-            (component) =>
-              changedFiles.some(
-                (file) =>
-                  file === component.path ||
-                  file.startsWith(`${component.path}/`),
-              ),
-          );
-          const historyBaselines =
-            affectedComponents.length > 0
-              ? await learnComponentConventionBaselinesFromGit(
-                  options.path,
-                  affectedComponents,
-                )
-              : undefined;
-
-          const addedLines = options.diffEnvCheck
-            ? await getAddedLines(options.path, diffRange)
-            : undefined;
-
-          return buildDiffScanResult(result, changedFiles, {
-            historyBaselines,
-            envCheck: options.diffEnvCheck,
-            addedLines,
-          });
-        })()
-      : undefined;
 
   const sectionOutputExplicitlyRequested =
     hasExplicitSectionOutputFlags(options) || options.allDetectors;
   const detectorOutputExplicitlyRequested =
     scanProfile.explicitDetectorOutputIds.length > 0;
-  const diffOutputExplicitlyRequested = hasExplicitDiffOutputFlags(options);
-  const nonSectionOutputExplicitlyRequested =
-    detectorOutputExplicitlyRequested || diffOutputExplicitlyRequested;
+  const nonSectionOutputExplicitlyRequested = detectorOutputExplicitlyRequested;
   const nonTopologyOutputExplicitlyRequested =
     sectionOutputExplicitlyRequested || nonSectionOutputExplicitlyRequested;
   const topologyOnlyOutput =
@@ -707,9 +633,6 @@ const main = async () => {
     if (topology) {
       jsonPayload.topology = topology;
     }
-    if (diffOutputExplicitlyRequested && diffScan) {
-      jsonPayload.diffScan = diffScan;
-    }
     renderJson(jsonPayload, process.stdout);
   } else if (includeReportOutput) {
     let renderedMainTable = false;
@@ -735,17 +658,6 @@ const main = async () => {
         process.stdout,
         !renderedMainTable,
       );
-      renderedMainTable = true;
-    }
-
-    if (diffOutputExplicitlyRequested && diffScan) {
-      renderNamedTablePayload(
-        result,
-        "diffScan",
-        diffScan,
-        process.stdout,
-        !renderedMainTable,
-      );
     }
   }
 
@@ -757,19 +669,6 @@ const main = async () => {
       const content = renderTopologyToString(topology, "markdown");
       process.stdout.write(includeReportOutput ? `\n${content}` : content);
     }
-  }
-
-  if (
-    options.failOnNewEnvVars &&
-    diffScan?.newEnvVars &&
-    diffScan.newEnvVars.length > 0
-  ) {
-    const names = diffScan.newEnvVars.map((v) => v.name).join(", ");
-    process.stderr.write(
-      `diff-env-check: ${diffScan.newEnvVars.length} new env var(s) detected: ${names}\n`,
-    );
-    await flushWritable(process.stdout);
-    process.exit(1);
   }
 };
 

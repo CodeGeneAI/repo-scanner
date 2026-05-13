@@ -1,14 +1,5 @@
 export { getCallChain, getCalleesOf, getCallersOf } from "./call-graph/query";
 export type { DetectorResult, Finding } from "./detectors/types";
-export { learnComponentConventionBaselinesFromGit } from "./diff/convention-history";
-export { getAddedLines } from "./diff/git";
-export {
-  buildDiffScanResult,
-  computeNetNewEnvVars,
-  isLikelyTestFile,
-  resetDiffConventionOptions,
-  setDiffConventionOptions,
-} from "./diff/scan-diff";
 export type {
   DiagramKind,
   DiagramOutput,
@@ -30,7 +21,6 @@ export type {
   ComponentMetadata,
   CrossPackageDependencyGraph,
   DeadExport,
-  DiffScanResult,
   EnvValueType,
   EnvVarInfo,
   EnvVarUsage,

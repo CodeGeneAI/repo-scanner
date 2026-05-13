@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { CliParseError, parseArgs } from "./cli";
+import { parseArgs } from "./cli";
 
 describe("parseArgs", () => {
   it("parses default values", () => {
@@ -296,79 +296,5 @@ describe("parseArgs", () => {
     ]);
     expect(result.topology).toBeTrue();
     expect(result.topologyDiagrams).toEqual(["architecture", "erd"]);
-  });
-
-  it("parses --diff range", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--diff", "HEAD~1"]);
-    expect(result.diff).toBe("HEAD~1");
-  });
-
-  it("parses --diff --cached for staged files", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--diff", "--cached"]);
-    expect(result.diff).toBe("--cached");
-  });
-
-  it("parses --diff --staged for staged files", () => {
-    const result = parseArgs(["bun", "repo-scanner", "--diff", "--staged"]);
-    expect(result.diff).toBe("--staged");
-  });
-
-  it("rejects unknown flags as --diff value", () => {
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--diff", "--unknown-flag"]),
-    ).toThrow(CliParseError);
-  });
-
-  it("parses --diff --staged with --diff-env-check", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "--staged",
-      "--diff-env-check",
-    ]);
-    expect(result.diff).toBe("--staged");
-    expect(result.diffEnvCheck).toBeTrue();
-  });
-
-  it("defaults diff pre-commit flags to false/undefined", () => {
-    const result = parseArgs(["bun", "repo-scanner"]);
-    expect(result.diffEnvCheck).toBeFalse();
-    expect(result.failOnNewEnvVars).toBeFalse();
-  });
-
-  it("parses --fail-on-new-env-vars flag", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--fail-on-new-env-vars",
-    ]);
-    expect(result.failOnNewEnvVars).toBeTrue();
-    expect(result.diffEnvCheck).toBeTrue();
-  });
-
-  it("throws CliParseError for diff-only flags without --diff", () => {
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--diff-env-check"]),
-    ).toThrow(CliParseError);
-    expect(() =>
-      parseArgs(["bun", "repo-scanner", "--fail-on-new-env-vars"]),
-    ).toThrow(CliParseError);
-  });
-
-  it("parses all diff pre-commit flags together", () => {
-    const result = parseArgs([
-      "bun",
-      "repo-scanner",
-      "--diff",
-      "HEAD",
-      "--diff-env-check",
-      "--fail-on-new-env-vars",
-    ]);
-    expect(result.diff).toBe("HEAD");
-    expect(result.diffEnvCheck).toBeTrue();
-    expect(result.failOnNewEnvVars).toBeTrue();
   });
 });

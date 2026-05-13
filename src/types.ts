@@ -320,30 +320,6 @@ export interface CallGraph {
   readonly warnings?: readonly string[];
 }
 
-export interface DiffBlastRadius {
-  readonly component: string;
-  readonly score: number;
-  readonly dependents: readonly string[];
-}
-
-export interface DiffConventionViolation {
-  readonly file: string;
-  readonly violation: string;
-}
-
-export interface DiffScanResult {
-  readonly changedFiles: readonly string[];
-  readonly affectedComponents: readonly string[];
-  readonly blastRadius: readonly DiffBlastRadius[];
-  readonly testFilesToUpdate: readonly string[];
-  readonly conventionViolations: readonly DiffConventionViolation[];
-  readonly newTodos: readonly TodoAnnotation[];
-  readonly newDeadExports: readonly DeadExport[];
-  readonly suggestedReviewFocus: readonly string[];
-  readonly warnings?: readonly string[];
-  readonly newEnvVars?: readonly EnvVarInfo[];
-}
-
 export interface ExternalService {
   readonly name: string;
   readonly category: string;
@@ -381,9 +357,6 @@ export interface CliOptions {
   readonly topology: boolean;
   readonly topologyDiagrams?: readonly DiagramKind[];
   readonly topologyOutput?: string;
-  readonly diff?: string;
-  readonly diffEnvCheck: boolean;
-  readonly failOnNewEnvVars: boolean;
   readonly callGraph: boolean;
   readonly dbSchema: boolean;
   readonly env: boolean;

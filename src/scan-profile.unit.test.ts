@@ -104,15 +104,6 @@ describe("resolveScanProfile", () => {
     expect(profile.explicitDetectorOutputIds).toEqual([]);
   });
 
-  it("adds env detector when --diff-env-check is used", () => {
-    const profile = resolveScanProfile(
-      parseArgs(["bun", "repo-scanner", "--diff", "HEAD", "--diff-env-check"]),
-    );
-
-    expect(profile.allDetectors).toBeFalse();
-    expect(profile.enabledDetectorIds).toContain("env");
-  });
-
   it("runs env-only mode via --detectors without section flags", () => {
     const profile = resolveScanProfile(
       parseArgs(["bun", "repo-scanner", "--detectors", "env"]),

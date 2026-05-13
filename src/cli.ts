@@ -46,9 +46,6 @@ Core output profile:
                                       Presets: @inventory,@quality,@architecture
 
 Specialized scans:
-  --diff <git-range>                 Diff-focused scan (e.g. HEAD~1, main...feature)
-  --diff-env-check                   Check net-new env vars in changed files
-  --fail-on-new-env-vars             Exit 1 if diff introduces new env vars
   --topology                         Generate mermaid topology diagrams
   --topology-diagrams <list>         architecture|dependency|dataflow|api-topology|erd|call-graph
   --topology-output <path>           Write topology markdown to file
@@ -72,7 +69,6 @@ Examples:
   repo-scanner completion zsh > _repo-scanner
   repo-scanner completion install fish
   repo-scanner completion uninstall fish
-  repo-scanner --diff main...HEAD --diff-env-check
 `;
 
 const parsePositiveInteger = (raw: string): number | undefined => {
@@ -108,10 +104,6 @@ const parseCommaSeparatedValues = (
 
 const isFlagToken = (raw: string | undefined): boolean =>
   raw?.startsWith("--") ?? false;
-
-const KNOWN_GIT_DIFF_FLAGS = new Set(["--cached", "--staged"]);
-const isKnownGitDiffFlag = (raw: string): boolean =>
-  KNOWN_GIT_DIFF_FLAGS.has(raw);
 
 const failCliParse = (message: string): never => {
   throw new CliParseError(message);
@@ -162,9 +154,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let topology = false;
   let topologyDiagrams: DiagramKind[] | undefined;
   let topologyOutput: string | undefined;
-  let diff: string | undefined;
-  let diffEnvCheck = false;
-  let failOnNewEnvVars = false;
   let dbSchema = false;
   let env = false;
   let namingConvention = false;
@@ -480,28 +469,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
         }
         topology = true;
         break;
-      case "--diff": {
-        const value =
-          args[++i] ??
-          failCliParse(
-            "Error: --diff requires a git range (e.g. HEAD~1, main...feature) or --cached/--staged.",
-          );
-        if (isFlagToken(value) && !isKnownGitDiffFlag(value)) {
-          failCliParse(
-            "Error: --diff requires a git range (e.g. HEAD~1, main...feature) or --cached/--staged.",
-          );
-        }
-        diff = value;
-        break;
-      }
-      case "--diff-env-check":
-        diffEnvCheck = true;
-        break;
-      case "--fail-on-new-env-vars":
-        failOnNewEnvVars = true;
-        // Env-var failure checks require diff env-check payload generation.
-        diffEnvCheck = true;
-        break;
       case "--vcs":
         vcs = true;
         break;
@@ -513,13 +480,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
           `Error: unexpected argument "${arg}". Use --help for usage.`,
         );
     }
-  }
-
-  const usesDiffOnlyFlags = diffEnvCheck || failOnNewEnvVars;
-  if (usesDiffOnlyFlags && !diff) {
-    failCliParse(
-      "Error: --diff is required when using diff-only flags (--diff-env-check, --fail-on-new-env-vars).",
-    );
   }
 
   return {
@@ -546,9 +506,6 @@ export const parseArgs = (argv: string[]): CliOptions => {
     topology,
     topologyDiagrams,
     topologyOutput,
-    diff,
-    diffEnvCheck,
-    failOnNewEnvVars,
     dbSchema,
     env,
     namingConvention,

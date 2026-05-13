@@ -79,26 +79,6 @@ export class FileIndex {
     else this.byExt.set(entry.ext, [entry]);
   }
 
-  /**
-   * Build a FileIndex from an explicit list of relative file paths.
-   * Used for diff-scoped scanning where the file list is already known.
-   * Skips the filesystem walk — O(n) on the input list only.
-   */
-  static fromPaths(
-    rootPath: string,
-    relativePaths: readonly string[],
-  ): FileIndex {
-    const index = new FileIndex(rootPath);
-    for (const rawRel of relativePaths) {
-      const rel = path.normalize(rawRel);
-      const abs = path.join(rootPath, rel);
-      const name = path.basename(rel);
-      const ext = path.extname(name).toLowerCase();
-      index.addEntry({ path: abs, name, ext, relativePath: rel });
-    }
-    return index;
-  }
-
   /** Build the index by walking the filesystem once. */
   static async build(rootPath: string): Promise<FileIndex> {
     const rootRules = await collectScanignoreRules(rootPath);

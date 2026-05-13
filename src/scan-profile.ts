@@ -285,10 +285,6 @@ export const resolveScanProfile = (
       }
     }
 
-    if (options.diffEnvCheck) {
-      explicitExecutionDetectors.add("env");
-    }
-
     return {
       allDetectors: false,
       selectedSections: [],
@@ -304,10 +300,6 @@ export const resolveScanProfile = (
       for (const detectorId of required) {
         topologyExecutionDetectors.add(detectorId);
       }
-    }
-
-    if (options.diffEnvCheck) {
-      topologyExecutionDetectors.add("env");
     }
 
     return {
@@ -333,10 +325,6 @@ export const resolveScanProfile = (
 
   for (const detectorId of explicitExecutionDetectors) {
     enabledDetectorIds.add(detectorId);
-  }
-
-  if (options.diffEnvCheck) {
-    enabledDetectorIds.add("env");
   }
 
   // Ensure requested topology diagrams have required detector data even when
