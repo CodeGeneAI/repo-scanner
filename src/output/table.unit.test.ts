@@ -157,3 +157,74 @@ describe("renderTable slicing", () => {
     expect(out).not.toMatch(/Components/);
   });
 });
+
+import type { Component } from "../types";
+
+describe("renderTable component scoped frameworks column", () => {
+  const make = (over: Partial<Component>): Component => ({
+    path: "apps/web",
+    name: "web",
+    kind: "app",
+    ...over,
+  });
+
+  test("renders frameworks inline after the path column", () => {
+    const out = capture(
+      baseResult({
+        architecture: {
+          monorepo: true,
+          components: [
+            make({ scoped: { frameworks: ["Next.js", "Tailwind CSS"] } }),
+          ],
+        },
+      }),
+    );
+    expect(out).toMatch(/apps\/web[\s\S]*Next\.js[\s\S]*Tailwind CSS/);
+  });
+
+  test("truncates with +N more when more than 3 frameworks", () => {
+    const out = capture(
+      baseResult({
+        architecture: {
+          monorepo: true,
+          components: [
+            make({
+              scoped: {
+                frameworks: [
+                  "Next.js",
+                  "React",
+                  "Tailwind CSS",
+                  "tRPC",
+                  "Drizzle",
+                ],
+              },
+            }),
+          ],
+        },
+      }),
+    );
+    expect(out).toMatch(/Next\.js.*React.*Tailwind CSS.*\+2 more/);
+  });
+
+  test("renders (none) when scoped.frameworks is empty or undefined", () => {
+    const out1 = capture(
+      baseResult({
+        architecture: {
+          monorepo: true,
+          components: [make({ scoped: { frameworks: [] } })],
+        },
+      }),
+    );
+    expect(out1).toMatch(/apps\/web[\s\S]*\(none\)/);
+
+    const out2 = capture(
+      baseResult({
+        architecture: {
+          monorepo: true,
+          components: [make({ scoped: undefined })],
+        },
+      }),
+    );
+    expect(out2).toMatch(/apps\/web[\s\S]*\(none\)/);
+  });
+});
