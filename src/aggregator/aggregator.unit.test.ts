@@ -560,6 +560,79 @@ describe("aggregate: per-component languageStats", () => {
   });
 });
 
+describe("aggregate: scoped under detector filter", () => {
+  const rootPath = "/tmp/test-repo";
+
+  const setup = (): DetectorResult[] => [
+    {
+      detectorId: "framework",
+      findings: [
+        {
+          value: "Next.js",
+          confidence: 1,
+          evidence: [],
+          filePath: "apps/web/package.json",
+        },
+      ],
+    },
+    {
+      detectorId: "language",
+      findings: [],
+      metadata: {
+        perLanguage: [
+          { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+        ],
+        totalFiles: 1,
+        totalLines: 10,
+        perFile: [
+          {
+            relativePath: "apps/web/index.ts",
+            language: "TypeScript",
+            lines: 10,
+          },
+        ],
+      },
+    },
+    {
+      detectorId: "monorepo",
+      findings: [
+        { value: "Turborepo", confidence: 1, evidence: [] },
+        { value: "monorepo", confidence: 1, evidence: [] },
+      ],
+      componentHints: [{ path: "apps/web", name: "web" }],
+    },
+  ];
+
+  it("--detectors monorepo: scoped is undefined on every component", async () => {
+    const all = setup();
+    const r = await aggregate(rootPath, [all[2]!], undefined, {
+      selectedDetectors: detectorSet("monorepo"),
+    });
+    const web = r.architecture?.components.find((c) => c.path === "apps/web");
+    expect(web?.scoped).toBeUndefined();
+  });
+
+  it("--detectors monorepo,framework: scoped.frameworks set, languageStats absent", async () => {
+    const all = setup();
+    const r = await aggregate(rootPath, [all[0]!, all[2]!], undefined, {
+      selectedDetectors: detectorSet("monorepo", "framework"),
+    });
+    const web = r.architecture?.components.find((c) => c.path === "apps/web");
+    expect(web?.scoped?.frameworks).toEqual(["Next.js"]);
+    expect(web?.scoped?.languageStats).toBeUndefined();
+  });
+
+  it("--detectors monorepo,language: scoped.languageStats set, frameworks absent", async () => {
+    const all = setup();
+    const r = await aggregate(rootPath, [all[1]!, all[2]!], undefined, {
+      selectedDetectors: detectorSet("monorepo", "language"),
+    });
+    const web = r.architecture?.components.find((c) => c.path === "apps/web");
+    expect(web?.scoped?.frameworks).toBeUndefined();
+    expect(web?.scoped?.languageStats?.totalFiles).toBe(1);
+  });
+});
+
 describe("aggregate: per-component framework attribution", () => {
   const rootPath = "/tmp/test-repo";
 

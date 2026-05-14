@@ -48,7 +48,7 @@ repo-scanner --path . --detectors monorepo --json
 
 - **language** — files and lines of code per language across the supported language set (extension-based).
 - **framework** — framework and library detection from manifest files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Gemfile`, `composer.json`, `pubspec.yaml`, etc.).
-- **monorepo** — workspace detection (Turborepo, Nx, Lerna, Rush, pnpm workspaces, Go workspaces, Bazel, Pants, Melos, .NET Solutions) plus component classification. Returns the detected workspace tool name in `architecture.toolName`.
+- **monorepo** — workspace detection (Turborepo, Nx, Lerna, Rush, pnpm workspaces, Go workspaces, Bazel, Pants, Melos, .NET Solutions) plus component classification. Returns the detected workspace tool name in `architecture.toolName`. Each component carries `scoped.frameworks` and `scoped.languageStats` for per-component inventory.
 - **packageManager** — detects npm, pnpm, Yarn, Bun, pip, Poetry, uv, Pipenv, Cargo, Go modules, Bundler, Composer, NuGet, pub, Maven, Gradle, sbt, Mix, Swift Package Manager, Stack, Cabal from lockfiles and manifests.
 
 ## Component classification
@@ -97,6 +97,18 @@ result.architecture.components;       // Component[]
 result.languageStats;                 // LanguageStats
 ```
 
+### Component-level inventory
+
+Each `Component` in `architecture.components` carries optional `scoped` data with per-component frameworks and language stats:
+
+```ts
+const component = result.architecture.components[0];
+component.scoped?.frameworks;      // readonly string[] | undefined
+component.scoped?.languageStats;   // LanguageStats | undefined
+```
+
+`scoped` itself is present when at least one of the framework or language detectors ran for this scan. Each sub-field is individually present iff its detector ran — empty arrays mean "scanned, found nothing"; absent fields mean "didn't run." Top-level `inventory.frameworks` and `languageStats` continue to report the repo-wide aggregate (union across all components plus root-level files).
+
 ### Filtered scans
 
 Passing `options.detectors` makes `scanRepo` return only the fields owned by the selected detectors. Other top-level keys are omitted entirely (not present-as-undefined), so `JSON.stringify` drops them and TypeScript narrows the return type to `PartialRepoScanResult`.
@@ -124,6 +136,7 @@ import type {
   Architecture,
   Component,
   ComponentKind,
+  ComponentScope,
   DetectorId,
   Inventory,
   LanguageStats,
