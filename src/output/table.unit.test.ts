@@ -202,6 +202,59 @@ test("CI providers section absent when inventory.ciProviders is undefined (slice
   expect(out).not.toMatch(/CI providers/);
 });
 
+test("renders Build systems section with detected entries", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: [],
+        buildSystems: ["Bazel", "Make"],
+      },
+    }),
+  );
+  expect(out).toMatch(/Build systems/);
+  expect(out).toMatch(/Bazel.*Make|Make.*Bazel/);
+});
+
+test("Build systems section shows (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/Build systems[\s\S]*\(none\)/);
+});
+
+test("Build systems section absent when inventory.buildSystems is undefined (sliced)", () => {
+  const out = capturePartial({
+    scannedAt: "2026-05-13T00:00:00Z",
+    rootPath: "/x",
+    inventory: { packageManagers: ["pnpm"] }, // buildSystems explicitly undefined
+  });
+  expect(out).not.toMatch(/Build systems/);
+});
+
+test("Build systems section appears after Package managers and before CI providers", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: ["pnpm"],
+        ciProviders: ["GitHub Actions"],
+        buildSystems: ["Make"],
+      },
+    }),
+  );
+  expect(out).toMatch(/Build systems/);
+  // Order: Package managers → Build systems → CI providers → Monorepo
+  const pmIdx = out.indexOf("Package managers");
+  const bsIdx = out.indexOf("Build systems");
+  const ciIdx = out.indexOf("CI providers");
+  const moIdx = out.indexOf("Monorepo");
+  expect(pmIdx).toBeLessThan(bsIdx);
+  expect(bsIdx).toBeLessThan(ciIdx);
+  expect(ciIdx).toBeLessThan(moIdx);
+});
+
 import type { Component } from "../types";
 
 describe("renderTable component scoped frameworks column", () => {

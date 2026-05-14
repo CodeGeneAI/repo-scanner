@@ -220,6 +220,7 @@ const resolveExplicitDetectorIds = (
   if (options.monorepoDetector) ids.push("monorepo");
   if (options.packageManagerDetector) ids.push("packageManager");
   if (options.ciProviderDetector) ids.push("ciProvider");
+  if (options.buildSystemDetector) ids.push("buildSystem");
   return ids;
 };
 

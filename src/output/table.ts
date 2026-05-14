@@ -52,6 +52,11 @@ export const renderTable = (
     w(`  ${list(result.inventory.packageManagers)}\n`);
   }
 
+  if (result.inventory?.buildSystems !== undefined) {
+    w(section("Build systems"));
+    w(`  ${list(result.inventory.buildSystems)}\n`);
+  }
+
   if (result.inventory?.ciProviders !== undefined) {
     w(section("CI providers"));
     w(`  ${list(result.inventory.ciProviders)}\n`);

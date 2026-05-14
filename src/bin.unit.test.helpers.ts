@@ -100,11 +100,15 @@ export const runRepoScanner = (
 //   framework     → inventory.frameworks
 //   monorepo      → architecture
 //   packageManager → inventory.packageManagers
+//   ciProvider    → inventory.ciProviders
+//   buildSystem   → inventory.buildSystems
 const DETECTOR_OWNED_TOP_LEVEL_KEYS: Record<string, readonly string[]> = {
   language: ["inventory", "languageStats"],
   framework: ["inventory"],
   monorepo: ["architecture"],
   packageManager: ["inventory"],
+  ciProvider: ["inventory"],
+  buildSystem: ["inventory"],
 };
 
 export const assertDetectorSelectorScoping = (
