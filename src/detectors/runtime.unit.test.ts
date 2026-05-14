@@ -10,7 +10,9 @@ import type { Finding } from "./types";
 
 const parse = (f: Finding): RuntimeInfo => JSON.parse(f.value) as RuntimeInfo;
 
-const detect = async (files: Record<string, string>): Promise<Finding[]> => {
+const detect = async (
+  files: Record<string, string>,
+): Promise<readonly Finding[]> => {
   const dir = await mkdtemp(path.join(tmpdir(), "rs-runtime-"));
   for (const [rel, content] of Object.entries(files)) {
     const full = path.join(dir, rel);
@@ -375,8 +377,7 @@ describe("runtime detector: mise.toml", () => {
 
   test("stops reading [tools] at next section header", async () => {
     const runtimes = await detectRuntimes({
-      "mise.toml":
-        '[tools]\nnodejs = "20.0.0"\n\n[settings]\nverbose = true\n',
+      "mise.toml": '[tools]\nnodejs = "20.0.0"\n\n[settings]\nverbose = true\n',
     });
     const fromMise = runtimes.filter((r) => r.source.startsWith("mise.toml#"));
     expect(fromMise).toHaveLength(1);

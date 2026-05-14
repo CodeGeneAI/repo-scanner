@@ -200,8 +200,7 @@ registerDetector({
         let m: RegExpExecArray | null;
         while ((m = lineRe.exec(block)) !== null) {
           const toolName = m[1]!;
-          const language =
-            TOOL_ALIASES.get(toolName.toLowerCase()) ?? toolName;
+          const language = TOOL_ALIASES.get(toolName.toLowerCase()) ?? toolName;
           emit({
             language,
             version: m[2]!,

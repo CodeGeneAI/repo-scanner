@@ -247,12 +247,7 @@ describe("parseArgs", () => {
   });
 
   it("parses --detectors runtime", () => {
-    const result = parseArgs([
-      "bun",
-      "src/bin.ts",
-      "--detectors",
-      "runtime",
-    ]);
+    const result = parseArgs(["bun", "src/bin.ts", "--detectors", "runtime"]);
     expect(result.runtimeDetector).toBe(true);
     expect(result.frameworkDetector).toBe(false);
     expect(result.languageDetector).toBe(false);

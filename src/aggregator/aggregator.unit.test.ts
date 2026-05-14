@@ -999,7 +999,12 @@ describe("aggregate: runtime wiring", () => {
         detectorId: "runtime",
         findings: [
           makeRuntimeFinding("Node", "20.11.0", ".nvmrc", ".nvmrc"),
-          makeRuntimeFinding("Python", "3.11.4", ".python-version", ".python-version"),
+          makeRuntimeFinding(
+            "Python",
+            "3.11.4",
+            ".python-version",
+            ".python-version",
+          ),
         ],
       },
     ];
@@ -1023,7 +1028,12 @@ describe("aggregate: runtime wiring", () => {
         detectorId: "runtime",
         findings: [
           makeRuntimeFinding("Node", "20.11.0", ".nvmrc", ".nvmrc"),
-          makeRuntimeFinding("Node", "20.11.0", "package.json#engines.node", "package.json"),
+          makeRuntimeFinding(
+            "Node",
+            "20.11.0",
+            "package.json#engines.node",
+            "package.json",
+          ),
         ],
       },
     ];
@@ -1040,7 +1050,12 @@ describe("aggregate: runtime wiring", () => {
         detectorId: "runtime",
         findings: [
           makeRuntimeFinding("Node", "20.11.0", ".nvmrc", ".nvmrc"),
-          makeRuntimeFinding("Node", ">=18.0.0", "package.json#engines.node", "package.json"),
+          makeRuntimeFinding(
+            "Node",
+            ">=18.0.0",
+            "package.json#engines.node",
+            "package.json",
+          ),
         ],
       },
     ];
