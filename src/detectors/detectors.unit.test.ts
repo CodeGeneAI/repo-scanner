@@ -25,11 +25,12 @@ describe("detector catalog", () => {
     ]);
   });
 
-  it("registers exactly four detectors via init", () => {
+  it("registers exactly five detectors via init", () => {
     const registeredIds = getDetectors()
       .map((detector) => detector.id)
       .sort();
     expect(registeredIds).toEqual([
+      "ciProvider",
       "framework",
       "language",
       "monorepo",
