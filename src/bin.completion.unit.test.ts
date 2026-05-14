@@ -24,7 +24,7 @@ describe("repo-scanner bin completion", () => {
     const payload = JSON.parse(decode(result.stdout));
 
     expect(result.exitCode).toBe(0);
-    expect(payload.detectors.length).toBe(6);
+    expect(payload.detectors.length).toBe(7);
     expect(payload.presets).toBeUndefined();
   });
 

@@ -14,6 +14,10 @@ export const DETECTOR_CATALOG = [
     id: "buildSystem",
     description: "Build system orchestration detection",
   },
+  {
+    id: "containerization",
+    description: "Container runtime and orchestration detection",
+  },
 ] as const;
 
 export type DetectorCatalogEntry = (typeof DETECTOR_CATALOG)[number];

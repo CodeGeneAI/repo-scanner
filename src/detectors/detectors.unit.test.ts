@@ -15,10 +15,11 @@ function findDetector(id: string): Detector {
 }
 
 describe("detector catalog", () => {
-  it("exposes exactly six detector ids", () => {
+  it("exposes exactly seven detector ids", () => {
     expect([...DETECTOR_IDS].sort()).toEqual([
       "buildSystem",
       "ciProvider",
+      "containerization",
       "framework",
       "language",
       "monorepo",
@@ -35,6 +36,7 @@ describe("detector catalog", () => {
     expect(registeredIds).toEqual([
       "buildSystem",
       "ciProvider",
+      "containerization",
       "framework",
       "language",
       "monorepo",

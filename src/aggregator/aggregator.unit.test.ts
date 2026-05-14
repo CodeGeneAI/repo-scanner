@@ -314,6 +314,7 @@ describe("aggregate: schema slicing under detector filter", () => {
       packageManagers: ["pnpm"],
       ciProviders: [],
       buildSystems: [],
+      containerization: [],
     });
   });
 
