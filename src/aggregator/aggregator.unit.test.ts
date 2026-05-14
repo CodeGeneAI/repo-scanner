@@ -313,6 +313,7 @@ describe("aggregate: schema slicing under detector filter", () => {
       frameworks: ["Next.js"],
       packageManagers: ["pnpm"],
       ciProviders: [],
+      buildSystems: [],
     });
   });
 

@@ -23,6 +23,7 @@ const baseResult = (over: Partial<RepoScanResult> = {}): RepoScanResult => ({
     frameworks: [],
     packageManagers: [],
     ciProviders: [],
+    buildSystems: [],
   },
   architecture: { monorepo: false, components: [] },
   languageStats: { totalFiles: 0, totalLines: 0, perLanguage: [] },
@@ -60,6 +61,7 @@ test("renders Package managers section with detected entries", () => {
         frameworks: [],
         packageManagers: ["Bun", "pnpm"],
         ciProviders: [],
+        buildSystems: [],
       },
     }),
   );
@@ -172,6 +174,7 @@ test("renders CI providers section between Package managers and Monorepo", () =>
         frameworks: [],
         packageManagers: [],
         ciProviders: ["GitHub Actions", "CircleCI"],
+        buildSystems: [],
       },
     }),
   );

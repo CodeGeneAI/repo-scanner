@@ -27,6 +27,7 @@ export interface Inventory {
   readonly frameworks: readonly string[];
   readonly packageManagers: readonly string[];
   readonly ciProviders: readonly string[];
+  readonly buildSystems: readonly string[];
 }
 
 export interface Architecture {
@@ -63,6 +64,7 @@ export interface PartialInventory {
   readonly frameworks?: readonly string[];
   readonly packageManagers?: readonly string[];
   readonly ciProviders?: readonly string[];
+  readonly buildSystems?: readonly string[];
 }
 
 export interface PartialRepoScanResult {
@@ -89,4 +91,5 @@ export interface CliOptions {
   readonly monorepoDetector: boolean;
   readonly packageManagerDetector: boolean;
   readonly ciProviderDetector: boolean;
+  readonly buildSystemDetector: boolean;
 }

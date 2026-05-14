@@ -10,6 +10,10 @@ export const DETECTOR_CATALOG = [
     id: "ciProvider",
     description: "CI/CD provider detection from config files",
   },
+  {
+    id: "buildSystem",
+    description: "Build system orchestration detection",
+  },
 ] as const;
 
 export type DetectorCatalogEntry = (typeof DETECTOR_CATALOG)[number];
