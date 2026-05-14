@@ -460,3 +460,303 @@ describe("aggregate: schema slicing under detector filter", () => {
     ]);
   });
 });
+
+describe("aggregate: per-component languageStats", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("groups per-file language data into each component's scoped.languageStats", async () => {
+    const perFile = [
+      { relativePath: "apps/web/index.ts", language: "TypeScript", lines: 100 },
+      { relativePath: "apps/web/util.ts", language: "TypeScript", lines: 50 },
+      {
+        relativePath: "packages/ui/index.tsx",
+        language: "TypeScript",
+        lines: 30,
+      },
+      { relativePath: "root.ts", language: "TypeScript", lines: 10 },
+    ];
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [],
+        metadata: {
+          perLanguage: [
+            { language: "TypeScript", files: 4, lines: 190, percentage: 100 },
+          ],
+          totalFiles: 4,
+          totalLines: 190,
+          perFile,
+        },
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [
+          { path: "apps/web", name: "web" },
+          { path: "packages/ui", name: "ui" },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    const ui = result.architecture.components.find(
+      (c) => c.path === "packages/ui",
+    );
+    expect(web?.scoped?.languageStats?.totalFiles).toBe(2);
+    expect(web?.scoped?.languageStats?.totalLines).toBe(150);
+    expect(web?.scoped?.languageStats?.perLanguage).toEqual([
+      { language: "TypeScript", files: 2, lines: 150, percentage: 100 },
+    ]);
+    expect(ui?.scoped?.languageStats?.totalFiles).toBe(1);
+    expect(ui?.scoped?.languageStats?.totalLines).toBe(30);
+  });
+
+  it("component with no in-scope files has zero-count stats, not undefined", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [],
+        metadata: {
+          perLanguage: [
+            { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+          ],
+          totalFiles: 1,
+          totalLines: 10,
+          perFile: [
+            {
+              relativePath: "apps/web/index.ts",
+              language: "TypeScript",
+              lines: 10,
+            },
+          ],
+        },
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [
+          { path: "apps/web", name: "web" },
+          { path: "tooling/empty", name: "empty" },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const empty = result.architecture.components.find(
+      (c) => c.path === "tooling/empty",
+    );
+    expect(empty?.scoped?.languageStats).toEqual({
+      totalFiles: 0,
+      totalLines: 0,
+      perLanguage: [],
+    });
+  });
+});
+
+describe("aggregate: scoped under detector filter", () => {
+  const rootPath = "/tmp/test-repo";
+
+  const setup = (): DetectorResult[] => [
+    {
+      detectorId: "framework",
+      findings: [
+        {
+          value: "Next.js",
+          confidence: 1,
+          evidence: [],
+          filePath: "apps/web/package.json",
+        },
+      ],
+    },
+    {
+      detectorId: "language",
+      findings: [],
+      metadata: {
+        perLanguage: [
+          { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+        ],
+        totalFiles: 1,
+        totalLines: 10,
+        perFile: [
+          {
+            relativePath: "apps/web/index.ts",
+            language: "TypeScript",
+            lines: 10,
+          },
+        ],
+      },
+    },
+    {
+      detectorId: "monorepo",
+      findings: [
+        { value: "Turborepo", confidence: 1, evidence: [] },
+        { value: "monorepo", confidence: 1, evidence: [] },
+      ],
+      componentHints: [{ path: "apps/web", name: "web" }],
+    },
+  ];
+
+  it("--detectors monorepo: scoped is undefined on every component", async () => {
+    const all = setup();
+    const r = await aggregate(rootPath, [all[2]!], undefined, {
+      selectedDetectors: detectorSet("monorepo"),
+    });
+    const web = r.architecture?.components.find((c) => c.path === "apps/web");
+    expect(web?.scoped).toBeUndefined();
+  });
+
+  it("--detectors monorepo,framework: scoped.frameworks set, languageStats absent", async () => {
+    const all = setup();
+    const r = await aggregate(rootPath, [all[0]!, all[2]!], undefined, {
+      selectedDetectors: detectorSet("monorepo", "framework"),
+    });
+    const web = r.architecture?.components.find((c) => c.path === "apps/web");
+    expect(web?.scoped?.frameworks).toEqual(["Next.js"]);
+    expect(web?.scoped?.languageStats).toBeUndefined();
+  });
+
+  it("--detectors monorepo,language: scoped.languageStats set, frameworks absent", async () => {
+    const all = setup();
+    const r = await aggregate(rootPath, [all[1]!, all[2]!], undefined, {
+      selectedDetectors: detectorSet("monorepo", "language"),
+    });
+    const web = r.architecture?.components.find((c) => c.path === "apps/web");
+    expect(web?.scoped?.frameworks).toBeUndefined();
+    expect(web?.scoped?.languageStats?.totalFiles).toBe(1);
+  });
+});
+
+describe("aggregate: per-component framework attribution", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("attributes framework findings to the deepest matching component", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "framework",
+        findings: [
+          {
+            value: "Next.js",
+            confidence: 1,
+            evidence: [],
+            filePath: "apps/web/package.json",
+          },
+          {
+            value: "React",
+            confidence: 1,
+            evidence: [],
+            filePath: "packages/ui/package.json",
+          },
+          {
+            value: "Tailwind CSS",
+            confidence: 1,
+            evidence: [],
+            filePath: "apps/web/tailwind.config.ts",
+          },
+        ],
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: ["found turbo.json"] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [
+          { path: "apps/web", name: "web" },
+          { path: "packages/ui", name: "ui" },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    const ui = result.architecture.components.find(
+      (c) => c.path === "packages/ui",
+    );
+    expect(web?.scoped?.frameworks?.slice().sort()).toEqual([
+      "Next.js",
+      "Tailwind CSS",
+    ]);
+    expect(ui?.scoped?.frameworks).toEqual(["React"]);
+  });
+
+  it("findings without filePath stay in top-level inventory only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "framework",
+        findings: [
+          { value: "Detected Somewhere", confidence: 1, evidence: [] },
+        ],
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [{ path: "apps/web", name: "web" }],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    expect(result.inventory.frameworks).toContain("Detected Somewhere");
+    expect(web?.scoped?.frameworks).toEqual([]);
+  });
+
+  it("normalizes backslash file paths for component matching (Windows)", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "framework",
+        findings: [
+          {
+            value: "Next.js",
+            confidence: 1,
+            evidence: [],
+            filePath: "apps\\web\\package.json",
+          },
+        ],
+      },
+      {
+        detectorId: "language",
+        findings: [],
+        metadata: {
+          perLanguage: [
+            { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+          ],
+          totalFiles: 1,
+          totalLines: 10,
+          perFile: [
+            {
+              relativePath: "apps\\web\\index.ts",
+              language: "TypeScript",
+              lines: 10,
+            },
+          ],
+        },
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [{ path: "apps/web", name: "web" }],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    expect(web?.scoped?.frameworks).toEqual(["Next.js"]);
+    expect(web?.scoped?.languageStats?.totalFiles).toBe(1);
+  });
+});

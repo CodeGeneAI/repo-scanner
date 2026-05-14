@@ -8,12 +8,18 @@ export type ComponentKind =
   | "script"
   | "library";
 
+export interface ComponentScope {
+  readonly frameworks?: readonly string[];
+  readonly languageStats?: LanguageStats;
+}
+
 export interface Component {
   readonly path: string;
   readonly name: string;
   readonly kind: ComponentKind;
   readonly secondaryKinds?: readonly ComponentKind[];
   readonly description?: string;
+  readonly scoped?: ComponentScope;
 }
 
 export interface Inventory {

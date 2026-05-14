@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { FileIndex } from "../utils/file-index";
@@ -146,8 +146,10 @@ describe("framework detector", () => {
     expect(values).toContain("TanStack Start");
   });
 
-  // Dedup
-  it("deduplicates Spring Boot from Gradle and Maven", async () => {
+  // Dedup — createFindingAdder dedupes by (name, filePath); same name from
+  // different files produces one Finding per file. The aggregator uses a Set
+  // so the framework still appears once in the final output per component.
+  it("emits one Spring Boot finding per source file (build.gradle + pom.xml)", async () => {
     await writeFile(
       path.join(tmpDir, "build.gradle"),
       "implementation 'org.springframework.boot:spring-boot-starter'",
@@ -157,6 +159,48 @@ describe("framework detector", () => {
       "<artifactId>spring-boot-starter</artifactId>",
     );
     const { values } = await runFrameworkDetector(tmpDir);
-    expect(values.filter((v) => v === "Spring Boot").length).toBe(1);
+    expect(values.filter((v) => v === "Spring Boot").length).toBe(2);
+  });
+
+  it("emits Finding.filePath pointing at the source manifest", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "rs-fp-"));
+    await writeFile(
+      path.join(dir, "package.json"),
+      JSON.stringify({ dependencies: { next: "^15", react: "^19" } }),
+    );
+    const result = await runFrameworkDetector(dir);
+    const nextFinding = result.result.findings.find(
+      (f) => f.value === "Next.js",
+    );
+    expect(nextFinding?.filePath).toBe("package.json");
+    const reactFinding = result.result.findings.find(
+      (f) => f.value === "React",
+    );
+    expect(reactFinding?.filePath).toBe("package.json");
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("emits one config-file finding per matching primary file (multi-component)", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "rs-cfg-"));
+    await mkdir(path.join(dir, "apps/web"), { recursive: true });
+    await mkdir(path.join(dir, "apps/admin"), { recursive: true });
+    await writeFile(
+      path.join(dir, "apps/web/next.config.js"),
+      "module.exports = {};\n",
+    );
+    await writeFile(
+      path.join(dir, "apps/admin/next.config.js"),
+      "module.exports = {};\n",
+    );
+    const result = await runFrameworkDetector(dir);
+    const nextFindings = result.result.findings.filter(
+      (f) => f.value === "Next.js",
+    );
+    expect(nextFindings).toHaveLength(2);
+    expect(nextFindings.map((f) => f.filePath).sort()).toEqual([
+      "apps/admin/next.config.js",
+      "apps/web/next.config.js",
+    ]);
+    await rm(dir, { recursive: true, force: true });
   });
 });

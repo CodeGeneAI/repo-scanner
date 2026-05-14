@@ -2,6 +2,7 @@ import type { DetectorId } from "../detectors/catalog";
 import type { DetectorResult } from "../detectors/types";
 import type {
   Component,
+  ComponentScope,
   LanguageStats,
   PartialInventory,
   PartialRepoScanResult,
@@ -110,6 +111,124 @@ export async function aggregate(
       isMonorepo = result.findings.length > 0;
       const named = result.findings.find((f) => f.value !== "monorepo");
       if (named) monorepoToolName = named.value;
+    }
+  }
+
+  // === Phase B: per-component attribution ===
+
+  const componentPaths = [...componentMap.keys()].sort(
+    (a, b) => b.length - a.length, // longest-prefix wins
+  );
+
+  // Normalize separators so component matching works on Windows. The file
+  // index can produce backslash-separated relativePaths via path.relative,
+  // while component paths are always slash-delimited.
+  const toForwardSlash = (p: string): string => p.replace(/\\/g, "/");
+
+  const findComponentForFile = (filePath: string): string | undefined => {
+    const normalized = toForwardSlash(filePath);
+    for (const compPath of componentPaths) {
+      if (normalized === compPath || normalized.startsWith(`${compPath}/`)) {
+        return compPath;
+      }
+    }
+    return undefined;
+  };
+
+  // --- Framework attribution ---
+  const componentFrameworks = new Map<string, Set<string>>();
+  for (const compPath of componentPaths) {
+    componentFrameworks.set(compPath, new Set());
+  }
+
+  const frameworkRan = results.some((r) => r.detectorId === "framework");
+
+  for (const result of results) {
+    if (result.detectorId !== "framework") continue;
+    for (const finding of result.findings) {
+      if (!finding.filePath) continue;
+      const compPath = findComponentForFile(finding.filePath);
+      if (!compPath) continue;
+      componentFrameworks.get(compPath)!.add(finding.value);
+    }
+  }
+
+  // --- Language attribution ---
+  const languageDetectorResult = results.find(
+    (r) => r.detectorId === "language",
+  );
+  const perFile = (languageDetectorResult?.metadata?.perFile ?? []) as Array<{
+    relativePath: string;
+    language: string;
+    lines: number;
+  }>;
+
+  const componentLangStats = new Map<
+    string,
+    {
+      files: number;
+      lines: number;
+      perLang: Map<string, { files: number; lines: number }>;
+    }
+  >();
+  for (const compPath of componentPaths) {
+    componentLangStats.set(compPath, {
+      files: 0,
+      lines: 0,
+      perLang: new Map(),
+    });
+  }
+
+  for (const entry of perFile) {
+    const compPath = findComponentForFile(entry.relativePath);
+    if (!compPath) continue;
+    const bucket = componentLangStats.get(compPath)!;
+    bucket.files += 1;
+    bucket.lines += entry.lines;
+    const existing = bucket.perLang.get(entry.language) ?? {
+      files: 0,
+      lines: 0,
+    };
+    existing.files += 1;
+    existing.lines += entry.lines;
+    bucket.perLang.set(entry.language, existing);
+  }
+
+  const languageRan = results.some((r) => r.detectorId === "language");
+
+  // Re-materialize each component with scoped attached.
+  for (const [compPath, comp] of componentMap) {
+    const scopedBuilder: {
+      frameworks?: readonly string[];
+      languageStats?: LanguageStats;
+    } = {};
+
+    if (frameworkRan) {
+      const fwSet = componentFrameworks.get(compPath);
+      scopedBuilder.frameworks = fwSet ? [...fwSet].sort() : [];
+    }
+
+    if (languageRan) {
+      const bucket = componentLangStats.get(compPath);
+      const totalFiles = bucket?.files ?? 0;
+      const totalLines = bucket?.lines ?? 0;
+      const perLanguage =
+        totalFiles > 0
+          ? [...(bucket?.perLang.entries() ?? [])]
+              .map(([language, { files, lines }]) => ({
+                language,
+                files,
+                lines,
+                percentage: Math.round((files / totalFiles) * 1000) / 10,
+              }))
+              .sort((a, b) => b.percentage - a.percentage)
+          : [];
+      scopedBuilder.languageStats = { totalFiles, totalLines, perLanguage };
+    }
+
+    if (Object.keys(scopedBuilder).length > 0) {
+      const scoped: ComponentScope = scopedBuilder;
+      componentMap.set(compPath, { ...comp, scoped });
     }
   }
 

@@ -68,8 +68,15 @@ export const renderTable = (
           c.secondaryKinds && c.secondaryKinds.length > 0
             ? ` ${DIM}(+${c.secondaryKinds.join(", +")})${RESET}`
             : "";
+        const fws = c.scoped?.frameworks;
+        const fwSummary =
+          fws === undefined || fws.length === 0
+            ? `${DIM}(none)${RESET}`
+            : fws.length <= 3
+              ? fws.join(", ")
+              : `${fws.slice(0, 3).join(", ")} ${DIM}+${fws.length - 3} more${RESET}`;
         w(
-          `  ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${desc} ${DIM}${c.path}${RESET}\n`,
+          `  ${YELLOW}${c.kind.padEnd(8)}${RESET}${secondary} ${c.name}${desc} ${DIM}${c.path}${RESET}  ${fwSummary}\n`,
         );
       }
     } else {

@@ -4,6 +4,7 @@ export interface Finding {
   readonly value: string;
   readonly confidence: number;
   readonly evidence: readonly string[];
+  readonly filePath?: string;
 }
 
 export interface DetectorResult {
