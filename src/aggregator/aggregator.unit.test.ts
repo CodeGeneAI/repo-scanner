@@ -905,3 +905,74 @@ describe("aggregate: buildSystem wiring", () => {
     expect(result.inventory.buildSystems).toEqual([]);
   });
 });
+
+describe("aggregate: containerization wiring", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("collapses multiple Docker Compose variant findings to unique inventory entries", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "containerization",
+        findings: [
+          {
+            value: "Docker Compose",
+            confidence: 1,
+            evidence: [],
+            filePath: "docker-compose.yml",
+          },
+          {
+            value: "Docker Compose",
+            confidence: 1,
+            evidence: [],
+            filePath: "compose.yaml",
+          },
+          {
+            value: "Docker",
+            confidence: 1,
+            evidence: [],
+            filePath: "Dockerfile",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.containerization.slice().sort()).toEqual([
+      "Docker",
+      "Docker Compose",
+    ]);
+  });
+
+  it("--detectors containerization: inventory.containerization only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "containerization",
+        findings: [
+          {
+            value: "Docker",
+            confidence: 1,
+            evidence: [],
+            filePath: "Dockerfile",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results, undefined, {
+      selectedDetectors: detectorSet("containerization"),
+    });
+    expect(Object.keys(result).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(result.inventory!)).toEqual(["containerization"]);
+    expect(result.inventory!.containerization).toEqual(["Docker"]);
+  });
+
+  it("empty containerization when detector ran but found nothing", async () => {
+    const results: DetectorResult[] = [
+      { detectorId: "containerization", findings: [] },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.containerization).toEqual([]);
+  });
+});
