@@ -833,3 +833,74 @@ describe("aggregate: per-component framework attribution", () => {
     expect(web?.scoped?.languageStats?.totalFiles).toBe(1);
   });
 });
+
+describe("aggregate: buildSystem wiring", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("collapses duplicate buildSystem findings to unique inventory entries", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "buildSystem",
+        findings: [
+          {
+            value: "Bazel",
+            confidence: 1,
+            evidence: [],
+            filePath: "BUILD.bazel",
+          },
+          {
+            value: "Bazel",
+            confidence: 1,
+            evidence: [],
+            filePath: "WORKSPACE",
+          },
+          {
+            value: "Make",
+            confidence: 1,
+            evidence: [],
+            filePath: "Makefile",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.buildSystems.slice().sort()).toEqual([
+      "Bazel",
+      "Make",
+    ]);
+  });
+
+  it("--detectors buildSystem: inventory.buildSystems only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "buildSystem",
+        findings: [
+          {
+            value: "Make",
+            confidence: 1,
+            evidence: [],
+            filePath: "Makefile",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results, undefined, {
+      selectedDetectors: detectorSet("buildSystem"),
+    });
+    expect(Object.keys(result).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(result.inventory!)).toEqual(["buildSystems"]);
+    expect(result.inventory!.buildSystems).toEqual(["Make"]);
+  });
+
+  it("empty buildSystems when detector ran but found nothing", async () => {
+    const results: DetectorResult[] = [
+      { detectorId: "buildSystem", findings: [] },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.buildSystems).toEqual([]);
+  });
+});
