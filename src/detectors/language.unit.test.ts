@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
@@ -323,4 +323,28 @@ describe("language detector", () => {
       expect(result.metadata?.totalLines).toBe(0);
     });
   });
+});
+
+test("emits per-file metadata for component attribution", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "rs-lang-pf-"));
+  await mkdir(path.join(dir, "apps/web"), { recursive: true });
+  await writeFile(path.join(dir, "apps/web/index.ts"), "export const x = 1;\n");
+  await writeFile(path.join(dir, "root.ts"), "export const y = 2;\n");
+
+  const detector = getDetectors().find((d) => d.id === "language")!;
+  const index = await FileIndex.build(dir);
+  const result = await detector.detect(dir, index);
+
+  const perFile = result.metadata?.perFile as
+    | Array<{ relativePath: string; language: string; lines: number }>
+    | undefined;
+  expect(Array.isArray(perFile)).toBe(true);
+  const paths = perFile!.map((e) => e.relativePath).sort();
+  expect(paths).toContain("apps/web/index.ts");
+  expect(paths).toContain("root.ts");
+  const entry = perFile!.find((e) => e.relativePath === "apps/web/index.ts")!;
+  expect(entry.language).toBe("TypeScript");
+  expect(entry.lines).toBeGreaterThan(0);
+
+  await rm(dir, { recursive: true, force: true });
 });

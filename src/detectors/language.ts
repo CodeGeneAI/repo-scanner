@@ -113,12 +113,30 @@ registerDetector({
 
     // Count lines of code per language concurrently
     const allLangFiles = [...filesByLang.entries()].flatMap(([lang, files]) =>
-      files.map((f) => ({ lang, path: f.path })),
+      files.map((f) => ({
+        lang,
+        path: f.path,
+        relativePath: f.relativePath,
+      })),
     );
+    const perFileEntries: Array<{
+      relativePath: string;
+      language: string;
+      lines: number;
+    }> = [];
+
     const lineCounts = await mapWithConcurrency(
       allLangFiles,
       LOC_CONCURRENCY,
-      async (item) => ({ lang: item.lang, lines: await countLines(item.path) }),
+      async (item) => {
+        const lines = await countLines(item.path);
+        perFileEntries.push({
+          relativePath: item.relativePath,
+          language: item.lang,
+          lines,
+        });
+        return { lang: item.lang, lines };
+      },
     );
     const locByLang = new Map<string, number>();
     for (const { lang, lines } of lineCounts) {
@@ -143,7 +161,12 @@ registerDetector({
     return {
       detectorId: "language",
       findings: findings.sort((a, b) => b.confidence - a.confidence),
-      metadata: { perLanguage, totalFiles, totalLines },
+      metadata: {
+        perLanguage,
+        totalFiles,
+        totalLines,
+        perFile: perFileEntries,
+      },
     };
   },
 });
