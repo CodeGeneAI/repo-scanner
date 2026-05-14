@@ -390,3 +390,66 @@ describe("renderTable component scoped frameworks column", () => {
     expect(out2).toMatch(/apps\/web[\s\S]*\(none\)/);
   });
 });
+
+test("renders Runtimes section with detected entries", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: [],
+        buildSystems: [],
+        containerization: [],
+        runtimes: [
+          { language: "Node", version: "20.11.0", source: ".nvmrc" },
+          { language: "Python", version: "3.11.4", source: ".python-version" },
+        ],
+      },
+    }),
+  );
+  expect(out).toMatch(/Runtimes/);
+  expect(out).toMatch(/Node/);
+  expect(out).toMatch(/20\.11\.0/);
+  expect(out).toMatch(/from .nvmrc/);
+  expect(out).toMatch(/Python/);
+  expect(out).toMatch(/3\.11\.4/);
+});
+
+test("Runtimes section shows (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/Runtimes/);
+  expect(out).toMatch(/Runtimes[\s\S]*\(none\)/);
+});
+
+test("Runtimes section absent when inventory.runtimes is undefined (sliced)", () => {
+  const out = capturePartial({
+    scannedAt: "2026-05-13T00:00:00Z",
+    rootPath: "/x",
+    inventory: { frameworks: ["Next.js"] }, // runtimes explicitly undefined
+  });
+  expect(out).not.toMatch(/Runtimes/);
+});
+
+test("Runtimes section appears after Containerization and before Monorepo", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: [],
+        buildSystems: [],
+        containerization: ["Docker"],
+        runtimes: [{ language: "Node", version: "20.0.0", source: ".nvmrc" }],
+      },
+    }),
+  );
+  expect(out).toMatch(/Runtimes/);
+  // Order: Containerization → Runtimes → Monorepo
+  const cnIdx = out.indexOf("Containerization");
+  const rtIdx = out.indexOf("Runtimes");
+  const moIdx = out.indexOf("Monorepo");
+  expect(cnIdx).toBeLessThan(rtIdx);
+  expect(rtIdx).toBeLessThan(moIdx);
+});
