@@ -252,6 +252,7 @@ export async function aggregate(
         languages: sorted(languageNames),
         frameworks: sorted(frameworks),
         packageManagers: sorted(packageManagers),
+        ciProviders: [],
       },
       architecture: {
         monorepo: isMonorepo,
@@ -268,6 +269,7 @@ export async function aggregate(
   if (include("framework")) partialInventory.frameworks = sorted(frameworks);
   if (include("packageManager"))
     partialInventory.packageManagers = sorted(packageManagers);
+  if (include("ciProvider")) partialInventory.ciProviders = [];
   const hasInventory = Object.keys(partialInventory).length > 0;
 
   const partial: PartialRepoScanResult = {

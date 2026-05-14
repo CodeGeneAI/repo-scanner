@@ -18,7 +18,12 @@ const capture = (result: RepoScanResult): string => {
 const baseResult = (over: Partial<RepoScanResult> = {}): RepoScanResult => ({
   scannedAt: "2026-05-13T00:00:00Z",
   rootPath: "/x",
-  inventory: { languages: [], frameworks: [], packageManagers: [] },
+  inventory: {
+    languages: [],
+    frameworks: [],
+    packageManagers: [],
+    ciProviders: [],
+  },
   architecture: { monorepo: false, components: [] },
   languageStats: { totalFiles: 0, totalLines: 0, perLanguage: [] },
   ...over,
@@ -54,6 +59,7 @@ test("renders Package managers section with detected entries", () => {
         languages: [],
         frameworks: [],
         packageManagers: ["Bun", "pnpm"],
+        ciProviders: [],
       },
     }),
   );
