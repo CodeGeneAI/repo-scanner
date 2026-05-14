@@ -18,6 +18,10 @@ export const DETECTOR_CATALOG = [
     id: "containerization",
     description: "Container runtime and orchestration detection",
   },
+  {
+    id: "runtime",
+    description: "Runtime version detection from project config",
+  },
 ] as const;
 
 export type DetectorCatalogEntry = (typeof DETECTOR_CATALOG)[number];

@@ -5,3 +5,4 @@ import "./package-manager";
 import "./ci";
 import "./build-system";
 import "./containerization";
+import "./runtime";

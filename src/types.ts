@@ -1,5 +1,11 @@
 import type { DetectorId } from "./detectors/catalog";
 
+export interface RuntimeInfo {
+  readonly language: string;
+  readonly version: string;
+  readonly source: string;
+}
+
 export type ComponentKind =
   | "app"
   | "service"
@@ -29,6 +35,7 @@ export interface Inventory {
   readonly ciProviders: readonly string[];
   readonly buildSystems: readonly string[];
   readonly containerization: readonly string[];
+  readonly runtimes: readonly RuntimeInfo[];
 }
 
 export interface Architecture {
@@ -67,6 +74,7 @@ export interface PartialInventory {
   readonly ciProviders?: readonly string[];
   readonly buildSystems?: readonly string[];
   readonly containerization?: readonly string[];
+  readonly runtimes?: readonly RuntimeInfo[];
 }
 
 export interface PartialRepoScanResult {
@@ -95,4 +103,5 @@ export interface CliOptions {
   readonly ciProviderDetector: boolean;
   readonly buildSystemDetector: boolean;
   readonly containerizationDetector: boolean;
+  readonly runtimeDetector: boolean;
 }

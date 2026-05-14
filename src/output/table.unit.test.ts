@@ -25,6 +25,7 @@ const baseResult = (over: Partial<RepoScanResult> = {}): RepoScanResult => ({
     ciProviders: [],
     buildSystems: [],
     containerization: [],
+    runtimes: [],
   },
   architecture: { monorepo: false, components: [] },
   languageStats: { totalFiles: 0, totalLines: 0, perLanguage: [] },
@@ -64,6 +65,7 @@ test("renders Package managers section with detected entries", () => {
         ciProviders: [],
         buildSystems: [],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -178,6 +180,7 @@ test("renders CI providers section between Package managers and Monorepo", () =>
         ciProviders: ["GitHub Actions", "CircleCI"],
         buildSystems: [],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -215,6 +218,7 @@ test("renders Build systems section with detected entries", () => {
         ciProviders: [],
         buildSystems: ["Bazel", "Make"],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -246,6 +250,7 @@ test("Build systems section appears after Package managers and before CI provide
         ciProviders: ["GitHub Actions"],
         buildSystems: ["Make"],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -270,6 +275,7 @@ test("renders Containerization section with detected entries", () => {
         ciProviders: [],
         buildSystems: [],
         containerization: ["Docker", "Docker Compose"],
+        runtimes: [],
       },
     }),
   );
@@ -301,6 +307,7 @@ test("Containerization section appears after CI providers and before Monorepo", 
         ciProviders: ["GitHub Actions"],
         buildSystems: [],
         containerization: ["Docker"],
+        runtimes: [],
       },
     }),
   );
@@ -382,4 +389,67 @@ describe("renderTable component scoped frameworks column", () => {
     );
     expect(out2).toMatch(/apps\/web[\s\S]*\(none\)/);
   });
+});
+
+test("renders Runtimes section with detected entries", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: [],
+        buildSystems: [],
+        containerization: [],
+        runtimes: [
+          { language: "Node", version: "20.11.0", source: ".nvmrc" },
+          { language: "Python", version: "3.11.4", source: ".python-version" },
+        ],
+      },
+    }),
+  );
+  expect(out).toMatch(/Runtimes/);
+  expect(out).toMatch(/Node/);
+  expect(out).toMatch(/20\.11\.0/);
+  expect(out).toMatch(/from .nvmrc/);
+  expect(out).toMatch(/Python/);
+  expect(out).toMatch(/3\.11\.4/);
+});
+
+test("Runtimes section shows (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/Runtimes/);
+  expect(out).toMatch(/Runtimes[\s\S]*\(none\)/);
+});
+
+test("Runtimes section absent when inventory.runtimes is undefined (sliced)", () => {
+  const out = capturePartial({
+    scannedAt: "2026-05-13T00:00:00Z",
+    rootPath: "/x",
+    inventory: { frameworks: ["Next.js"] }, // runtimes explicitly undefined
+  });
+  expect(out).not.toMatch(/Runtimes/);
+});
+
+test("Runtimes section appears after Containerization and before Monorepo", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: [],
+        buildSystems: [],
+        containerization: ["Docker"],
+        runtimes: [{ language: "Node", version: "20.0.0", source: ".nvmrc" }],
+      },
+    }),
+  );
+  expect(out).toMatch(/Runtimes/);
+  // Order: Containerization → Runtimes → Monorepo
+  const cnIdx = out.indexOf("Containerization");
+  const rtIdx = out.indexOf("Runtimes");
+  const moIdx = out.indexOf("Monorepo");
+  expect(cnIdx).toBeLessThan(rtIdx);
+  expect(rtIdx).toBeLessThan(moIdx);
 });
