@@ -1,6 +1,6 @@
 {
   "name": "@codegeneai/repo-scanner",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "module",
   "license": "MIT",
   "description": "Universal repository structure scanner for any codebase",

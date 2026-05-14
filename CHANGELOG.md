@@ -1,5 +1,12 @@
 # @codegeneai/repo-scanner
 
+## [2.3.0](https://github.com/CodeGeneAI/repo-scanner/compare/v2.2.0...v2.3.0) (2026-05-14)
+
+
+### Features
+
+* buildSystem detector (24 build orchestration tools) ([#20](https://github.com/CodeGeneAI/repo-scanner/issues/20)) ([0c6da5b](https://github.com/CodeGeneAI/repo-scanner/commit/0c6da5b5f9382d2bb9e7c1b4c1e433aced86b135))
+
 ## [2.2.0](https://github.com/CodeGeneAI/repo-scanner/compare/v2.1.0...v2.2.0) (2026-05-14)
 
 
