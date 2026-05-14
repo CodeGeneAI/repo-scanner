@@ -33,6 +33,7 @@ describe("detector catalog", () => {
       .map((d) => d.id)
       .sort();
     expect(registeredIds).toEqual([
+      "buildSystem",
       "ciProvider",
       "framework",
       "language",
