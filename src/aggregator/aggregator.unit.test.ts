@@ -634,6 +634,77 @@ describe("aggregate: scoped under detector filter", () => {
   });
 });
 
+describe("aggregate: ciProviders wiring", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("collapses duplicate ciProvider findings into a single inventory entry", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "ciProvider",
+        findings: [
+          {
+            value: "Azure Pipelines",
+            confidence: 1,
+            evidence: [],
+            filePath: "azure-pipelines.yml",
+          },
+          {
+            value: "Azure Pipelines",
+            confidence: 1,
+            evidence: [],
+            filePath: ".azure/extra.yml",
+          },
+          {
+            value: "GitHub Actions",
+            confidence: 1,
+            evidence: [],
+            filePath: ".github/workflows/ci.yml",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.ciProviders.slice().sort()).toEqual([
+      "Azure Pipelines",
+      "GitHub Actions",
+    ]);
+  });
+
+  it("--detectors ciProvider: inventory.ciProviders only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "ciProvider",
+        findings: [
+          {
+            value: "GitHub Actions",
+            confidence: 1,
+            evidence: [],
+            filePath: ".github/workflows/ci.yml",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results, undefined, {
+      selectedDetectors: detectorSet("ciProvider"),
+    });
+    expect(Object.keys(result).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(result.inventory!)).toEqual(["ciProviders"]);
+    expect(result.inventory!.ciProviders).toEqual(["GitHub Actions"]);
+  });
+
+  it("empty ciProviders when detector ran but found nothing", async () => {
+    const results: DetectorResult[] = [
+      { detectorId: "ciProvider", findings: [] },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.ciProviders).toEqual([]);
+  });
+});
+
 describe("aggregate: per-component framework attribution", () => {
   const rootPath = "/tmp/test-repo";
 
