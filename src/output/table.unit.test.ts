@@ -164,6 +164,41 @@ describe("renderTable slicing", () => {
   });
 });
 
+test("renders CI providers section between Package managers and Monorepo", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: ["GitHub Actions", "CircleCI"],
+      },
+    }),
+  );
+  expect(out).toMatch(/CI providers/);
+  expect(out).toMatch(/GitHub Actions.*CircleCI|CircleCI.*GitHub Actions/);
+  // Order: Package managers must precede CI providers; CI providers must precede Monorepo.
+  const pmIdx = out.indexOf("Package managers");
+  const ciIdx = out.indexOf("CI providers");
+  const moIdx = out.indexOf("Monorepo");
+  expect(pmIdx).toBeLessThan(ciIdx);
+  expect(ciIdx).toBeLessThan(moIdx);
+});
+
+test("CI providers section shows (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/CI providers[\s\S]*\(none\)/);
+});
+
+test("CI providers section absent when inventory.ciProviders is undefined (sliced)", () => {
+  const out = capturePartial({
+    scannedAt: "2026-05-13T00:00:00Z",
+    rootPath: "/x",
+    inventory: { frameworks: ["Next.js"] }, // ciProviders explicitly undefined
+  });
+  expect(out).not.toMatch(/CI providers/);
+});
+
 import type { Component } from "../types";
 
 describe("renderTable component scoped frameworks column", () => {
