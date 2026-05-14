@@ -24,19 +24,30 @@ const detect = async (
 describe("buildSystem detector: file rules", () => {
   test.each([
     ["Makefile", "Make"],
+    ["makefile", "Make"],
     ["GNUmakefile", "Make"],
     ["Justfile", "Just"],
+    ["justfile", "Just"],
     [".justfile", "Just"],
     ["Taskfile.yml", "Task"],
     ["Taskfile.yaml", "Task"],
+    ["taskfile.yml", "Task"],
+    ["taskfile.yaml", "Task"],
+    ["Taskfile.dist.yml", "Task"],
+    ["Taskfile.dist.yaml", "Task"],
+    ["taskfile.dist.yml", "Task"],
+    ["taskfile.dist.yaml", "Task"],
     ["Rakefile", "Rake"],
     ["rakefile", "Rake"],
     ["CMakeLists.txt", "CMake"],
     ["meson.build", "Meson"],
     ["SConstruct", "SCons"],
+    ["Sconstruct", "SCons"],
+    ["sconstruct", "SCons"],
+    ["SConstruct.py", "SCons"],
+    ["sconstruct.py", "SCons"],
     ["SConscript", "SCons"],
     ["build.xml", "Ant"],
-    ["BUILD", "Bazel"],
     ["BUILD.bazel", "Bazel"],
     ["WORKSPACE", "Bazel"],
     ["WORKSPACE.bazel", "Bazel"],
@@ -51,6 +62,26 @@ describe("buildSystem detector: file rules", () => {
   ])("detects %s as %s", async (file, expected) => {
     const names = await detect({ [file]: "# build file\n" });
     expect(names).toContain(expected);
+  });
+});
+
+describe("buildSystem detector: Bazel/Pants disambiguation", () => {
+  test("bare BUILD file alone does NOT report Bazel (Pants/Buck disambiguation)", async () => {
+    const names = await detect({ BUILD: "# target\n" });
+    expect(names).not.toContain("Bazel");
+  });
+
+  test("BUILD + WORKSPACE still reports Bazel", async () => {
+    const names = await detect({
+      BUILD: "# target\n",
+      WORKSPACE: "",
+    });
+    expect(names).toContain("Bazel");
+  });
+
+  test("BUILD.bazel alone still reports Bazel", async () => {
+    const names = await detect({ "BUILD.bazel": "# target\n" });
+    expect(names).toContain("Bazel");
   });
 });
 
