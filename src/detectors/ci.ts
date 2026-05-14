@@ -23,7 +23,6 @@ const CI_FILE_RULES: ReadonlyMap<string, string> = new Map([
 const CI_DIR_RULES: ReadonlyMap<string, string> = new Map([
   [".github/workflows", "GitHub Actions"],
   [".buildkite", "Buildkite"],
-  [".azure", "Azure Pipelines"],
   [".teamcity", "TeamCity"],
   [".semaphore", "Semaphore"],
   [".circleci", "CircleCI"],

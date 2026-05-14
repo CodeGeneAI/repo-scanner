@@ -54,11 +54,6 @@ describe("ciProvider detector: directory rules", () => {
     expect(names).toContain("Buildkite");
   });
 
-  test("detects Azure Pipelines from any file in .azure/", async () => {
-    const names = await detect({ ".azure/pipelines.yml": "stages: []\n" });
-    expect(names).toContain("Azure Pipelines");
-  });
-
   test("detects TeamCity from any file in .teamcity/", async () => {
     const names = await detect({ ".teamcity/settings.kts": "// kts\n" });
     expect(names).toContain("TeamCity");
@@ -91,14 +86,22 @@ describe("ciProvider detector: edge cases", () => {
     expect([...names].sort()).toEqual(["GitHub Actions", "Travis CI"]);
   });
 
-  test("Azure detected from both file and dir signals (aggregator dedups later)", async () => {
+  test("Azure detected from azure-pipelines.yml at repo root", async () => {
+    const names = await detect({ "azure-pipelines.yml": "stages: []\n" });
+    expect(names).toContain("Azure Pipelines");
+  });
+
+  test("does not classify a bare .azure/ config dir as Azure Pipelines", async () => {
+    const names = await detect({
+      ".azure/config": "[defaults]\n",
+    });
+    expect(names).not.toContain("Azure Pipelines");
+  });
+
+  test("still detects Azure Pipelines via azure-pipelines.yml at root", async () => {
     const names = await detect({
       "azure-pipelines.yml": "stages: []\n",
-      ".azure/extra.yml": "stages: []\n",
     });
-    // Detector emits one finding per (name, filePath) pair — two pairs here.
-    // The aggregator's inventory Set collapses by name to a single entry;
-    // tested separately in aggregator.unit.test.ts (CI-4).
-    expect(names.filter((n) => n === "Azure Pipelines")).toHaveLength(2);
+    expect(names).toContain("Azure Pipelines");
   });
 });

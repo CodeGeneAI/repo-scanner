@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
@@ -149,5 +149,24 @@ describe("FileIndex", () => {
       expect(index.hasAny(["go.mod"])).toBe(true);
       expect(index.hasAny(["go.sum"])).toBe(false);
     });
+  });
+});
+
+describe("FileIndex relativePath normalization", () => {
+  test("stored relativePath uses forward slashes only (no backslashes)", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "rs-fi-"));
+    await mkdir(path.join(dir, "apps", "web"), { recursive: true });
+    await writeFile(path.join(dir, "apps", "web", "index.ts"), "");
+    await writeFile(path.join(dir, "root.ts"), "");
+
+    const index = await FileIndex.build(dir);
+    const all = index.getByExtension(".ts");
+    for (const entry of all) {
+      expect(entry.relativePath).not.toContain("\\");
+    }
+    const paths = all.map((e) => e.relativePath).sort();
+    expect(paths).toEqual(["apps/web/index.ts", "root.ts"]);
+
+    await rm(dir, { recursive: true, force: true });
   });
 });
