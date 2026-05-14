@@ -2,6 +2,7 @@ import type { DetectorId } from "../detectors/catalog";
 import type { DetectorResult } from "../detectors/types";
 import type {
   Component,
+  ComponentScope,
   LanguageStats,
   PartialInventory,
   PartialRepoScanResult,
@@ -110,6 +111,49 @@ export async function aggregate(
       isMonorepo = result.findings.length > 0;
       const named = result.findings.find((f) => f.value !== "monorepo");
       if (named) monorepoToolName = named.value;
+    }
+  }
+
+  // === Phase B: per-component attribution ===
+
+  const componentPaths = [...componentMap.keys()].sort(
+    (a, b) => b.length - a.length, // longest-prefix wins
+  );
+
+  const findComponentForFile = (filePath: string): string | undefined => {
+    for (const compPath of componentPaths) {
+      if (filePath === compPath || filePath.startsWith(`${compPath}/`)) {
+        return compPath;
+      }
+    }
+    return undefined;
+  };
+
+  // Group framework findings by component via longest-prefix match.
+  const componentFrameworks = new Map<string, Set<string>>();
+  for (const compPath of componentPaths) {
+    componentFrameworks.set(compPath, new Set());
+  }
+
+  const frameworkRan = results.some((r) => r.detectorId === "framework");
+
+  for (const result of results) {
+    if (result.detectorId !== "framework") continue;
+    for (const finding of result.findings) {
+      if (!finding.filePath) continue;
+      const compPath = findComponentForFile(finding.filePath);
+      if (!compPath) continue;
+      componentFrameworks.get(compPath)!.add(finding.value);
+    }
+  }
+
+  // Re-materialize each component with scoped attached.
+  for (const [compPath, comp] of componentMap) {
+    const fwSet = componentFrameworks.get(compPath);
+    const fw = fwSet ? [...fwSet].sort() : [];
+    const scoped: ComponentScope = frameworkRan ? { frameworks: fw } : {};
+    if (Object.keys(scoped).length > 0) {
+      componentMap.set(compPath, { ...comp, scoped });
     }
   }
 

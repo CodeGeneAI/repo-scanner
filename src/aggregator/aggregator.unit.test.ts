@@ -460,3 +460,83 @@ describe("aggregate: schema slicing under detector filter", () => {
     ]);
   });
 });
+
+describe("aggregate: per-component framework attribution", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("attributes framework findings to the deepest matching component", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "framework",
+        findings: [
+          {
+            value: "Next.js",
+            confidence: 1,
+            evidence: [],
+            filePath: "apps/web/package.json",
+          },
+          {
+            value: "React",
+            confidence: 1,
+            evidence: [],
+            filePath: "packages/ui/package.json",
+          },
+          {
+            value: "Tailwind CSS",
+            confidence: 1,
+            evidence: [],
+            filePath: "apps/web/tailwind.config.ts",
+          },
+        ],
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: ["found turbo.json"] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [
+          { path: "apps/web", name: "web" },
+          { path: "packages/ui", name: "ui" },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    const ui = result.architecture.components.find(
+      (c) => c.path === "packages/ui",
+    );
+    expect(web?.scoped?.frameworks?.slice().sort()).toEqual([
+      "Next.js",
+      "Tailwind CSS",
+    ]);
+    expect(ui?.scoped?.frameworks).toEqual(["React"]);
+  });
+
+  it("findings without filePath stay in top-level inventory only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "framework",
+        findings: [
+          { value: "Detected Somewhere", confidence: 1, evidence: [] },
+        ],
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [{ path: "apps/web", name: "web" }],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    expect(result.inventory.frameworks).toContain("Detected Somewhere");
+    expect(web?.scoped?.frameworks).toEqual([]);
+  });
+});
