@@ -6,6 +6,7 @@ export type {
   Architecture,
   Component,
   ComponentKind,
+  ComponentScope,
   Inventory,
   LanguageStats,
   PartialInventory,
