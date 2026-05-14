@@ -166,3 +166,235 @@ describe("runtime detector: dedup", () => {
     expect(runtimes).toHaveLength(0);
   });
 });
+
+describe("runtime detector: package.json engines", () => {
+  test("detects node version from package.json engines.node", async () => {
+    const runtimes = await detectRuntimes({
+      "package.json": JSON.stringify({ engines: { node: ">=20.0.0" } }),
+    });
+    expect(runtimes).toContainEqual({
+      language: "Node",
+      version: ">=20.0.0",
+      source: "package.json#engines.node",
+    });
+  });
+
+  test("detects npm version from package.json engines.npm", async () => {
+    const runtimes = await detectRuntimes({
+      "package.json": JSON.stringify({ engines: { npm: ">=10.0.0" } }),
+    });
+    expect(runtimes).toContainEqual({
+      language: "npm",
+      version: ">=10.0.0",
+      source: "package.json#engines.npm",
+    });
+  });
+
+  test("detects pnpm version from package.json engines.pnpm", async () => {
+    const runtimes = await detectRuntimes({
+      "package.json": JSON.stringify({ engines: { pnpm: ">=8.0.0" } }),
+    });
+    expect(runtimes).toContainEqual({
+      language: "pnpm",
+      version: ">=8.0.0",
+      source: "package.json#engines.pnpm",
+    });
+  });
+
+  test("detects bun version from package.json engines.bun", async () => {
+    const runtimes = await detectRuntimes({
+      "package.json": JSON.stringify({ engines: { bun: ">=1.0.0" } }),
+    });
+    expect(runtimes).toContainEqual({
+      language: "Bun",
+      version: ">=1.0.0",
+      source: "package.json#engines.bun",
+    });
+  });
+
+  test("ignores package.json without engines", async () => {
+    const runtimes = await detectRuntimes({
+      "package.json": JSON.stringify({ name: "foo", version: "1.0.0" }),
+    });
+    const fromPkg = runtimes.filter((r) =>
+      r.source.startsWith("package.json#engines"),
+    );
+    expect(fromPkg).toHaveLength(0);
+  });
+});
+
+describe("runtime detector: pyproject.toml", () => {
+  test("detects Python version from requires-python", async () => {
+    const runtimes = await detectRuntimes({
+      "pyproject.toml":
+        '[project]\nname = "myapp"\nrequires-python = ">=3.11"\n',
+    });
+    expect(runtimes).toContainEqual({
+      language: "Python",
+      version: ">=3.11",
+      source: "pyproject.toml#requires-python",
+    });
+  });
+
+  test("ignores pyproject.toml without requires-python", async () => {
+    const runtimes = await detectRuntimes({
+      "pyproject.toml": '[project]\nname = "myapp"\n',
+    });
+    const fromPyproject = runtimes.filter(
+      (r) => r.source === "pyproject.toml#requires-python",
+    );
+    expect(fromPyproject).toHaveLength(0);
+  });
+});
+
+describe("runtime detector: Cargo.toml", () => {
+  test("detects Rust version from rust-version", async () => {
+    const runtimes = await detectRuntimes({
+      "Cargo.toml": '[package]\nname = "myapp"\nrust-version = "1.70"\n',
+    });
+    expect(runtimes).toContainEqual({
+      language: "Rust",
+      version: "1.70",
+      source: "Cargo.toml#rust-version",
+    });
+  });
+
+  test("ignores Cargo.toml without rust-version", async () => {
+    const runtimes = await detectRuntimes({
+      "Cargo.toml": '[package]\nname = "myapp"\nversion = "0.1.0"\n',
+    });
+    const fromCargo = runtimes.filter(
+      (r) => r.source === "Cargo.toml#rust-version",
+    );
+    expect(fromCargo).toHaveLength(0);
+  });
+});
+
+describe("runtime detector: .tool-versions", () => {
+  test("detects multiple tools from .tool-versions", async () => {
+    const runtimes = await detectRuntimes({
+      ".tool-versions": "nodejs 20.11.0\npython 3.11.4\nruby 3.2.2\n",
+    });
+    expect(runtimes).toContainEqual({
+      language: "Node",
+      version: "20.11.0",
+      source: ".tool-versions",
+    });
+    expect(runtimes).toContainEqual({
+      language: "Python",
+      version: "3.11.4",
+      source: ".tool-versions",
+    });
+    expect(runtimes).toContainEqual({
+      language: "Ruby",
+      version: "3.2.2",
+      source: ".tool-versions",
+    });
+  });
+
+  test("handles node alias in .tool-versions", async () => {
+    const runtimes = await detectRuntimes({
+      ".tool-versions": "node 18.0.0\n",
+    });
+    expect(runtimes).toContainEqual({
+      language: "Node",
+      version: "18.0.0",
+      source: ".tool-versions",
+    });
+  });
+
+  test("handles golang alias in .tool-versions", async () => {
+    const runtimes = await detectRuntimes({
+      ".tool-versions": "golang 1.21.0\n",
+    });
+    expect(runtimes).toContainEqual({
+      language: "Go",
+      version: "1.21.0",
+      source: ".tool-versions",
+    });
+  });
+
+  test("strips comments from .tool-versions lines", async () => {
+    const runtimes = await detectRuntimes({
+      ".tool-versions": "nodejs 20.0.0 # lts version\n",
+    });
+    const nodeRuntime = runtimes.find(
+      (r) => r.language === "Node" && r.source === ".tool-versions",
+    );
+    expect(nodeRuntime).toBeDefined();
+    // version should not include the comment
+    expect(nodeRuntime?.version).not.toContain("#");
+  });
+
+  test("ignores empty lines and comment-only lines in .tool-versions", async () => {
+    const runtimes = await detectRuntimes({
+      ".tool-versions": "# This is a comment\n\nnodejs 20.0.0\n",
+    });
+    const nodeRuntimes = runtimes.filter(
+      (r) => r.language === "Node" && r.source === ".tool-versions",
+    );
+    expect(nodeRuntimes).toHaveLength(1);
+  });
+});
+
+describe("runtime detector: mise.toml", () => {
+  test("detects tools from mise.toml [tools] section", async () => {
+    const runtimes = await detectRuntimes({
+      "mise.toml": '[tools]\nnodejs = "20.11.0"\npython = "3.11.4"\n',
+    });
+    expect(runtimes).toContainEqual({
+      language: "Node",
+      version: "20.11.0",
+      source: "mise.toml#tools.nodejs",
+    });
+    expect(runtimes).toContainEqual({
+      language: "Python",
+      version: "3.11.4",
+      source: "mise.toml#tools.python",
+    });
+  });
+
+  test("detects tools from .mise.toml [tools] section", async () => {
+    const runtimes = await detectRuntimes({
+      ".mise.toml": '[tools]\nruby = "3.2.2"\n',
+    });
+    expect(runtimes).toContainEqual({
+      language: "Ruby",
+      version: "3.2.2",
+      source: ".mise.toml#tools.ruby",
+    });
+  });
+
+  test("ignores mise.toml without [tools] section", async () => {
+    const runtimes = await detectRuntimes({
+      "mise.toml": "[settings]\nverbose = true\n",
+    });
+    const fromMise = runtimes.filter((r) => r.source.startsWith("mise.toml#"));
+    expect(fromMise).toHaveLength(0);
+  });
+
+  test("stops reading [tools] at next section header", async () => {
+    const runtimes = await detectRuntimes({
+      "mise.toml":
+        '[tools]\nnodejs = "20.0.0"\n\n[settings]\nverbose = true\n',
+    });
+    const fromMise = runtimes.filter((r) => r.source.startsWith("mise.toml#"));
+    expect(fromMise).toHaveLength(1);
+    expect(fromMise[0]?.language).toBe("Node");
+  });
+});
+
+describe("runtime detector: conflicting versions", () => {
+  test("different versions from different sources both surface as separate findings", async () => {
+    const runtimes = await detectRuntimes({
+      ".nvmrc": "20.11.0\n",
+      "package.json": JSON.stringify({ engines: { node: ">=18.0.0" } }),
+    });
+    const nodeRuntimes = runtimes.filter((r) => r.language === "Node");
+    // Both should be present since they have different versions
+    expect(nodeRuntimes.length).toBeGreaterThanOrEqual(2);
+    const versions = nodeRuntimes.map((r) => r.version);
+    expect(versions).toContain("20.11.0");
+    expect(versions).toContain(">=18.0.0");
+  });
+});
