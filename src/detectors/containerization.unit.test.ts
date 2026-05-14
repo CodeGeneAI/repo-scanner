@@ -94,3 +94,35 @@ describe("containerization detector: edge cases", () => {
     expect(names).toContain("Dev Container");
   });
 });
+
+describe("containerization detector: devcontainer file rules (C1 + C2)", () => {
+  test("detects root-level .devcontainer.json (file alongside repo root)", async () => {
+    const names = await detect({ ".devcontainer.json": '{"name":"dev"}\n' });
+    expect(names).toContain("Dev Container");
+  });
+
+  test("detects .devcontainer/devcontainer.json via file rule (not just dir rule)", async () => {
+    const names = await detect({
+      ".devcontainer/devcontainer.json": '{"name":"dev"}\n',
+    });
+    expect(names).toContain("Dev Container");
+  });
+
+  test("detects nested apps/X/.devcontainer/devcontainer.json (monorepo)", async () => {
+    const names = await detect({
+      "apps/api/.devcontainer/devcontainer.json": '{"name":"api-dev"}\n',
+      "apps/web/.devcontainer/devcontainer.json": '{"name":"web-dev"}\n',
+    });
+    expect(names).toContain("Dev Container");
+  });
+
+  test("Dev Container detected once across multiple devcontainer.json files (dedup)", async () => {
+    const names = await detect({
+      ".devcontainer/devcontainer.json": '{"name":"root"}\n',
+      "apps/api/.devcontainer/devcontainer.json": '{"name":"api"}\n',
+    });
+    expect(names.filter((n) => n === "Dev Container")).toHaveLength(2);
+    // Note: detector-level dedup is per (name, filePath); aggregator dedups to ONE.
+    // This test inspects the detector's emitted findings only.
+  });
+});

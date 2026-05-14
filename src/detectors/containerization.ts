@@ -11,12 +11,14 @@ const CONTAINER_FILE_RULES: ReadonlyMap<string, string> = new Map([
   ["docker-compose.yaml", "Docker Compose"],
   ["compose.yml", "Docker Compose"],
   ["compose.yaml", "Docker Compose"],
+  [".devcontainer.json", "Dev Container"], // C1 — root-level config
+  ["devcontainer.json", "Dev Container"], // C2 — covers root .devcontainer/ AND nested app .devcontainer/
 ]);
 
-/** Directory rules: any primary file under prefix → tool. */
-const CONTAINER_DIR_RULES: ReadonlyMap<string, string> = new Map([
-  [".devcontainer", "Dev Container"],
-]);
+/** Directory rules: any primary file under prefix → tool.
+ * Kept for future extensibility; currently empty because all known cases
+ * are handled by CONTAINER_FILE_RULES (including devcontainer detection). */
+const CONTAINER_DIR_RULES: ReadonlyMap<string, string> = new Map([]);
 
 registerDetector({
   id: "containerization",
