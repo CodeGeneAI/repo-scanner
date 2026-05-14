@@ -21,7 +21,8 @@ export function createFindingAdder(): {
     filePath?: string,
   ) => void;
 } {
-  const seen = new Set<string>();
+  const seen = new Set<string>(); // bare names — public, used by package-manager.ts
+  const seenKeys = new Set<string>(); // `${name}::${filePath ?? ""}` — internal dedup
   const findings: Finding[] = [];
 
   const addFinding = (
@@ -30,7 +31,9 @@ export function createFindingAdder(): {
     evidence: string,
     filePath?: string,
   ) => {
-    if (seen.has(name)) return;
+    const key = `${name}::${filePath ?? ""}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
     seen.add(name);
     findings.push({
       value: name,

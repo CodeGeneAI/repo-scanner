@@ -146,8 +146,10 @@ describe("framework detector", () => {
     expect(values).toContain("TanStack Start");
   });
 
-  // Dedup
-  it("deduplicates Spring Boot from Gradle and Maven", async () => {
+  // Dedup — createFindingAdder dedupes by (name, filePath); same name from
+  // different files produces one Finding per file. The aggregator uses a Set
+  // so the framework still appears once in the final output per component.
+  it("emits one Spring Boot finding per source file (build.gradle + pom.xml)", async () => {
     await writeFile(
       path.join(tmpDir, "build.gradle"),
       "implementation 'org.springframework.boot:spring-boot-starter'",
@@ -157,7 +159,7 @@ describe("framework detector", () => {
       "<artifactId>spring-boot-starter</artifactId>",
     );
     const { values } = await runFrameworkDetector(tmpDir);
-    expect(values.filter((v) => v === "Spring Boot").length).toBe(1);
+    expect(values.filter((v) => v === "Spring Boot").length).toBe(2);
   });
 
   it("emits Finding.filePath pointing at the source manifest", async () => {
