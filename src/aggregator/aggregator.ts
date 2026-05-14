@@ -50,6 +50,8 @@ export async function aggregate(
   const buildSystems = new Set<string>();
   const containerization = new Set<string>();
   const languageNames = new Set<string>();
+  const runtimes: RuntimeInfo[] = [];
+  const seenRuntimeKeys = new Set<string>();
 
   const componentMap = new Map<string, Component>();
   let languageStats: LanguageStats = EMPTY_LANGUAGE_STATS;
@@ -118,6 +120,21 @@ export async function aggregate(
       isMonorepo = result.findings.length > 0;
       const named = result.findings.find((f) => f.value !== "monorepo");
       if (named) monorepoToolName = named.value;
+    }
+
+    // Special: runtime findings — JSON-encoded RuntimeInfo
+    if (result.detectorId === "runtime") {
+      for (const finding of result.findings) {
+        try {
+          const info = JSON.parse(finding.value) as RuntimeInfo;
+          const key = `${info.language}::${info.version}`;
+          if (seenRuntimeKeys.has(key)) continue;
+          seenRuntimeKeys.add(key);
+          runtimes.push(info);
+        } catch {
+          // Detector controls the format — never happens in practice.
+        }
+      }
     }
   }
 
@@ -243,6 +260,12 @@ export async function aggregate(
     (a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name),
   );
 
+  const sortedRuntimes = [...runtimes].sort(
+    (a, b) =>
+      a.language.localeCompare(b.language) ||
+      a.version.localeCompare(b.version),
+  );
+
   const selected = options?.selectedDetectors;
   const include = (id: DetectorId): boolean => !selected || selected.has(id);
 
@@ -262,7 +285,7 @@ export async function aggregate(
         ciProviders: sorted(ciProviders),
         buildSystems: sorted(buildSystems),
         containerization: sorted(containerization),
-        runtimes: [],
+        runtimes: sortedRuntimes,
       },
       architecture: {
         monorepo: isMonorepo,
@@ -284,7 +307,8 @@ export async function aggregate(
     partialInventory.buildSystems = sorted(buildSystems);
   if (include("containerization"))
     partialInventory.containerization = sorted(containerization);
-  if (include("runtime")) (partialInventory as Record<string, unknown>).runtimes = [];
+  if (include("runtime"))
+    (partialInventory as Record<string, unknown>).runtimes = sortedRuntimes;
   const hasInventory = Object.keys(partialInventory).length > 0;
 
   const partial: PartialRepoScanResult = {
