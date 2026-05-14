@@ -14,15 +14,30 @@ export interface PackageJson {
 export function createFindingAdder(): {
   seen: Set<string>;
   findings: Finding[];
-  addFinding: (name: string, confidence: number, evidence: string) => void;
+  addFinding: (
+    name: string,
+    confidence: number,
+    evidence: string,
+    filePath?: string,
+  ) => void;
 } {
   const seen = new Set<string>();
   const findings: Finding[] = [];
 
-  const addFinding = (name: string, confidence: number, evidence: string) => {
+  const addFinding = (
+    name: string,
+    confidence: number,
+    evidence: string,
+    filePath?: string,
+  ) => {
     if (seen.has(name)) return;
     seen.add(name);
-    findings.push({ value: name, confidence, evidence: [evidence] });
+    findings.push({
+      value: name,
+      confidence,
+      evidence: [evidence],
+      ...(filePath ? { filePath } : {}),
+    });
   };
 
   return { seen, findings, addFinding };
@@ -42,7 +57,12 @@ export async function scanFilesForIndicators(
   index: FileIndex,
   fileNames: readonly string[],
   indicatorMap: ReadonlyMap<string, string>,
-  addFinding: (name: string, confidence: number, evidence: string) => void,
+  addFinding: (
+    name: string,
+    confidence: number,
+    evidence: string,
+    filePath?: string,
+  ) => void,
   confidence: number,
   evidencePrefix: string,
   options?: ScanIndicatorsOptions,
@@ -68,6 +88,7 @@ export async function scanFilesForIndicators(
             name,
             confidence,
             `${evidencePrefix}: ${indicator} in ${file.relativePath}`,
+            file.relativePath,
           );
         }
       }
@@ -82,7 +103,12 @@ export async function scanFilesForIndicators(
 export async function scanPythonDeps(
   index: FileIndex,
   packageMap: ReadonlyMap<string, string>,
-  addFinding: (name: string, confidence: number, evidence: string) => void,
+  addFinding: (
+    name: string,
+    confidence: number,
+    evidence: string,
+    filePath?: string,
+  ) => void,
   confidence: number,
 ): Promise<void> {
   for (const file of [
@@ -101,6 +127,7 @@ export async function scanPythonDeps(
           name,
           confidence,
           `Python dep: ${pkg} in ${file.relativePath}`,
+          file.relativePath,
         );
       }
     }
@@ -113,7 +140,12 @@ export async function scanPythonDeps(
 export async function scanGemfile(
   index: FileIndex,
   gemMap: ReadonlyMap<string, string>,
-  addFinding: (name: string, confidence: number, evidence: string) => void,
+  addFinding: (
+    name: string,
+    confidence: number,
+    evidence: string,
+    filePath?: string,
+  ) => void,
   confidence: number,
 ): Promise<void> {
   for (const gemfile of index.getByNamePrimary("Gemfile")) {
@@ -121,7 +153,12 @@ export async function scanGemfile(
     if (!content) continue;
     for (const [gem, name] of gemMap) {
       if (content.includes(`'${gem}'`) || content.includes(`"${gem}"`)) {
-        addFinding(name, confidence, `Gemfile contains ${gem}`);
+        addFinding(
+          name,
+          confidence,
+          `Gemfile contains ${gem}`,
+          gemfile.relativePath,
+        );
       }
     }
   }
@@ -133,7 +170,12 @@ export async function scanGemfile(
 export async function scanComposerJson(
   index: FileIndex,
   packageMap: ReadonlyMap<string, string>,
-  addFinding: (name: string, confidence: number, evidence: string) => void,
+  addFinding: (
+    name: string,
+    confidence: number,
+    evidence: string,
+    filePath?: string,
+  ) => void,
   confidence: number,
 ): Promise<void> {
   for (const composerFile of index.getByNamePrimary("composer.json")) {
@@ -148,6 +190,7 @@ export async function scanComposerJson(
           name,
           confidence,
           `Composer dep: ${depName} in ${composerFile.relativePath}`,
+          composerFile.relativePath,
         );
       }
     }

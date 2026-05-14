@@ -185,7 +185,12 @@ registerDetector({
     for (const [fileName, framework] of CONFIG_FRAMEWORK_MAP) {
       const files = index.getByNamePrimary(fileName);
       if (files.length > 0) {
-        addFinding(framework, 1.0, `config file: ${fileName}`);
+        addFinding(
+          framework,
+          1.0,
+          `config file: ${fileName}`,
+          files[0].relativePath,
+        );
       }
     }
 
@@ -201,6 +206,7 @@ registerDetector({
             framework,
             0.95,
             `npm dependency: ${depName} in ${pkgFile.relativePath}`,
+            pkgFile.relativePath,
           );
         }
       }
@@ -244,6 +250,7 @@ registerDetector({
             framework,
             0.95,
             `Elixir dep: ${dep} in ${mixFile.relativePath}`,
+            mixFile.relativePath,
           );
         }
       }
@@ -260,6 +267,7 @@ registerDetector({
             framework,
             0.95,
             `.NET reference: ${indicator} in ${csprojFile.relativePath}`,
+            csprojFile.relativePath,
           );
         }
       }

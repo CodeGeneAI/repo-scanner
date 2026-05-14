@@ -159,4 +159,22 @@ describe("framework detector", () => {
     const { values } = await runFrameworkDetector(tmpDir);
     expect(values.filter((v) => v === "Spring Boot").length).toBe(1);
   });
+
+  it("emits Finding.filePath pointing at the source manifest", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "rs-fp-"));
+    await writeFile(
+      path.join(dir, "package.json"),
+      JSON.stringify({ dependencies: { next: "^15", react: "^19" } }),
+    );
+    const result = await runFrameworkDetector(dir);
+    const nextFinding = result.result.findings.find(
+      (f) => f.value === "Next.js",
+    );
+    expect(nextFinding?.filePath).toBe("package.json");
+    const reactFinding = result.result.findings.find(
+      (f) => f.value === "React",
+    );
+    expect(reactFinding?.filePath).toBe("package.json");
+    await rm(dir, { recursive: true, force: true });
+  });
 });
