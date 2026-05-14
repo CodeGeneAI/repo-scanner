@@ -1,5 +1,52 @@
 # @codegeneai/repo-scanner
 
+## [2.0.0](https://github.com/CodeGeneAI/repo-scanner/compare/v1.0.1...v2.0.0) (2026-05-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** --format and -f are gone. Migrate '--format json' to '--json' and drop '--format table' entirely.
+* **api:** SDK consumers calling scanRepo(path, { detectors: [...] }) who access fields outside their selected detectors will now see undefined where they previously got empty defaults. Migrate by either omitting options.detectors or by checking optional fields before access.
+
+### Features
+
+* add packageManager detector (lockfile + manifest fallback) ([9536c53](https://github.com/CodeGeneAI/repo-scanner/commit/9536c53ff6f90e6788cd086c1f831c9367ecfb6f))
+* **api:** --detectors filter slices the result schema ([ae66ced](https://github.com/CodeGeneAI/repo-scanner/commit/ae66ced7dcae03bcbca6a8344518ab3baafc08e8))
+* **api:** --detectors filter slices the result schema ([6a6e8f1](https://github.com/CodeGeneAI/repo-scanner/commit/6a6e8f14effde027f5000b4f74ac02585274d3e6))
+* **architecture:** expose monorepo toolName ([9b72ae3](https://github.com/CodeGeneAI/repo-scanner/commit/9b72ae3857373b389c92c7027742eb83eba5da34))
+* **cli:** expose packageManager detector in CLI and README ([18e86ac](https://github.com/CodeGeneAI/repo-scanner/commit/18e86ac024a02656747d2666a4217a3e72dc8ac2))
+* **cli:** replace --format with boolean --json flag ([d316176](https://github.com/CodeGeneAI/repo-scanner/commit/d316176133fb5e8685d8a61f3d6d9ec4370949a5))
+* **detector:** packageManager detects 20 lockfile types ([a2fb136](https://github.com/CodeGeneAI/repo-scanner/commit/a2fb13638a9014b6e81eb77b85a6fef9ea12f165))
+* **detector:** packageManager manifest fallback rules ([4a95d9f](https://github.com/CodeGeneAI/repo-scanner/commit/4a95d9f6b4e85ebb3ce4445f5d5c632fcab0dcc8))
+* **detector:** scaffold packageManager detector surface ([808c8bc](https://github.com/CodeGeneAI/repo-scanner/commit/808c8bc410aa46784e3df92ce1412e2ef2e7c2fb))
+* **framework:** detect TanStack Start ([aadbb91](https://github.com/CodeGeneAI/repo-scanner/commit/aadbb9130d26097f267b34ada34e59b2079ef869))
+* **framework:** detect tRPC, Drizzle, Better Auth, TanStack libs ([fb7b0be](https://github.com/CodeGeneAI/repo-scanner/commit/fb7b0be31cef90359b6cdef5e9b9dbe82573473d))
+* **framework:** detect Werkzeug, Jinja2, and related Python libs ([48a76a8](https://github.com/CodeGeneAI/repo-scanner/commit/48a76a8392482a3af3fc5333e5cb16fedd18e29c))
+* **monorepo:** include tooling/ in convention component scan ([2c954df](https://github.com/CodeGeneAI/repo-scanner/commit/2c954dfd3828118f30dfecad40361cc58eef1332))
+* **monorepo:** parse go.work use() directive into components ([e56f2ff](https://github.com/CodeGeneAI/repo-scanner/commit/e56f2ff4b9431b349245b93e1bf3c6ff03e2ec35))
+* **monorepo:** parse pnpm-workspace.yaml packages globs ([882516a](https://github.com/CodeGeneAI/repo-scanner/commit/882516a33fdb2ad70338e2dba8327869e8a2eb3c))
+* **output:** colorize JSON on TTY + --no-color / NO_COLOR ([f4b6ff0](https://github.com/CodeGeneAI/repo-scanner/commit/f4b6ff059cc8dc3dc5b32681befbc0172ddf57d5))
+* **output:** colorize JSON output on TTY ([aa47485](https://github.com/CodeGeneAI/repo-scanner/commit/aa47485bb586e3aa0e2446950880f23e1a753125))
+* **output:** render monorepo flag in table view ([dab86a7](https://github.com/CodeGeneAI/repo-scanner/commit/dab86a7376128e87776420864bdd2e23c86eabe0))
+* **output:** table renderer slices sections under --detectors ([c3ffbdc](https://github.com/CodeGeneAI/repo-scanner/commit/c3ffbdcdd7f03f2264f52763d245e7bde46892ae))
+
+
+### Bug Fixes
+
+* **aggregator:** derive inventory.languages from languageStats ([39b6e4c](https://github.com/CodeGeneAI/repo-scanner/commit/39b6e4cd9010e9ce409403f4a9561060757b8ea0))
+* **api:** re-export PartialInventory and PartialRepoScanResult ([d3d55d1](https://github.com/CodeGeneAI/repo-scanner/commit/d3d55d1a822220376e983de0e398ee7be2e3b65d))
+* **api:** register detectors on SDK import ([672bdf0](https://github.com/CodeGeneAI/repo-scanner/commit/672bdf0bd31d1150f9390d7d40b586ddca0a29fb))
+* CI self-scan flag + ScanRepoOptions overload acceptance ([44855ba](https://github.com/CodeGeneAI/repo-scanner/commit/44855ba97918c8820864628093d5069b55795f0f))
+* **classifier:** recognize crates/ and keep explicit workspace members ([d4b2938](https://github.com/CodeGeneAI/repo-scanner/commit/d4b2938510775eab010a9e27c8d5f17057cf5d40))
+* **cli:** --detectors preserves canonical RepoScanResult schema ([8e382ae](https://github.com/CodeGeneAI/repo-scanner/commit/8e382ae90b8a659c577642d395696cf5a34a9c21))
+* **cli:** friendly error for nonexistent --path ([023670e](https://github.com/CodeGeneAI/repo-scanner/commit/023670e4c59e9b8be93e72586a070e07ae47a206))
+* **framework:** exclude Go module directive line from substring match ([0fd00fc](https://github.com/CodeGeneAI/repo-scanner/commit/0fd00fcc74b73bc5c93fe026ae0b680590d3dd75))
+* **monorepo:** attach manifest paths to go.work use() components ([f21089b](https://github.com/CodeGeneAI/repo-scanner/commit/f21089b7f96e97db237a0d34194dd525b7b722b5))
+* **output:** emit null for non-finite numbers + handle async EPIPE ([8d444dc](https://github.com/CodeGeneAI/repo-scanner/commit/8d444dcd051b01b33947b37d9eac20424c0d2100))
+* **output:** swallow EPIPE in renderJson when stdout pipe closes ([02ec422](https://github.com/CodeGeneAI/repo-scanner/commit/02ec4220df96cd63c3af2305761c53a002c68a88))
+* **packageManager:** address PR [#11](https://github.com/CodeGeneAI/repo-scanner/issues/11) review feedback ([25a080d](https://github.com/CodeGeneAI/repo-scanner/commit/25a080d4053efc1ccf7ba8af65199ce2b70e6c8e))
+* **scanignore:** recurse into ignored dirs when descendant negation exists ([f2931ad](https://github.com/CodeGeneAI/repo-scanner/commit/f2931ad6d4652ce704e4ece37002d4c664317fa9))
+
 ## [1.0.1](https://github.com/CodeGeneAI/repo-scanner/compare/v1.0.0...v1.0.1) (2026-05-13)
 
 
