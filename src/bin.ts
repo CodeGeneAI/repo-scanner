@@ -219,6 +219,7 @@ const resolveExplicitDetectorIds = (
   if (options.frameworkDetector) ids.push("framework");
   if (options.monorepoDetector) ids.push("monorepo");
   if (options.packageManagerDetector) ids.push("packageManager");
+  if (options.ciProviderDetector) ids.push("ciProvider");
   return ids;
 };
 
