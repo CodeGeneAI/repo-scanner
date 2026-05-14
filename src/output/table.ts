@@ -62,6 +62,27 @@ export const renderTable = (
     w(`  ${list(result.inventory.ciProviders)}\n`);
   }
 
+  if (result.inventory?.containerization !== undefined) {
+    w(section("Containerization"));
+    w(`  ${list(result.inventory.containerization)}\n`);
+  }
+
+  if (result.inventory?.runtimes !== undefined) {
+    w(section("Runtimes"));
+    if (result.inventory.runtimes.length === 0) {
+      w(`  ${DIM}(none)${RESET}\n`);
+    } else {
+      const maxLang = Math.max(
+        ...result.inventory.runtimes.map((r) => r.language.length),
+      );
+      for (const r of result.inventory.runtimes) {
+        w(
+          `  ${YELLOW}${r.language.padEnd(maxLang)}${RESET}  ${r.version}  ${DIM}(from ${r.source})${RESET}\n`,
+        );
+      }
+    }
+  }
+
   if (result.architecture) {
     w(section("Monorepo"));
     const flag = result.architecture.monorepo ? "yes" : "no";

@@ -314,6 +314,8 @@ describe("aggregate: schema slicing under detector filter", () => {
       packageManagers: ["pnpm"],
       ciProviders: [],
       buildSystems: [],
+      containerization: [],
+      runtimes: [],
     });
   });
 
@@ -902,5 +904,211 @@ describe("aggregate: buildSystem wiring", () => {
     ];
     const result = await aggregate(rootPath, results);
     expect(result.inventory.buildSystems).toEqual([]);
+  });
+});
+
+describe("aggregate: containerization wiring", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("collapses multiple Docker Compose variant findings to unique inventory entries", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "containerization",
+        findings: [
+          {
+            value: "Docker Compose",
+            confidence: 1,
+            evidence: [],
+            filePath: "docker-compose.yml",
+          },
+          {
+            value: "Docker Compose",
+            confidence: 1,
+            evidence: [],
+            filePath: "compose.yaml",
+          },
+          {
+            value: "Docker",
+            confidence: 1,
+            evidence: [],
+            filePath: "Dockerfile",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.containerization.slice().sort()).toEqual([
+      "Docker",
+      "Docker Compose",
+    ]);
+  });
+
+  it("--detectors containerization: inventory.containerization only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "containerization",
+        findings: [
+          {
+            value: "Docker",
+            confidence: 1,
+            evidence: [],
+            filePath: "Dockerfile",
+          },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results, undefined, {
+      selectedDetectors: detectorSet("containerization"),
+    });
+    expect(Object.keys(result).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(result.inventory!)).toEqual(["containerization"]);
+    expect(result.inventory!.containerization).toEqual(["Docker"]);
+  });
+
+  it("empty containerization when detector ran but found nothing", async () => {
+    const results: DetectorResult[] = [
+      { detectorId: "containerization", findings: [] },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.containerization).toEqual([]);
+  });
+});
+
+describe("aggregate: runtime wiring", () => {
+  const rootPath = "/tmp/test-repo";
+
+  const makeRuntimeFinding = (
+    language: string,
+    version: string,
+    source: string,
+    filePath?: string,
+  ) => ({
+    value: JSON.stringify({ language, version, source }),
+    confidence: 1.0 as const,
+    evidence: [source],
+    ...(filePath ? { filePath } : {}),
+  });
+
+  it("parses runtime findings into RuntimeInfo entries", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "runtime",
+        findings: [
+          makeRuntimeFinding("Node", "20.11.0", ".nvmrc", ".nvmrc"),
+          makeRuntimeFinding(
+            "Python",
+            "3.11.4",
+            ".python-version",
+            ".python-version",
+          ),
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.runtimes).toHaveLength(2);
+    expect(result.inventory.runtimes).toContainEqual({
+      language: "Node",
+      version: "20.11.0",
+      source: ".nvmrc",
+    });
+    expect(result.inventory.runtimes).toContainEqual({
+      language: "Python",
+      version: "3.11.4",
+      source: ".python-version",
+    });
+  });
+
+  it("deduplicates by (language, version) pair — same version from two sources collapses to one entry", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "runtime",
+        findings: [
+          makeRuntimeFinding("Node", "20.11.0", ".nvmrc", ".nvmrc"),
+          makeRuntimeFinding(
+            "Node",
+            "20.11.0",
+            "package.json#engines.node",
+            "package.json",
+          ),
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const nodeRuntimes = result.inventory.runtimes.filter(
+      (r) => r.language === "Node",
+    );
+    expect(nodeRuntimes).toHaveLength(1);
+  });
+
+  it("keeps both entries when versions conflict for same language", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "runtime",
+        findings: [
+          makeRuntimeFinding("Node", "20.11.0", ".nvmrc", ".nvmrc"),
+          makeRuntimeFinding(
+            "Node",
+            ">=18.0.0",
+            "package.json#engines.node",
+            "package.json",
+          ),
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const nodeRuntimes = result.inventory.runtimes.filter(
+      (r) => r.language === "Node",
+    );
+    expect(nodeRuntimes).toHaveLength(2);
+  });
+
+  it("sorts runtimes by language then version", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "runtime",
+        findings: [
+          makeRuntimeFinding("Python", "3.11.4", ".python-version"),
+          makeRuntimeFinding("Node", "20.11.0", ".nvmrc"),
+          makeRuntimeFinding("Go", "1.21", "go.mod"),
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const langs = result.inventory.runtimes.map((r) => r.language);
+    expect(langs).toEqual(["Go", "Node", "Python"]);
+  });
+
+  it("--detectors runtime: inventory.runtimes only", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "runtime",
+        findings: [makeRuntimeFinding("Node", "20.0.0", ".nvmrc", ".nvmrc")],
+      },
+    ];
+    const result = await aggregate(rootPath, results, undefined, {
+      selectedDetectors: detectorSet("runtime"),
+    });
+    expect(Object.keys(result).sort()).toEqual([
+      "inventory",
+      "rootPath",
+      "scannedAt",
+    ]);
+    expect(Object.keys(result.inventory!)).toEqual(["runtimes"]);
+    expect(result.inventory!.runtimes).toHaveLength(1);
+    expect(result.inventory!.runtimes![0]).toEqual({
+      language: "Node",
+      version: "20.0.0",
+      source: ".nvmrc",
+    });
+  });
+
+  it("empty runtimes when detector ran but found nothing", async () => {
+    const results: DetectorResult[] = [{ detectorId: "runtime", findings: [] }];
+    const result = await aggregate(rootPath, results);
+    expect(result.inventory.runtimes).toEqual([]);
   });
 });

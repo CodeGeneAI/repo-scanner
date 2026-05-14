@@ -221,6 +221,8 @@ const resolveExplicitDetectorIds = (
   if (options.packageManagerDetector) ids.push("packageManager");
   if (options.ciProviderDetector) ids.push("ciProvider");
   if (options.buildSystemDetector) ids.push("buildSystem");
+  if (options.containerizationDetector) ids.push("containerization");
+  if (options.runtimeDetector) ids.push("runtime");
   return ids;
 };
 

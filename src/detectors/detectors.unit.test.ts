@@ -15,14 +15,16 @@ function findDetector(id: string): Detector {
 }
 
 describe("detector catalog", () => {
-  it("exposes exactly six detector ids", () => {
+  it("exposes exactly eight detector ids", () => {
     expect([...DETECTOR_IDS].sort()).toEqual([
       "buildSystem",
       "ciProvider",
+      "containerization",
       "framework",
       "language",
       "monorepo",
       "packageManager",
+      "runtime",
     ]);
   });
 
@@ -35,10 +37,12 @@ describe("detector catalog", () => {
     expect(registeredIds).toEqual([
       "buildSystem",
       "ciProvider",
+      "containerization",
       "framework",
       "language",
       "monorepo",
       "packageManager",
+      "runtime",
     ]);
   });
 });

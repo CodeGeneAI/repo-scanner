@@ -52,6 +52,8 @@ repo-scanner --path . --detectors monorepo --json
 - **packageManager** — detects npm, pnpm, Yarn, Bun, pip, Poetry, uv, Pipenv, Cargo, Go modules, Bundler, Composer, NuGet, pub, Maven, Gradle, sbt, Mix, Swift Package Manager, Stack, Cabal from lockfiles and manifests.
 - **ciProvider** — CI/CD provider detection from config files: GitHub Actions, GitLab CI, CircleCI, Travis CI, Buildkite, Jenkins, Azure Pipelines, Bitbucket Pipelines, AppVeyor, Drone CI, Google Cloud Build, TeamCity, Semaphore, Codemagic, Bitrise.
 - **buildSystem** — language-agnostic build orchestration tools (Make, Just, Task, Bazel, Earthly, Mage, Dagger, etc.).
+- **containerization** — container runtime and orchestration: Docker (Dockerfile), Podman (Containerfile), Docker Compose (docker-compose.yml / compose.yml), Dev Container (.devcontainer/).
+- **runtime** — runtime versions from `.nvmrc` / `.python-version` / `.tool-versions` / `mise.toml` / `go.mod` / `Gemfile` / `package.json#engines` / `pyproject.toml` / `Cargo.toml`.
 
 ## Component classification
 
@@ -95,6 +97,8 @@ result.inventory.frameworks;          // string[]
 result.inventory.packageManagers;     // string[]
 result.inventory.ciProviders;         // string[] — e.g. ["GitHub Actions", "CircleCI"]
 result.inventory.buildSystems;        // string[]
+result.inventory.containerization;     // string[]
+result.inventory.runtimes;            // RuntimeInfo[] — { language, version, source }[]
 result.architecture.monorepo;         // boolean
 result.architecture.toolName;         // string | undefined — workspace tool, e.g. "Turborepo"
 result.architecture.components;       // Component[]
@@ -134,6 +138,8 @@ Field ownership:
 | `packageManager` | `inventory.packageManagers` |
 | `ciProvider` | `inventory.ciProviders` |
 | `buildSystem` | `inventory.buildSystems` |
+| `containerization` | `inventory.containerization` |
+| `runtime` | `inventory.runtimes` |
 
 ### Exported types
 
@@ -149,6 +155,7 @@ import type {
   PartialInventory,
   PartialRepoScanResult,
   RepoScanResult,
+  RuntimeInfo,
   ScanRepoOptions,
 } from "@codegeneai/repo-scanner";
 ```
@@ -160,7 +167,7 @@ import type {
 | `-p`, `--path <dir>` | Directory to scan | cwd |
 | `--json` | Output JSON instead of the default table. JSON output is colorized when stdout is a TTY. Pipe or redirect to disable, or set `NO_COLOR=1` / pass `--no-color`. | |
 | `--no-color` | Disable ANSI colors in JSON output (also honors `NO_COLOR` env var) | colors when stdout is a TTY |
-| `--detectors <list>` | Comma-separated detector IDs (`framework`, `language`, `monorepo`, `packageManager`, `ciProvider`, `buildSystem`). When provided, output only includes fields owned by the selected detectors. | all six |
+| `--detectors <list>` | Comma-separated detector IDs (`framework`, `language`, `monorepo`, `packageManager`, `ciProvider`, `buildSystem`, `containerization`, `runtime`). When provided, output only includes fields owned by the selected detectors. | all eight |
 | `--version`, `-v` | Show version | |
 | `--help`, `-h` | Show help | |
 

@@ -109,6 +109,7 @@ const DETECTOR_OWNED_TOP_LEVEL_KEYS: Record<string, readonly string[]> = {
   packageManager: ["inventory"],
   ciProvider: ["inventory"],
   buildSystem: ["inventory"],
+  containerization: ["inventory"],
 };
 
 export const assertDetectorSelectorScoping = (
