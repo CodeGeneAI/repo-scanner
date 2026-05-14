@@ -260,6 +260,59 @@ test("Build systems section appears after Package managers and before CI provide
   expect(ciIdx).toBeLessThan(moIdx);
 });
 
+test("renders Containerization section with detected entries", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: [],
+        buildSystems: [],
+        containerization: ["Docker", "Docker Compose"],
+      },
+    }),
+  );
+  expect(out).toMatch(/Containerization/);
+  expect(out).toMatch(/Docker.*Docker Compose|Docker Compose.*Docker/);
+});
+
+test("Containerization section shows (none) when empty", () => {
+  const out = capture(baseResult());
+  expect(out).toMatch(/Containerization[\s\S]*\(none\)/);
+});
+
+test("Containerization section absent when inventory.containerization is undefined (sliced)", () => {
+  const out = capturePartial({
+    scannedAt: "2026-05-13T00:00:00Z",
+    rootPath: "/x",
+    inventory: { frameworks: ["Next.js"] }, // containerization explicitly undefined
+  });
+  expect(out).not.toMatch(/Containerization/);
+});
+
+test("Containerization section appears after CI providers and before Monorepo", () => {
+  const out = capture(
+    baseResult({
+      inventory: {
+        languages: [],
+        frameworks: [],
+        packageManagers: [],
+        ciProviders: ["GitHub Actions"],
+        buildSystems: [],
+        containerization: ["Docker"],
+      },
+    }),
+  );
+  expect(out).toMatch(/Containerization/);
+  // Order: CI providers → Containerization → Monorepo
+  const ciIdx = out.indexOf("CI providers");
+  const cnIdx = out.indexOf("Containerization");
+  const moIdx = out.indexOf("Monorepo");
+  expect(ciIdx).toBeLessThan(cnIdx);
+  expect(cnIdx).toBeLessThan(moIdx);
+});
+
 import type { Component } from "../types";
 
 describe("renderTable component scoped frameworks column", () => {

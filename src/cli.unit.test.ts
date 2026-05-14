@@ -224,4 +224,25 @@ describe("parseArgs", () => {
     const result = parseArgs(["bun", "src/bin.ts"]);
     expect(result.buildSystemDetector).toBe(false);
   });
+
+  it("parses --detectors containerization", () => {
+    const result = parseArgs([
+      "bun",
+      "src/bin.ts",
+      "--detectors",
+      "containerization",
+    ]);
+    expect(result.containerizationDetector).toBe(true);
+    expect(result.frameworkDetector).toBe(false);
+    expect(result.languageDetector).toBe(false);
+    expect(result.monorepoDetector).toBe(false);
+    expect(result.packageManagerDetector).toBe(false);
+    expect(result.ciProviderDetector).toBe(false);
+    expect(result.buildSystemDetector).toBe(false);
+  });
+
+  it("defaults containerizationDetector to false", () => {
+    const result = parseArgs(["bun", "src/bin.ts"]);
+    expect(result.containerizationDetector).toBe(false);
+  });
 });
