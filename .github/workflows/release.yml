@@ -50,14 +50,21 @@ jobs:
       # Enable auto-merge on the release PR so it lands as soon as CI passes
       # and any required reviews are satisfied. Idempotent — calling on an
       # already-auto-merging PR is a no-op.
+      #
+      # SECURITY: the release-please `pr` output is the full PullRequest JSON,
+      # including release notes built from commit messages. NEVER interpolate
+      # it directly into a shell script via ${{ ... }} — pass it through an
+      # env var and feed it to jq on stdin so shell quoting is irrelevant.
       - name: Enable auto-merge on release PR
         if: ${{ steps.release-please.outputs.pr }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_PLEASE_PR: ${{ steps.release-please.outputs.pr }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          pr_number=$(echo '${{ steps.release-please.outputs.pr }}' | jq -r '.number')
+          pr_number=$(jq -r '.number' <<< "$RELEASE_PLEASE_PR")
           if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
-            gh pr merge "$pr_number" --auto --squash --repo "${{ github.repository }}"
+            gh pr merge "$pr_number" --auto --squash --repo "$GH_REPO"
           fi
 
       # All subsequent steps only run when release-please has actually created
