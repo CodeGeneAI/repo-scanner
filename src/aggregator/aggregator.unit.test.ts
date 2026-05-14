@@ -711,4 +711,52 @@ describe("aggregate: per-component framework attribution", () => {
     expect(result.inventory.frameworks).toContain("Detected Somewhere");
     expect(web?.scoped?.frameworks).toEqual([]);
   });
+
+  it("normalizes backslash file paths for component matching (Windows)", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "framework",
+        findings: [
+          {
+            value: "Next.js",
+            confidence: 1,
+            evidence: [],
+            filePath: "apps\\web\\package.json",
+          },
+        ],
+      },
+      {
+        detectorId: "language",
+        findings: [],
+        metadata: {
+          perLanguage: [
+            { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+          ],
+          totalFiles: 1,
+          totalLines: 10,
+          perFile: [
+            {
+              relativePath: "apps\\web\\index.ts",
+              language: "TypeScript",
+              lines: 10,
+            },
+          ],
+        },
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [{ path: "apps/web", name: "web" }],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    expect(web?.scoped?.frameworks).toEqual(["Next.js"]);
+    expect(web?.scoped?.languageStats?.totalFiles).toBe(1);
+  });
 });

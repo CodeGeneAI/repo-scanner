@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import os from "os";
 import path from "path";
 import { FileIndex } from "../utils/file-index";
@@ -177,6 +177,30 @@ describe("framework detector", () => {
       (f) => f.value === "React",
     );
     expect(reactFinding?.filePath).toBe("package.json");
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("emits one config-file finding per matching primary file (multi-component)", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "rs-cfg-"));
+    await mkdir(path.join(dir, "apps/web"), { recursive: true });
+    await mkdir(path.join(dir, "apps/admin"), { recursive: true });
+    await writeFile(
+      path.join(dir, "apps/web/next.config.js"),
+      "module.exports = {};\n",
+    );
+    await writeFile(
+      path.join(dir, "apps/admin/next.config.js"),
+      "module.exports = {};\n",
+    );
+    const result = await runFrameworkDetector(dir);
+    const nextFindings = result.result.findings.filter(
+      (f) => f.value === "Next.js",
+    );
+    expect(nextFindings).toHaveLength(2);
+    expect(nextFindings.map((f) => f.filePath).sort()).toEqual([
+      "apps/admin/next.config.js",
+      "apps/web/next.config.js",
+    ]);
     await rm(dir, { recursive: true, force: true });
   });
 });

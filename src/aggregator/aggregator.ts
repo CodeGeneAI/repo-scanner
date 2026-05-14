@@ -120,9 +120,15 @@ export async function aggregate(
     (a, b) => b.length - a.length, // longest-prefix wins
   );
 
+  // Normalize separators so component matching works on Windows. The file
+  // index can produce backslash-separated relativePaths via path.relative,
+  // while component paths are always slash-delimited.
+  const toForwardSlash = (p: string): string => p.replace(/\\/g, "/");
+
   const findComponentForFile = (filePath: string): string | undefined => {
+    const normalized = toForwardSlash(filePath);
     for (const compPath of componentPaths) {
-      if (filePath === compPath || filePath.startsWith(`${compPath}/`)) {
+      if (normalized === compPath || normalized.startsWith(`${compPath}/`)) {
         return compPath;
       }
     }

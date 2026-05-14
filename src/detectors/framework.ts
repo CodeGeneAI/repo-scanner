@@ -181,15 +181,18 @@ registerDetector({
   async detect(_rootPath: string, index: FileIndex): Promise<DetectorResult> {
     const { findings, addFinding } = createFindingAdder();
 
-    // 1. Check config files (highest confidence), skip secondary paths
+    // 1. Check config files (highest confidence), skip secondary paths.
+    // Iterate every matching primary file so each component containing a
+    // config file gets its own filePath-attributed finding — important for
+    // monorepos with sibling config files (e.g. apps/web/next.config.js
+    // and apps/admin/next.config.js).
     for (const [fileName, framework] of CONFIG_FRAMEWORK_MAP) {
-      const files = index.getByNamePrimary(fileName);
-      if (files.length > 0) {
+      for (const file of index.getByNamePrimary(fileName)) {
         addFinding(
           framework,
           1.0,
-          `config file: ${fileName}`,
-          files[0].relativePath,
+          `config file: ${file.relativePath}`,
+          file.relativePath,
         );
       }
     }
