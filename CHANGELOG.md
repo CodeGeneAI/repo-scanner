@@ -1,5 +1,12 @@
 # @codegeneai/repo-scanner
 
+## [2.1.0](https://github.com/CodeGeneAI/repo-scanner/compare/v2.0.0...v2.1.0) (2026-05-14)
+
+
+### Features
+
+* per-component frameworks + languageStats (Component.scoped) ([#16](https://github.com/CodeGeneAI/repo-scanner/issues/16)) ([6b7f961](https://github.com/CodeGeneAI/repo-scanner/commit/6b7f961649939121833670409624768346336a3d))
+
 ## [2.0.0](https://github.com/CodeGeneAI/repo-scanner/compare/v1.0.1...v2.0.0) (2026-05-14)
 
 
