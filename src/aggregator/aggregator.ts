@@ -7,6 +7,7 @@ import type {
   PartialInventory,
   PartialRepoScanResult,
   RepoScanResult,
+  RuntimeInfo,
 } from "../types";
 import type { FileIndex } from "../utils/file-index";
 import { classifyComponent } from "./component-classifier";
@@ -261,6 +262,7 @@ export async function aggregate(
         ciProviders: sorted(ciProviders),
         buildSystems: sorted(buildSystems),
         containerization: sorted(containerization),
+        runtimes: [],
       },
       architecture: {
         monorepo: isMonorepo,
@@ -282,6 +284,7 @@ export async function aggregate(
     partialInventory.buildSystems = sorted(buildSystems);
   if (include("containerization"))
     partialInventory.containerization = sorted(containerization);
+  if (include("runtime")) (partialInventory as Record<string, unknown>).runtimes = [];
   const hasInventory = Object.keys(partialInventory).length > 0;
 
   const partial: PartialRepoScanResult = {

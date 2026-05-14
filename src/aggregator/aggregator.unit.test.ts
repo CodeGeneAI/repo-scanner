@@ -315,6 +315,7 @@ describe("aggregate: schema slicing under detector filter", () => {
       ciProviders: [],
       buildSystems: [],
       containerization: [],
+      runtimes: [],
     });
   });
 

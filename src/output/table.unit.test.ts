@@ -25,6 +25,7 @@ const baseResult = (over: Partial<RepoScanResult> = {}): RepoScanResult => ({
     ciProviders: [],
     buildSystems: [],
     containerization: [],
+    runtimes: [],
   },
   architecture: { monorepo: false, components: [] },
   languageStats: { totalFiles: 0, totalLines: 0, perLanguage: [] },
@@ -64,6 +65,7 @@ test("renders Package managers section with detected entries", () => {
         ciProviders: [],
         buildSystems: [],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -178,6 +180,7 @@ test("renders CI providers section between Package managers and Monorepo", () =>
         ciProviders: ["GitHub Actions", "CircleCI"],
         buildSystems: [],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -215,6 +218,7 @@ test("renders Build systems section with detected entries", () => {
         ciProviders: [],
         buildSystems: ["Bazel", "Make"],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -246,6 +250,7 @@ test("Build systems section appears after Package managers and before CI provide
         ciProviders: ["GitHub Actions"],
         buildSystems: ["Make"],
         containerization: [],
+        runtimes: [],
       },
     }),
   );
@@ -270,6 +275,7 @@ test("renders Containerization section with detected entries", () => {
         ciProviders: [],
         buildSystems: [],
         containerization: ["Docker", "Docker Compose"],
+        runtimes: [],
       },
     }),
   );
@@ -301,6 +307,7 @@ test("Containerization section appears after CI providers and before Monorepo", 
         ciProviders: ["GitHub Actions"],
         buildSystems: [],
         containerization: ["Docker"],
+        runtimes: [],
       },
     }),
   );
