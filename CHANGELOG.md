@@ -1,5 +1,12 @@
 # @codegeneai/repo-scanner
 
+## [2.2.0](https://github.com/CodeGeneAI/repo-scanner/compare/v2.1.0...v2.2.0) (2026-05-14)
+
+
+### Features
+
+* ciProvider detector (15 CI/CD providers) ([#18](https://github.com/CodeGeneAI/repo-scanner/issues/18)) ([7f67e0f](https://github.com/CodeGeneAI/repo-scanner/commit/7f67e0f32057c4409fdf974f487316c1de1db608))
+
 ## [2.1.0](https://github.com/CodeGeneAI/repo-scanner/compare/v2.0.0...v2.1.0) (2026-05-14)
 
 
