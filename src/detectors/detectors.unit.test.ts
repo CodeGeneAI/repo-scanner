@@ -15,26 +15,34 @@ function findDetector(id: string): Detector {
 }
 
 describe("detector catalog", () => {
-  it("exposes exactly five detector ids", () => {
+  it("exposes exactly eight detector ids", () => {
     expect([...DETECTOR_IDS].sort()).toEqual([
+      "buildSystem",
       "ciProvider",
+      "containerization",
       "framework",
       "language",
       "monorepo",
       "packageManager",
+      "runtime",
     ]);
   });
 
-  it("registers exactly five detectors via init", () => {
+  it("registers all catalog detectors via init", () => {
+    // Verify all detectors registered by init match the full catalog.
+    // This list grows when new detectors are added to catalog + init.ts.
     const registeredIds = getDetectors()
-      .map((detector) => detector.id)
+      .map((d) => d.id)
       .sort();
     expect(registeredIds).toEqual([
+      "buildSystem",
       "ciProvider",
+      "containerization",
       "framework",
       "language",
       "monorepo",
       "packageManager",
+      "runtime",
     ]);
   });
 });

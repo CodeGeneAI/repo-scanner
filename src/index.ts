@@ -12,5 +12,6 @@ export type {
   PartialInventory,
   PartialRepoScanResult,
   RepoScanResult,
+  RuntimeInfo,
   ScanRepoOptions,
 } from "./types";

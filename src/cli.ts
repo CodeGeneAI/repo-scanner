@@ -94,6 +94,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
   let monorepoDetector = false;
   let packageManagerDetector = false;
   let ciProviderDetector = false;
+  let buildSystemDetector = false;
+  let containerizationDetector = false;
+  let runtimeDetector = false;
   const enableDetector = (detectorId: DetectorId): void => {
     switch (detectorId) {
       case "framework":
@@ -110,6 +113,15 @@ export const parseArgs = (argv: string[]): CliOptions => {
         return;
       case "ciProvider":
         ciProviderDetector = true;
+        return;
+      case "buildSystem":
+        buildSystemDetector = true;
+        return;
+      case "containerization":
+        containerizationDetector = true;
+        return;
+      case "runtime":
+        runtimeDetector = true;
         return;
     }
   };
@@ -216,6 +228,9 @@ export const parseArgs = (argv: string[]): CliOptions => {
     monorepoDetector,
     packageManagerDetector,
     ciProviderDetector,
+    buildSystemDetector,
+    containerizationDetector,
+    runtimeDetector,
   };
 };
 

@@ -51,6 +51,7 @@ export const INCLUDE_DOT_DIRS = new Set([
   ".ebextensions",
   ".teamcity",
   ".semaphore",
+  ".devcontainer",
 ]);
 
 export interface WalkOptions {
