@@ -129,7 +129,7 @@ export async function aggregate(
     return undefined;
   };
 
-  // Group framework findings by component via longest-prefix match.
+  // --- Framework attribution ---
   const componentFrameworks = new Map<string, Set<string>>();
   for (const compPath of componentPaths) {
     componentFrameworks.set(compPath, new Set());
@@ -147,12 +147,81 @@ export async function aggregate(
     }
   }
 
+  // --- Language attribution ---
+  const languageDetectorResult = results.find(
+    (r) => r.detectorId === "language",
+  );
+  const perFile = (languageDetectorResult?.metadata?.perFile ?? []) as Array<{
+    relativePath: string;
+    language: string;
+    lines: number;
+  }>;
+
+  const componentLangStats = new Map<
+    string,
+    {
+      files: number;
+      lines: number;
+      perLang: Map<string, { files: number; lines: number }>;
+    }
+  >();
+  for (const compPath of componentPaths) {
+    componentLangStats.set(compPath, {
+      files: 0,
+      lines: 0,
+      perLang: new Map(),
+    });
+  }
+
+  for (const entry of perFile) {
+    const compPath = findComponentForFile(entry.relativePath);
+    if (!compPath) continue;
+    const bucket = componentLangStats.get(compPath)!;
+    bucket.files += 1;
+    bucket.lines += entry.lines;
+    const existing = bucket.perLang.get(entry.language) ?? {
+      files: 0,
+      lines: 0,
+    };
+    existing.files += 1;
+    existing.lines += entry.lines;
+    bucket.perLang.set(entry.language, existing);
+  }
+
+  const languageRan = results.some((r) => r.detectorId === "language");
+
   // Re-materialize each component with scoped attached.
   for (const [compPath, comp] of componentMap) {
-    const fwSet = componentFrameworks.get(compPath);
-    const fw = fwSet ? [...fwSet].sort() : [];
-    const scoped: ComponentScope = frameworkRan ? { frameworks: fw } : {};
-    if (Object.keys(scoped).length > 0) {
+    const scopedBuilder: {
+      frameworks?: readonly string[];
+      languageStats?: LanguageStats;
+    } = {};
+
+    if (frameworkRan) {
+      const fwSet = componentFrameworks.get(compPath);
+      scopedBuilder.frameworks = fwSet ? [...fwSet].sort() : [];
+    }
+
+    if (languageRan) {
+      const bucket = componentLangStats.get(compPath);
+      const totalFiles = bucket?.files ?? 0;
+      const totalLines = bucket?.lines ?? 0;
+      const perLanguage =
+        totalFiles > 0
+          ? [...(bucket?.perLang.entries() ?? [])]
+              .map(([language, { files, lines }]) => ({
+                language,
+                files,
+                lines,
+                percentage: Math.round((files / totalFiles) * 1000) / 10,
+              }))
+              .sort((a, b) => b.percentage - a.percentage)
+          : [];
+      scopedBuilder.languageStats = { totalFiles, totalLines, perLanguage };
+    }
+
+    if (Object.keys(scopedBuilder).length > 0) {
+      const scoped: ComponentScope = scopedBuilder;
       componentMap.set(compPath, { ...comp, scoped });
     }
   }

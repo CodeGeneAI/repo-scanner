@@ -461,6 +461,105 @@ describe("aggregate: schema slicing under detector filter", () => {
   });
 });
 
+describe("aggregate: per-component languageStats", () => {
+  const rootPath = "/tmp/test-repo";
+
+  it("groups per-file language data into each component's scoped.languageStats", async () => {
+    const perFile = [
+      { relativePath: "apps/web/index.ts", language: "TypeScript", lines: 100 },
+      { relativePath: "apps/web/util.ts", language: "TypeScript", lines: 50 },
+      {
+        relativePath: "packages/ui/index.tsx",
+        language: "TypeScript",
+        lines: 30,
+      },
+      { relativePath: "root.ts", language: "TypeScript", lines: 10 },
+    ];
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [],
+        metadata: {
+          perLanguage: [
+            { language: "TypeScript", files: 4, lines: 190, percentage: 100 },
+          ],
+          totalFiles: 4,
+          totalLines: 190,
+          perFile,
+        },
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [
+          { path: "apps/web", name: "web" },
+          { path: "packages/ui", name: "ui" },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const web = result.architecture.components.find(
+      (c) => c.path === "apps/web",
+    );
+    const ui = result.architecture.components.find(
+      (c) => c.path === "packages/ui",
+    );
+    expect(web?.scoped?.languageStats?.totalFiles).toBe(2);
+    expect(web?.scoped?.languageStats?.totalLines).toBe(150);
+    expect(web?.scoped?.languageStats?.perLanguage).toEqual([
+      { language: "TypeScript", files: 2, lines: 150, percentage: 100 },
+    ]);
+    expect(ui?.scoped?.languageStats?.totalFiles).toBe(1);
+    expect(ui?.scoped?.languageStats?.totalLines).toBe(30);
+  });
+
+  it("component with no in-scope files has zero-count stats, not undefined", async () => {
+    const results: DetectorResult[] = [
+      {
+        detectorId: "language",
+        findings: [],
+        metadata: {
+          perLanguage: [
+            { language: "TypeScript", files: 1, lines: 10, percentage: 100 },
+          ],
+          totalFiles: 1,
+          totalLines: 10,
+          perFile: [
+            {
+              relativePath: "apps/web/index.ts",
+              language: "TypeScript",
+              lines: 10,
+            },
+          ],
+        },
+      },
+      {
+        detectorId: "monorepo",
+        findings: [
+          { value: "Turborepo", confidence: 1, evidence: [] },
+          { value: "monorepo", confidence: 1, evidence: [] },
+        ],
+        componentHints: [
+          { path: "apps/web", name: "web" },
+          { path: "tooling/empty", name: "empty" },
+        ],
+      },
+    ];
+    const result = await aggregate(rootPath, results);
+    const empty = result.architecture.components.find(
+      (c) => c.path === "tooling/empty",
+    );
+    expect(empty?.scoped?.languageStats).toEqual({
+      totalFiles: 0,
+      totalLines: 0,
+      perLanguage: [],
+    });
+  });
+});
+
 describe("aggregate: per-component framework attribution", () => {
   const rootPath = "/tmp/test-repo";
 
