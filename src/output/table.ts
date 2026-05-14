@@ -52,6 +52,11 @@ export const renderTable = (
     w(`  ${list(result.inventory.packageManagers)}\n`);
   }
 
+  if (result.inventory?.ciProviders !== undefined) {
+    w(section("CI providers"));
+    w(`  ${list(result.inventory.ciProviders)}\n`);
+  }
+
   if (result.architecture) {
     w(section("Monorepo"));
     const flag = result.architecture.monorepo ? "yes" : "no";

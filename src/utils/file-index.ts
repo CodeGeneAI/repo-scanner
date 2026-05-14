@@ -94,7 +94,9 @@ export class FileIndex {
     })) {
       const name = path.basename(filePath);
       const ext = path.extname(name).toLowerCase();
-      const relativePath = path.relative(rootPath, filePath);
+      const relativePath = path
+        .relative(rootPath, filePath)
+        .replace(/\\/g, "/");
       index.addEntry({ path: filePath, name, ext, relativePath });
     }
     return index;
@@ -185,7 +187,7 @@ const collectScanignoreRules = async (
 
   while (stack.length > 0) {
     const dirPath = stack.pop()!;
-    const dirRel = path.relative(rootPath, dirPath);
+    const dirRel = path.relative(rootPath, dirPath).replace(/\\/g, "/");
 
     const localRules = await readScanignore(dirPath);
     for (const rule of localRules) {

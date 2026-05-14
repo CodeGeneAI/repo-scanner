@@ -45,6 +45,7 @@ export async function aggregate(
 ): Promise<RepoScanResult | PartialRepoScanResult> {
   const frameworks = new Set<string>();
   const packageManagers = new Set<string>();
+  const ciProviders = new Set<string>();
   const languageNames = new Set<string>();
 
   const componentMap = new Map<string, Component>();
@@ -55,6 +56,7 @@ export async function aggregate(
   const categoryMap: Record<string, Set<string>> = {
     framework: frameworks,
     packageManager: packageManagers,
+    ciProvider: ciProviders,
     // language deliberately omitted — sourced from languageStats below
   };
 
@@ -252,6 +254,7 @@ export async function aggregate(
         languages: sorted(languageNames),
         frameworks: sorted(frameworks),
         packageManagers: sorted(packageManagers),
+        ciProviders: sorted(ciProviders),
       },
       architecture: {
         monorepo: isMonorepo,
@@ -268,6 +271,7 @@ export async function aggregate(
   if (include("framework")) partialInventory.frameworks = sorted(frameworks);
   if (include("packageManager"))
     partialInventory.packageManagers = sorted(packageManagers);
+  if (include("ciProvider")) partialInventory.ciProviders = sorted(ciProviders);
   const hasInventory = Object.keys(partialInventory).length > 0;
 
   const partial: PartialRepoScanResult = {

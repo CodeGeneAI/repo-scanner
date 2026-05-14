@@ -6,6 +6,10 @@ export const DETECTOR_CATALOG = [
     id: "packageManager",
     description: "Package manager detection from lockfiles and manifests",
   },
+  {
+    id: "ciProvider",
+    description: "CI/CD provider detection from config files",
+  },
 ] as const;
 
 export type DetectorCatalogEntry = (typeof DETECTOR_CATALOG)[number];

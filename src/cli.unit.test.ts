@@ -185,4 +185,23 @@ describe("parseArgs", () => {
       /unknown option "--topology"/,
     );
   });
+
+  it("parses --detectors ciProvider", () => {
+    const result = parseArgs([
+      "bun",
+      "src/bin.ts",
+      "--detectors",
+      "ciProvider",
+    ]);
+    expect(result.ciProviderDetector).toBe(true);
+    expect(result.frameworkDetector).toBe(false);
+    expect(result.languageDetector).toBe(false);
+    expect(result.monorepoDetector).toBe(false);
+    expect(result.packageManagerDetector).toBe(false);
+  });
+
+  it("defaults ciProviderDetector to false", () => {
+    const result = parseArgs(["bun", "src/bin.ts"]);
+    expect(result.ciProviderDetector).toBe(false);
+  });
 });
